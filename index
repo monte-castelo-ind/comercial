@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Comercial · Metas Mensais</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg-2: #14141f;
+    --bg-3: #1d1d2b;
+    --bg-card: #1a1a26;
+    --ink: #e8e8ee;
+    --ink-mute: #8a8a9b;
+    --line: rgba(255,255,255,0.08);
+    --line-2: rgba(255,255,255,0.14);
+    --accent: #6366f1;
+    --accent-soft: #4f46e5;
+    --verde: #10b981;
+    --verde-soft: rgba(16,185,129,0.15);
+    --amarelo: #f59e0b;
+    --amarelo-soft: rgba(245,158,11,0.15);
+    --vermelho: #ef4444;
+    --vermelho-soft: rgba(239,68,68,0.15);
+    --critico: #b91c1c;
+    --azul: #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; padding-bottom: 80px; }
+
+  /* TOPBAR */
+  .topbar {
+    background: var(--bg-2);
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .topbar-title { font-size: 18px; font-weight: 700; }
+  .topbar-sub { font-size: 12px; color: var(--ink-mute); margin-top: 2px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .topbar-month {
+    background: var(--bg-3);
+    border: 1px solid var(--line-2);
+    color: var(--ink);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* CONTENT */
+  .content { padding: 16px; max-width: 1200px; margin: 0 auto; }
+
+  /* DASHBOARD CARDS */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .dash-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+  }
+  .dash-num { font-size: 32px; font-weight: 800; line-height: 1; }
+  .dash-lbl {
+    font-size: 11px;
+    color: var(--ink-mute);
+    margin-top: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .dash-card.verde .dash-num { color: var(--verde); }
+  .dash-card.amarelo .dash-num { color: var(--amarelo); }
+  .dash-card.vermelho .dash-num { color: var(--vermelho); }
+  .dash-card.azul .dash-num { color: var(--azul); }
+
+  /* SUMMARY BAR */
+  .summary {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .summary-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .summary-label { font-size: 12px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+  .summary-meta { font-size: 14px; color: var(--ink-mute); }
+  .summary-real { font-size: 24px; font-weight: 800; }
+  .summary-pct { font-size: 13px; color: var(--ink-mute); margin-left: 8px; font-weight: 500; }
+  .progress-bar { width: 100%; height: 10px; background: var(--bg-3); border-radius: 5px; overflow: hidden; margin-top: 12px; }
+  .progress-fill { height: 100%; transition: width 0.5s ease; border-radius: 5px; }
+
+  /* CHART */
+  .chart-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .chart-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+  .chart-svg { width: 100%; height: auto; }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .tab {
+    background: var(--bg-3);
+    border: 1px solid var(--line-2);
+    color: var(--ink-mute);
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .tab .count { opacity: 0.7; margin-left: 4px; font-size: 10px; }
+
+  /* SEARCH */
+  .search-box {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 11px 14px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .search-box input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+  }
+
+  /* CLIENT ROW */
+  .client-row {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: center;
+  }
+  .client-row:hover { border-color: var(--line-2); }
+  .client-row.verde { border-left: 4px solid var(--verde); }
+  .client-row.amarelo { border-left: 4px solid var(--amarelo); }
+  .client-row.vermelho { border-left: 4px solid var(--vermelho); }
+  .client-row.critico { border-left: 4px solid var(--critico); background: rgba(185, 28, 28, 0.05); }
+
+  .client-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .client-meta-line { font-size: 12px; color: var(--ink-mute); }
+  .client-status {
+    text-align: right;
+    min-width: 110px;
+  }
+  .client-diff { font-size: 16px; font-weight: 800; }
+  .client-pct { font-size: 11px; color: var(--ink-mute); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .client-row.verde .client-diff { color: var(--verde); }
+  .client-row.amarelo .client-diff { color: var(--amarelo); }
+  .client-row.vermelho .client-diff { color: var(--vermelho); }
+  .client-row.critico .client-diff { color: var(--critico); }
+
+  .progress-mini {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .progress-mini-fill { height: 100%; transition: width 0.3s; }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg-2);
+    border-top: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    z-index: 40;
+  }
+  .nav-btn {
+    background: none;
+    border: none;
+    color: var(--ink-mute);
+    padding: 12px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn .nav-icon { font-size: 22px; display: block; margin-bottom: 2px; }
+
+  /* SCREENS */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* MODAL */
+  .modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal.open { display: flex; }
+  .modal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line-2);
+    border-radius: 18px;
+    padding: 20px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-title {
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-close {
+    background: var(--bg-3);
+    border: none;
+    color: var(--ink-mute);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  /* INPUTS */
+  .field { margin-bottom: 12px; }
+  .field-label { font-size: 11px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; font-weight: 600; }
+  .field-input {
+    width: 100%;
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 11px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+  }
+  .field-input:focus { border-color: var(--accent); }
+
+  /* BUTTONS */
+  .btn {
+    width: 100%;
+    padding: 13px;
+    border-radius: 11px;
+    border: none;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+  }
+  .btn:active { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary { background: var(--bg-3); color: var(--ink); border: 1px solid var(--line-2); }
+  .btn-danger { background: rgba(239,68,68,0.15); color: var(--vermelho); border: 1px solid rgba(239,68,68,0.3); }
+
+  /* IMPORT AREA */
+  .import-area {
+    background: var(--bg-card);
+    border: 2px dashed var(--line-2);
+    border-radius: 14px;
+    padding: 28px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .import-area:hover { border-color: var(--accent); }
+  .import-icon { font-size: 36px; margin-bottom: 10px; }
+  .import-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .import-desc { font-size: 12px; color: var(--ink-mute); }
+
+  /* DETAIL CHART (sparkline mensal) */
+  .detail-section { margin-bottom: 16px; }
+  .detail-section-title { font-size: 12px; color: var(--ink-mute); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; font-weight: 600; }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .stat-row:last-child { border: none; }
+  .stat-label { color: var(--ink-mute); }
+  .stat-value { font-weight: 700; }
+
+  /* EMPTY */
+  .empty {
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--ink-mute);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .empty-icon { font-size: 44px; margin-bottom: 12px; opacity: 0.6; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-3);
+    border: 1px solid var(--line-2);
+    color: var(--ink);
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    z-index: 200;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: none;
+  }
+  .toast.show { display: block; animation: toastIn 0.3s; }
+  @keyframes toastIn { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div>
+    <div class="topbar-title">📊 Comercial</div>
+    <div class="topbar-sub" id="topbar-sub">Acompanhamento de metas</div>
+  </div>
+  <input type="month" class="topbar-month" id="month-picker" />
+</div>
+
+<!-- ===== TELA: DASHBOARD ===== -->
+<div class="screen active" id="s-dashboard">
+  <div class="content">
+    <!-- 4 cards de status -->
+    <div class="dash-grid">
+      <div class="dash-card verde">
+        <div class="dash-num" id="d-verde">0</div>
+        <div class="dash-lbl">🟢 No alvo</div>
+      </div>
+      <div class="dash-card amarelo">
+        <div class="dash-num" id="d-amarelo">0</div>
+        <div class="dash-lbl">🟡 Atenção</div>
+      </div>
+      <div class="dash-card vermelho">
+        <div class="dash-num" id="d-vermelho">0</div>
+        <div class="dash-lbl">🔴 Negativo</div>
+      </div>
+      <div class="dash-card azul">
+        <div class="dash-num" id="d-total">0</div>
+        <div class="dash-lbl">📋 Total</div>
+      </div>
+    </div>
+
+    <!-- Resumo: Meta vs Realizado -->
+    <div class="summary">
+      <div class="summary-row">
+        <span class="summary-label">Resumo do mês</span>
+        <span class="summary-meta" id="summary-meta">Meta: R$ 0</span>
+      </div>
+      <div>
+        <span class="summary-real" id="summary-real">R$ 0</span>
+        <span class="summary-pct" id="summary-pct">0% da meta</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="summary-progress" style="width:0%; background: var(--accent);"></div>
+      </div>
+    </div>
+
+    <!-- Gráfico de barras horizontais (top 5 piores e top 5 melhores) -->
+    <div class="chart-card">
+      <div class="chart-title">📉 Top 5 — mais distantes da meta</div>
+      <svg class="chart-svg" id="chart-piores" viewBox="0 0 600 200" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">📈 Top 5 — superando a meta</div>
+      <svg class="chart-svg" id="chart-melhores" viewBox="0 0 600 200" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <!-- Distribuição visual -->
+    <div class="chart-card">
+      <div class="chart-title">🎯 Distribuição por status</div>
+      <svg class="chart-svg" id="chart-pizza" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TELA: CLIENTES ===== -->
+<div class="screen" id="s-clientes">
+  <div class="content">
+    <div class="search-box">
+      <span style="color: var(--ink-mute);">🔍</span>
+      <input type="text" id="search-clientes" placeholder="Buscar cliente..." oninput="renderClientes()"/>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" id="tab-todos" onclick="setFiltro('todos')">Todos<span class="count" id="count-todos">0</span></button>
+      <button class="tab" id="tab-vermelho" onclick="setFiltro('vermelho')">🔴 Negativos<span class="count" id="count-vermelho">0</span></button>
+      <button class="tab" id="tab-amarelo" onclick="setFiltro('amarelo')">🟡 Atenção<span class="count" id="count-amarelo">0</span></button>
+      <button class="tab" id="tab-verde" onclick="setFiltro('verde')">🟢 No alvo<span class="count" id="count-verde">0</span></button>
+    </div>
+
+    <div id="clientes-list"></div>
+  </div>
+</div>
+
+<!-- ===== TELA: IMPORTAR ===== -->
+<div class="screen" id="s-importar">
+  <div class="content">
+    <h2 style="font-size: 20px; margin-bottom: 6px;">📥 Importar Faturamento</h2>
+    <p style="color: var(--ink-mute); font-size: 13px; margin-bottom: 18px;">Importe o faturamento do mês via planilha Excel/CSV.</p>
+
+    <!-- Botão de import -->
+    <div class="import-area" onclick="document.getElementById('file-input').click()">
+      <div class="import-icon">📊</div>
+      <div class="import-title">Clique pra escolher um arquivo Excel ou CSV</div>
+      <div class="import-desc">O arquivo precisa ter colunas: Cliente | Faturamento</div>
+    </div>
+    <input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFileImport(event)" />
+
+    <div style="margin-top: 16px;">
+      <button class="btn btn-secondary" onclick="downloadModelo()">📄 Baixar modelo da planilha</button>
+    </div>
+
+    <!-- Resumo da importação -->
+    <div id="import-resumo" style="margin-top: 20px; display: none;"></div>
+
+    <hr style="border: none; border-top: 1px solid var(--line); margin: 28px 0;" />
+
+    <h3 style="font-size: 16px; margin-bottom: 8px;">✏️ Lançar manualmente</h3>
+    <p style="color: var(--ink-mute); font-size: 12px; margin-bottom: 14px;">Registre o faturamento de 1 cliente sem precisar de planilha.</p>
+    <button class="btn btn-primary" onclick="abrirModalLancarFat()">+ Lançar faturamento</button>
+  </div>
+</div>
+
+<!-- ===== TELA: GERENCIAR CLIENTES ===== -->
+<div class="screen" id="s-gerenciar">
+  <div class="content">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <div>
+        <h2 style="font-size: 20px;">⚙️ Clientes Cadastrados</h2>
+        <p style="color: var(--ink-mute); font-size: 12px; margin-top: 2px;" id="gerenciar-sub">0 clientes</p>
+      </div>
+      <button class="btn btn-primary" style="width: auto; padding: 10px 16px;" onclick="abrirModalNovoCliente()">+ Novo</button>
+    </div>
+
+    <div class="search-box">
+      <span style="color: var(--ink-mute);">🔍</span>
+      <input type="text" id="search-gerenciar" placeholder="Buscar cliente..." oninput="renderGerenciar()"/>
+    </div>
+
+    <div id="gerenciar-list"></div>
+  </div>
+</div>
+
+<!-- ===== BOTTOM NAV ===== -->
+<div class="bottom-nav">
+  <button class="nav-btn active" onclick="goTo('s-dashboard')" id="nav-dashboard">
+    <span class="nav-icon">📊</span>Dashboard
+  </button>
+  <button class="nav-btn" onclick="goTo('s-clientes')" id="nav-clientes">
+    <span class="nav-icon">👥</span>Clientes
+  </button>
+  <button class="nav-btn" onclick="goTo('s-importar')" id="nav-importar">
+    <span class="nav-icon">📥</span>Importar
+  </button>
+  <button class="nav-btn" onclick="goTo('s-gerenciar')" id="nav-gerenciar">
+    <span class="nav-icon">⚙️</span>Gerenciar
+  </button>
+</div>
+
+<!-- ===== MODAL: DETALHE CLIENTE ===== -->
+<div class="modal" id="modal-detalhe">
+  <div class="modal-card">
+    <div class="modal-title">
+      <span id="detalhe-titulo">Cliente</span>
+      <button class="modal-close" onclick="fecharModal('modal-detalhe')">✕</button>
+    </div>
+    <div id="detalhe-content"></div>
+  </div>
+</div>
+
+<!-- ===== MODAL: NOVO/EDITAR CLIENTE ===== -->
+<div class="modal" id="modal-cliente">
+  <div class="modal-card">
+    <div class="modal-title">
+      <span id="cliente-modal-titulo">Novo Cliente</span>
+      <button class="modal-close" onclick="fecharModal('modal-cliente')">✕</button>
+    </div>
+    <div class="field">
+      <div class="field-label">Nome do cliente *</div>
+      <input type="text" class="field-input" id="cli-nome" placeholder="Ex: Mercado Central"/>
+    </div>
+    <div class="field">
+      <div class="field-label">Meta mensal (R$) *</div>
+      <input type="number" class="field-input" id="cli-meta" placeholder="10000" step="0.01"/>
+    </div>
+    <div class="field">
+      <div class="field-label">Localização</div>
+      <input type="text" class="field-input" id="cli-local" placeholder="Ex: Porto Alegre"/>
+    </div>
+    <div class="field">
+      <div class="field-label">Vendedor responsável</div>
+      <input type="text" class="field-input" id="cli-vendedor" placeholder="Ex: Carlos"/>
+    </div>
+    <div class="field">
+      <div class="field-label">Observações</div>
+      <input type="text" class="field-input" id="cli-obs" placeholder="Opcional"/>
+    </div>
+    <button class="btn btn-primary" onclick="salvarCliente()">Salvar ✓</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: LANÇAR FATURAMENTO ===== -->
+<div class="modal" id="modal-faturamento">
+  <div class="modal-card">
+    <div class="modal-title">
+      <span>Lançar Faturamento</span>
+      <button class="modal-close" onclick="fecharModal('modal-faturamento')">✕</button>
+    </div>
+    <div class="field">
+      <div class="field-label">Cliente *</div>
+      <select class="field-input" id="fat-cliente"></select>
+    </div>
+    <div class="field">
+      <div class="field-label">Mês *</div>
+      <input type="month" class="field-input" id="fat-mes"/>
+    </div>
+    <div class="field">
+      <div class="field-label">Faturamento (R$) *</div>
+      <input type="number" class="field-input" id="fat-valor" placeholder="6500.00" step="0.01"/>
+    </div>
+    <button class="btn btn-primary" onclick="salvarFaturamento()">Salvar ✓</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: CONFIRMAÇÃO IMPORT ===== -->
+<div class="modal" id="modal-import-preview">
+  <div class="modal-card">
+    <div class="modal-title">
+      <span>Confirmar Importação</span>
+      <button class="modal-close" onclick="fecharModal('modal-import-preview')">✕</button>
+    </div>
+    <div id="import-preview-content"></div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px;">
+      <button class="btn btn-secondary" onclick="fecharModal('modal-import-preview')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarImport()">Confirmar ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, deleteDoc, setDoc, onSnapshot, doc, updateDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ==== FIREBASE CONFIG (USAR O SEU PRÓPRIO!) ====
+// Por enquanto, app funciona em modo LOCAL (localStorage)
+// Quando criar o projeto Firebase, substituir esta config:
+const FIREBASE_HABILITADO = false; // mude para true quando configurar
+const firebaseConfig = {
+  apiKey: "SUA-API-KEY",
+  authDomain: "seu-projeto.firebaseapp.com",
+  projectId: "seu-projeto",
+  storageBucket: "seu-projeto.firebasestorage.app",
+  messagingSenderId: "0",
+  appId: "0"
+};
+
+let db = null;
+if (FIREBASE_HABILITADO) {
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+}
+
+// ==== ESTADO ====
+let clientes = [];
+let faturamentos = []; // {clienteId, mes (YYYY-MM), valor, lancadoEm}
+let mesAtivo = ''; // YYYY-MM
+let filtroAtivo = 'todos';
+let _editClienteId = null;
+let _importPreview = [];
+
+// Faixas de status (% da meta)
+const FAIXA_VERDE = 100;   // ≥ 100% = verde
+const FAIXA_AMARELO = 80;  // 80-99% = amarelo
+// < 80% = vermelho
+// < 50% = crítico
+
+// ==== UTILS ====
+function fmtBR(v) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v || 0);
+}
+function fmtBRdec(v) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(v || 0);
+}
+function getMesAtual() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function nomeMes(mesYM) {
+  if (!mesYM) return '';
+  const [y, m] = mesYM.split('-');
+  const nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  return nomes[parseInt(m)-1] + '/' + y;
+}
+function statusCliente(real, meta) {
+  if (!meta || meta <= 0) return 'verde';
+  const pct = (real / meta) * 100;
+  if (pct < 50) return 'critico';
+  if (pct < FAIXA_AMARELO) return 'vermelho';
+  if (pct < FAIXA_VERDE) return 'amarelo';
+  return 'verde';
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ==== STORAGE LOCAL ====
+function carregarLocal() {
+  try {
+    const c = localStorage.getItem('comercial_clientes');
+    if (c) clientes = JSON.parse(c);
+    const f = localStorage.getItem('comercial_faturamentos');
+    if (f) faturamentos = JSON.parse(f);
+  } catch(e) { console.error(e); }
+}
+function salvarLocal() {
+  try {
+    localStorage.setItem('comercial_clientes', JSON.stringify(clientes));
+    localStorage.setItem('comercial_faturamentos', JSON.stringify(faturamentos));
+  } catch(e) { console.error(e); }
+}
+
+// ==== NAVEGAÇÃO ====
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const navId = id.replace('s-', 'nav-');
+  const nav = document.getElementById(navId);
+  if (nav) nav.classList.add('active');
+  if (id === 's-dashboard') renderDashboard();
+  if (id === 's-clientes') renderClientes();
+  if (id === 's-gerenciar') renderGerenciar();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ==== DASHBOARD ====
+function renderDashboard() {
+  const dadosMes = clientes.map(c => {
+    const fat = faturamentos.find(f => f.clienteId === c.id && f.mes === mesAtivo);
+    const real = fat ? fat.valor : 0;
+    const status = statusCliente(real, c.meta);
+    return { cliente: c, real, status };
+  });
+
+  // Contadores
+  let cVerde=0, cAmarelo=0, cVermelho=0;
+  dadosMes.forEach(d => {
+    if (d.status === 'verde') cVerde++;
+    else if (d.status === 'amarelo') cAmarelo++;
+    else cVermelho++; // vermelho ou critico
+  });
+
+  document.getElementById('d-verde').textContent = cVerde;
+  document.getElementById('d-amarelo').textContent = cAmarelo;
+  document.getElementById('d-vermelho').textContent = cVermelho;
+  document.getElementById('d-total').textContent = clientes.length;
+
+  // Resumo
+  const metaTotal = clientes.reduce((s, c) => s + (c.meta || 0), 0);
+  const realTotal = dadosMes.reduce((s, d) => s + d.real, 0);
+  const pct = metaTotal > 0 ? Math.round((realTotal / metaTotal) * 100) : 0;
+  document.getElementById('summary-meta').textContent = 'Meta: ' + fmtBR(metaTotal);
+  document.getElementById('summary-real').textContent = fmtBR(realTotal);
+  document.getElementById('summary-pct').textContent = pct + '% da meta';
+  const progressEl = document.getElementById('summary-progress');
+  progressEl.style.width = Math.min(pct, 100) + '%';
+  progressEl.style.background = pct >= 100 ? 'var(--verde)' : pct >= 80 ? 'var(--amarelo)' : 'var(--vermelho)';
+
+  // Gráficos
+  const ordenadoPorPior = [...dadosMes]
+    .filter(d => d.cliente.meta > 0)
+    .sort((a,b) => (a.real/a.cliente.meta) - (b.real/b.cliente.meta));
+  renderBarChart('chart-piores', ordenadoPorPior.slice(0, 5), false);
+  renderBarChart('chart-melhores', ordenadoPorPior.slice(-5).reverse(), true);
+  renderPizza(cVerde, cAmarelo, cVermelho);
+}
+
+function renderBarChart(svgId, dados, isMelhores) {
+  const svg = document.getElementById(svgId);
+  if (!dados.length) {
+    svg.innerHTML = '<text x="300" y="100" fill="#8a8a9b" text-anchor="middle" font-size="13">Sem dados ainda</text>';
+    return;
+  }
+
+  const W = 600, H = 200, pad = 12, barH = 24, gap = 6;
+  const labelW = 180;
+  const chartW = W - labelW - 80;
+
+  let html = '';
+  const maxVal = Math.max(...dados.map(d => Math.max(d.cliente.meta, d.real)));
+
+  dados.forEach((d, i) => {
+    const y = pad + i * (barH + gap);
+    const pct = d.cliente.meta > 0 ? (d.real / d.cliente.meta) * 100 : 0;
+    const fill = isMelhores ? 'var(--verde)' : (pct < 50 ? 'var(--critico)' : pct < 80 ? 'var(--vermelho)' : 'var(--amarelo)');
+    const wReal = (d.real / maxVal) * chartW;
+    const wMeta = (d.cliente.meta / maxVal) * chartW;
+    const nome = (d.cliente.nome || '').substring(0, 22);
+
+    // Background da meta
+    html += '<rect x="' + labelW + '" y="' + y + '" width="' + wMeta + '" height="' + barH + '" rx="4" fill="rgba(255,255,255,0.05)"/>';
+    // Barra real
+    html += '<rect x="' + labelW + '" y="' + y + '" width="' + wReal + '" height="' + barH + '" rx="4" fill="' + fill + '"/>';
+    // Nome do cliente
+    html += '<text x="' + (labelW - 8) + '" y="' + (y + barH/2 + 4) + '" fill="#e8e8ee" font-size="11" text-anchor="end" font-weight="600">' + nome + '</text>';
+    // % no final
+    html += '<text x="' + (labelW + wMeta + 8) + '" y="' + (y + barH/2 + 4) + '" fill="#8a8a9b" font-size="11">' + Math.round(pct) + '%</text>';
+  });
+
+  const realHeight = pad * 2 + dados.length * (barH + gap);
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + realHeight);
+  svg.innerHTML = html;
+}
+
+function renderPizza(verde, amarelo, vermelho) {
+  const svg = document.getElementById('chart-pizza');
+  const total = verde + amarelo + vermelho;
+  if (total === 0) {
+    svg.innerHTML = '<text x="200" y="100" fill="#8a8a9b" text-anchor="middle" font-size="13">Sem dados ainda</text>';
+    return;
+  }
+
+  const cx = 100, cy = 100, r = 70;
+  let startAngle = -90;
+  const segments = [
+    { val: verde, color: '#10b981', label: 'No alvo' },
+    { val: amarelo, color: '#f59e0b', label: 'Atenção' },
+    { val: vermelho, color: '#ef4444', label: 'Negativo' }
+  ];
+
+  let html = '';
+  segments.forEach(s => {
+    if (s.val === 0) return;
+    const angle = (s.val / total) * 360;
+    const endAngle = startAngle + angle;
+    const x1 = cx + r * Math.cos(startAngle * Math.PI / 180);
+    const y1 = cy + r * Math.sin(startAngle * Math.PI / 180);
+    const x2 = cx + r * Math.cos(endAngle * Math.PI / 180);
+    const y2 = cy + r * Math.sin(endAngle * Math.PI / 180);
+    const largeArc = angle > 180 ? 1 : 0;
+    html += '<path d="M ' + cx + ' ' + cy + ' L ' + x1 + ' ' + y1 + ' A ' + r + ' ' + r + ' 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 + ' Z" fill="' + s.color + '" stroke="#0a0a0f" stroke-width="2"/>';
+    startAngle = endAngle;
+  });
+
+  // Legenda
+  let yLeg = 50;
+  segments.forEach(s => {
+    if (s.val === 0) return;
+    const pct = Math.round((s.val / total) * 100);
+    html += '<rect x="220" y="' + yLeg + '" width="14" height="14" fill="' + s.color + '" rx="3"/>';
+    html += '<text x="240" y="' + (yLeg + 11) + '" fill="#e8e8ee" font-size="13" font-weight="600">' + s.label + '</text>';
+    html += '<text x="350" y="' + (yLeg + 11) + '" fill="#8a8a9b" font-size="13">' + s.val + ' · ' + pct + '%</text>';
+    yLeg += 28;
+  });
+
+  svg.innerHTML = html;
+}
+
+// ==== CLIENTES (LISTA) ====
+function setFiltro(f) {
+  filtroAtivo = f;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + f).classList.add('active');
+  renderClientes();
+}
+
+function renderClientes() {
+  const q = (document.getElementById('search-clientes')?.value || '').toLowerCase();
+  const dadosMes = clientes.map(c => {
+    const fat = faturamentos.find(f => f.clienteId === c.id && f.mes === mesAtivo);
+    const real = fat ? fat.valor : 0;
+    return { cliente: c, real, status: statusCliente(real, c.meta) };
+  });
+
+  // Atualizar contadores das tabs
+  let cTodos=dadosMes.length, cVerde=0, cAmarelo=0, cVermelho=0;
+  dadosMes.forEach(d => {
+    if (d.status === 'verde') cVerde++;
+    else if (d.status === 'amarelo') cAmarelo++;
+    else cVermelho++;
+  });
+  document.getElementById('count-todos').textContent = cTodos;
+  document.getElementById('count-verde').textContent = cVerde;
+  document.getElementById('count-amarelo').textContent = cAmarelo;
+  document.getElementById('count-vermelho').textContent = cVermelho;
+
+  let lista = dadosMes;
+  if (filtroAtivo === 'verde') lista = dadosMes.filter(d => d.status === 'verde');
+  else if (filtroAtivo === 'amarelo') lista = dadosMes.filter(d => d.status === 'amarelo');
+  else if (filtroAtivo === 'vermelho') lista = dadosMes.filter(d => d.status === 'vermelho' || d.status === 'critico');
+  if (q) lista = lista.filter(d => d.cliente.nome.toLowerCase().includes(q));
+
+  // Ordenar negativos primeiro
+  lista.sort((a,b) => {
+    const ordem = { critico:0, vermelho:1, amarelo:2, verde:3 };
+    return ordem[a.status] - ordem[b.status];
+  });
+
+  const el = document.getElementById('clientes-list');
+  if (!lista.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div>Nenhum cliente nessa categoria.</div>';
+    return;
+  }
+
+  el.innerHTML = lista.map(d => {
+    const c = d.cliente;
+    const diff = d.real - c.meta;
+    const pct = c.meta > 0 ? Math.round((d.real / c.meta) * 100) : 0;
+    const sigla = diff >= 0 ? '+' : '';
+    const corStatus = d.status === 'critico' ? 'var(--critico)' :
+                      d.status === 'vermelho' ? 'var(--vermelho)' :
+                      d.status === 'amarelo' ? 'var(--amarelo)' : 'var(--verde)';
+    const barraFill = Math.min(pct, 100);
+    return '<div class="client-row ' + d.status + '" onclick="abrirDetalhe(\'' + c.id + '\')">' +
+      '<div>' +
+        '<div class="client-name">' + c.nome + '</div>' +
+        '<div class="client-meta-line">Meta: ' + fmtBR(c.meta) + ' · Real: ' + fmtBR(d.real) +
+        (c.vendedor ? ' · 👤 ' + c.vendedor : '') + '</div>' +
+        '<div class="progress-mini"><div class="progress-mini-fill" style="width:' + barraFill + '%; background:' + corStatus + ';"></div></div>' +
+      '</div>' +
+      '<div class="client-status">' +
+        '<div class="client-diff">' + sigla + fmtBR(diff) + '</div>' +
+        '<div class="client-pct">' + pct + '% da meta</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ==== DETALHE CLIENTE ====
+function abrirDetalhe(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('detalhe-titulo').textContent = c.nome;
+
+  // Histórico dos últimos 6 meses
+  const ultimos = [];
+  const [y, m] = mesAtivo.split('-').map(Number);
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(y, m-1-i, 1);
+    const ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    const fat = faturamentos.find(f => f.clienteId === id && f.mes === ym);
+    ultimos.push({ mes: ym, valor: fat ? fat.valor : 0 });
+  }
+
+  // Mês atual
+  const fatAtual = faturamentos.find(f => f.clienteId === id && f.mes === mesAtivo);
+  const real = fatAtual ? fatAtual.valor : 0;
+  const diff = real - c.meta;
+  const pct = c.meta > 0 ? Math.round((real / c.meta) * 100) : 0;
+
+  // Gráfico mini de evolução
+  const maxVal = Math.max(...ultimos.map(u => u.valor), c.meta);
+  let chartHtml = '<svg viewBox="0 0 360 120" style="width:100%; height: 120px; margin-top: 8px;">';
+  // Linha da meta
+  const yMeta = 100 - (c.meta / maxVal) * 80;
+  chartHtml += '<line x1="0" y1="' + yMeta + '" x2="360" y2="' + yMeta + '" stroke="var(--ink-mute)" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>';
+  chartHtml += '<text x="358" y="' + (yMeta - 4) + '" fill="#8a8a9b" font-size="9" text-anchor="end">META</text>';
+  // Barras
+  const barW = 360 / ultimos.length;
+  ultimos.forEach((u, i) => {
+    const h = (u.valor / maxVal) * 80;
+    const yBar = 100 - h;
+    const xBar = i * barW + barW * 0.2;
+    const wBar = barW * 0.6;
+    const cor = u.valor >= c.meta ? 'var(--verde)' : u.valor >= c.meta * 0.8 ? 'var(--amarelo)' : 'var(--vermelho)';
+    chartHtml += '<rect x="' + xBar + '" y="' + yBar + '" width="' + wBar + '" height="' + h + '" rx="2" fill="' + cor + '"/>';
+    const [yr, mn] = u.mes.split('-');
+    const nomes = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+    chartHtml += '<text x="' + (xBar + wBar/2) + '" y="115" fill="#8a8a9b" font-size="10" text-anchor="middle">' + nomes[parseInt(mn)-1] + '</text>';
+  });
+  chartHtml += '</svg>';
+
+  let html = '';
+  if (c.local) html += '<p style="color: var(--ink-mute); font-size: 13px; margin-bottom: 12px;">📍 ' + c.local + '</p>';
+
+  // Estatísticas mês atual
+  html += '<div class="detail-section">';
+  html += '<div class="detail-section-title">' + nomeMes(mesAtivo) + '</div>';
+  html += '<div class="stat-row"><span class="stat-label">Meta</span><span class="stat-value">' + fmtBR(c.meta) + '</span></div>';
+  html += '<div class="stat-row"><span class="stat-label">Realizado</span><span class="stat-value">' + fmtBR(real) + '</span></div>';
+  html += '<div class="stat-row"><span class="stat-label">Diferença</span><span class="stat-value" style="color:' + (diff >= 0 ? 'var(--verde)' : 'var(--vermelho)') + '">' + (diff >= 0 ? '+' : '') + fmtBR(diff) + '</span></div>';
+  html += '<div class="stat-row"><span class="stat-label">% da meta</span><span class="stat-value">' + pct + '%</span></div>';
+  html += '</div>';
+
+  // Gráfico histórico
+  html += '<div class="detail-section">';
+  html += '<div class="detail-section-title">Últimos 6 meses</div>';
+  html += chartHtml;
+  html += '</div>';
+
+  // Detalhes
+  if (c.vendedor || c.obs) {
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section-title">Outras informações</div>';
+    if (c.vendedor) html += '<div class="stat-row"><span class="stat-label">Vendedor</span><span class="stat-value">' + c.vendedor + '</span></div>';
+    if (c.obs) html += '<div class="stat-row"><span class="stat-label">Obs.</span><span class="stat-value">' + c.obs + '</span></div>';
+    html += '</div>';
+  }
+
+  // Botões
+  html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;">';
+  html += '<button class="btn btn-secondary" onclick="editarCliente(\'' + c.id + '\')">✏️ Editar</button>';
+  html += '<button class="btn btn-primary" onclick="abrirModalLancarFat(\'' + c.id + '\')">+ Lançar fat.</button>';
+  html += '</div>';
+
+  document.getElementById('detalhe-content').innerHTML = html;
+  abrirModal('modal-detalhe');
+}
+
+// ==== GERENCIAR (CRUD CLIENTES) ====
+function renderGerenciar() {
+  const q = (document.getElementById('search-gerenciar')?.value || '').toLowerCase();
+  const lista = q ? clientes.filter(c => c.nome.toLowerCase().includes(q)) : clientes;
+  document.getElementById('gerenciar-sub').textContent = lista.length + ' cliente(s)';
+
+  const el = document.getElementById('gerenciar-list');
+  if (!lista.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🏢</div>Nenhum cliente cadastrado.<br>Use o botão "+ Novo" para começar.</div>';
+    return;
+  }
+
+  el.innerHTML = lista.map(c => {
+    return '<div class="client-row" style="border-left: 4px solid var(--accent);">' +
+      '<div>' +
+        '<div class="client-name">' + c.nome + '</div>' +
+        '<div class="client-meta-line">Meta: ' + fmtBR(c.meta) + (c.vendedor ? ' · ' + c.vendedor : '') + (c.local ? ' · ' + c.local : '') + '</div>' +
+      '</div>' +
+      '<div style="display: flex; gap: 6px;">' +
+        '<button class="btn btn-secondary" style="padding:8px 12px; font-size:12px; width:auto;" onclick="event.stopPropagation();editarCliente(\'' + c.id + '\')">✏️</button>' +
+        '<button class="btn btn-danger" style="padding:8px 12px; font-size:12px; width:auto;" onclick="event.stopPropagation();excluirCliente(\'' + c.id + '\')">🗑</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function abrirModalNovoCliente() {
+  _editClienteId = null;
+  document.getElementById('cliente-modal-titulo').textContent = 'Novo Cliente';
+  document.getElementById('cli-nome').value = '';
+  document.getElementById('cli-meta').value = '';
+  document.getElementById('cli-local').value = '';
+  document.getElementById('cli-vendedor').value = '';
+  document.getElementById('cli-obs').value = '';
+  abrirModal('modal-cliente');
+}
+
+function editarCliente(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  _editClienteId = id;
+  document.getElementById('cliente-modal-titulo').textContent = 'Editar Cliente';
+  document.getElementById('cli-nome').value = c.nome || '';
+  document.getElementById('cli-meta').value = c.meta || '';
+  document.getElementById('cli-local').value = c.local || '';
+  document.getElementById('cli-vendedor').value = c.vendedor || '';
+  document.getElementById('cli-obs').value = c.obs || '';
+  fecharModal('modal-detalhe');
+  abrirModal('modal-cliente');
+}
+
+function salvarCliente() {
+  const nome = document.getElementById('cli-nome').value.trim();
+  const meta = parseFloat(document.getElementById('cli-meta').value);
+  if (!nome) { alert('Informe o nome do cliente.'); return; }
+  if (isNaN(meta) || meta <= 0) { alert('Informe uma meta mensal válida.'); return; }
+
+  const dados = {
+    nome,
+    meta,
+    local: document.getElementById('cli-local').value.trim(),
+    vendedor: document.getElementById('cli-vendedor').value.trim(),
+    obs: document.getElementById('cli-obs').value.trim(),
+    atualizadoEm: Date.now()
+  };
+
+  if (_editClienteId) {
+    const c = clientes.find(x => x.id === _editClienteId);
+    if (c) Object.assign(c, dados);
+    showToast('Cliente atualizado!');
+  } else {
+    dados.id = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    dados.criadoEm = Date.now();
+    clientes.push(dados);
+    showToast('Cliente cadastrado!');
+  }
+
+  salvarLocal();
+  fecharModal('modal-cliente');
+  renderGerenciar();
+  if (document.getElementById('s-dashboard').classList.contains('active')) renderDashboard();
+  if (document.getElementById('s-clientes').classList.contains('active')) renderClientes();
+}
+
+function excluirCliente(id) {
+  const c = clientes.find(x => x.id === id);
+  if (!c) return;
+  if (!confirm('Excluir o cliente "' + c.nome + '"?\n\nTodos os faturamentos dele também serão removidos.')) return;
+  clientes = clientes.filter(x => x.id !== id);
+  faturamentos = faturamentos.filter(f => f.clienteId !== id);
+  salvarLocal();
+  showToast('Cliente excluído.');
+  renderGerenciar();
+}
+
+// ==== LANÇAR FATURAMENTO MANUAL ====
+function abrirModalLancarFat(clienteId) {
+  fecharModal('modal-detalhe');
+  const sel = document.getElementById('fat-cliente');
+  sel.innerHTML = clientes.map(c => '<option value="' + c.id + '"' + (c.id === clienteId ? ' selected' : '') + '>' + c.nome + '</option>').join('');
+  document.getElementById('fat-mes').value = mesAtivo;
+  document.getElementById('fat-valor').value = '';
+  abrirModal('modal-faturamento');
+}
+
+function salvarFaturamento() {
+  const clienteId = document.getElementById('fat-cliente').value;
+  const mes = document.getElementById('fat-mes').value;
+  const valor = parseFloat(document.getElementById('fat-valor').value);
+  if (!clienteId) { alert('Selecione um cliente.'); return; }
+  if (!mes) { alert('Informe o mês.'); return; }
+  if (isNaN(valor) || valor < 0) { alert('Informe um valor válido.'); return; }
+
+  // Substituir se já existe pra esse cliente/mês
+  const idx = faturamentos.findIndex(f => f.clienteId === clienteId && f.mes === mes);
+  const dados = { clienteId, mes, valor, lancadoEm: Date.now() };
+  if (idx >= 0) faturamentos[idx] = dados;
+  else faturamentos.push(dados);
+
+  salvarLocal();
+  fecharModal('modal-faturamento');
+  showToast('Faturamento salvo!');
+  if (document.getElementById('s-dashboard').classList.contains('active')) renderDashboard();
+  if (document.getElementById('s-clientes').classList.contains('active')) renderClientes();
+}
+
+// ==== IMPORTAR PLANILHA ====
+function downloadModelo() {
+  const csv = 'Cliente,Faturamento\n' +
+              'Mercado Central,12500\n' +
+              'Padaria Vila Nova,7800\n' +
+              'Super Bom Preço,15000';
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'modelo-faturamento.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function handleFileImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  let dados = [];
+
+  try {
+    if (ext === 'csv') {
+      const text = await file.text();
+      dados = parseCSV(text);
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      // Carregar SheetJS dinamicamente
+      if (!window.XLSX) {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+      }
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      dados = parseSheetData(json);
+    } else {
+      alert('Formato não suportado. Use .csv ou .xlsx');
+      return;
+    }
+  } catch (e) {
+    alert('Erro ao ler arquivo: ' + e.message);
+    return;
+  }
+
+  if (!dados.length) {
+    alert('Não foi possível encontrar dados no arquivo.\nO arquivo precisa ter colunas: Cliente | Faturamento');
+    return;
+  }
+
+  // Mostrar preview
+  _importPreview = dados;
+  mostrarPreviewImport(dados);
+  // Reset input
+  event.target.value = '';
+}
+
+function loadScript(url) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function parseCSV(text) {
+  const linhas = text.split(/\r?\n/).filter(l => l.trim());
+  if (!linhas.length) return [];
+  const sep = text.includes(';') && !text.split('\n')[0].includes(',') ? ';' : ',';
+  const header = linhas[0].split(sep).map(h => h.trim().toLowerCase());
+  const idxNome = header.findIndex(h => h.includes('cliente') || h.includes('nome'));
+  const idxFat = header.findIndex(h => h.includes('fatur') || h.includes('valor') || h.includes('venda'));
+  if (idxNome < 0 || idxFat < 0) return [];
+
+  const out = [];
+  for (let i = 1; i < linhas.length; i++) {
+    const cols = linhas[i].split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
+    const nome = cols[idxNome];
+    const fatRaw = (cols[idxFat] || '').replace(/[R$\s.]/g, '').replace(',', '.');
+    const valor = parseFloat(fatRaw);
+    if (nome && !isNaN(valor)) out.push({ nome, valor });
+  }
+  return out;
+}
+
+function parseSheetData(json) {
+  if (!json.length) return [];
+  const header = json[0].map(h => String(h || '').trim().toLowerCase());
+  const idxNome = header.findIndex(h => h.includes('cliente') || h.includes('nome'));
+  const idxFat = header.findIndex(h => h.includes('fatur') || h.includes('valor') || h.includes('venda'));
+  if (idxNome < 0 || idxFat < 0) return [];
+
+  const out = [];
+  for (let i = 1; i < json.length; i++) {
+    const row = json[i];
+    if (!row) continue;
+    const nome = String(row[idxNome] || '').trim();
+    const valor = parseFloat(row[idxFat]);
+    if (nome && !isNaN(valor)) out.push({ nome, valor });
+  }
+  return out;
+}
+
+function mostrarPreviewImport(dados) {
+  const naoEncontrados = [];
+  const encontrados = [];
+
+  dados.forEach(d => {
+    const c = clientes.find(c => c.nome.toLowerCase() === d.nome.toLowerCase());
+    if (c) encontrados.push({ ...d, cliente: c });
+    else naoEncontrados.push(d);
+  });
+
+  let html = '<div style="margin-bottom: 14px;">';
+  html += '<p style="font-size: 13px; color: var(--ink-mute); margin-bottom: 8px;">' +
+          'Mês de destino: <strong style="color: var(--ink);">' + nomeMes(mesAtivo) + '</strong></p>';
+  html += '<p style="font-size: 13px;">📥 <strong>' + dados.length + ' linhas</strong> no arquivo:</p>';
+  html += '</div>';
+
+  if (encontrados.length) {
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section-title">✅ ' + encontrados.length + ' clientes encontrados</div>';
+    encontrados.slice(0, 10).forEach(e => {
+      html += '<div class="stat-row"><span class="stat-label">' + e.cliente.nome + '</span><span class="stat-value">' + fmtBR(e.valor) + '</span></div>';
+    });
+    if (encontrados.length > 10) html += '<div style="text-align:center; color: var(--ink-mute); font-size: 12px; padding: 6px;">+ ' + (encontrados.length - 10) + ' outros</div>';
+    html += '</div>';
+  }
+
+  if (naoEncontrados.length) {
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section-title" style="color: var(--amarelo);">⚠️ ' + naoEncontrados.length + ' não cadastrados (serão criados automaticamente)</div>';
+    naoEncontrados.slice(0, 10).forEach(e => {
+      html += '<div class="stat-row"><span class="stat-label">' + e.nome + '</span><span class="stat-value">' + fmtBR(e.valor) + '</span></div>';
+    });
+    if (naoEncontrados.length > 10) html += '<div style="text-align:center; color: var(--ink-mute); font-size: 12px; padding: 6px;">+ ' + (naoEncontrados.length - 10) + ' outros</div>';
+    html += '<p style="font-size: 11px; color: var(--ink-mute); margin-top: 8px;">⚠ Clientes novos serão criados com meta = R$ 0. Edite depois em "Gerenciar".</p>';
+    html += '</div>';
+  }
+
+  document.getElementById('import-preview-content').innerHTML = html;
+  abrirModal('modal-import-preview');
+}
+
+function confirmarImport() {
+  let criados = 0, atualizados = 0;
+
+  _importPreview.forEach(d => {
+    let c = clientes.find(c => c.nome.toLowerCase() === d.nome.toLowerCase());
+    if (!c) {
+      // Criar cliente novo
+      c = {
+        id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+        nome: d.nome,
+        meta: 0,
+        local: '',
+        vendedor: '',
+        obs: '',
+        criadoEm: Date.now(),
+        atualizadoEm: Date.now()
+      };
+      clientes.push(c);
+      criados++;
+    }
+    // Lançar/atualizar faturamento
+    const idx = faturamentos.findIndex(f => f.clienteId === c.id && f.mes === mesAtivo);
+    const novo = { clienteId: c.id, mes: mesAtivo, valor: d.valor, lancadoEm: Date.now() };
+    if (idx >= 0) faturamentos[idx] = novo;
+    else faturamentos.push(novo);
+    atualizados++;
+  });
+
+  salvarLocal();
+  _importPreview = [];
+  fecharModal('modal-import-preview');
+  showToast(atualizados + ' lançamentos · ' + criados + ' clientes novos');
+  goTo('s-dashboard');
+}
+
+// ==== MODAIS ====
+function abrirModal(id) { document.getElementById(id).classList.add('open'); }
+function fecharModal(id) { document.getElementById(id).classList.remove('open'); }
+
+
+// === DADOS DE EXEMPLO (REMOVER QUANDO USAR EM PRODUÇÃO) ===
+function carregarDadosExemplo() {
+  if (clientes.length > 0) return; // Só carrega se estiver vazio
+  
+  const hoje = getMesAtual();
+  const [y, m] = hoje.split('-').map(Number);
+  const mesAnterior1 = new Date(y, m-2, 1);
+  const mesAnterior2 = new Date(y, m-3, 1);
+  const mes1 = mesAnterior1.getFullYear() + '-' + String(mesAnterior1.getMonth()+1).padStart(2,'0');
+  const mes2 = mesAnterior2.getFullYear() + '-' + String(mesAnterior2.getMonth()+1).padStart(2,'0');
+  
+  const exemplos = [
+    // CRÍTICOS (< 50%)
+    { nome: 'Empório do Bairro', meta: 10000, fatAtual: 1500, fatM1: 8500, fatM2: 9200, vendedor: 'Ana Silva', local: 'Porto Alegre' },
+    { nome: 'Mini Mercado União', meta: 8000, fatAtual: 2800, fatM1: 7500, fatM2: 8200, vendedor: 'Ana Silva', local: 'Canoas' },
+    
+    // VERMELHOS (50-79%)
+    { nome: 'Mercado Central', meta: 12500, fatAtual: 8000, fatM1: 11800, fatM2: 13200, vendedor: 'Carlos Souza', local: 'Porto Alegre' },
+    { nome: 'Padaria Vila Nova', meta: 8000, fatAtual: 4800, fatM1: 7200, fatM2: 8500, vendedor: 'Carlos Souza', local: 'Gravataí' },
+    { nome: 'Atacado Norte', meta: 18000, fatAtual: 12500, fatM1: 17500, fatM2: 19000, vendedor: 'João Lima', local: 'Sapucaia' },
+    
+    // AMARELOS (80-99%)
+    { nome: 'Super Bom Preço', meta: 15000, fatAtual: 14200, fatM1: 14800, fatM2: 15500, vendedor: 'João Lima', local: 'Porto Alegre' },
+    { nome: 'Mercadinho Família', meta: 6000, fatAtual: 5400, fatM1: 5900, fatM2: 6100, vendedor: 'Pedro Alves', local: 'Viamão' },
+    
+    // VERDES (≥ 100%)
+    { nome: 'Atacado Central', meta: 20000, fatAtual: 24200, fatM1: 21500, fatM2: 22800, vendedor: 'Pedro Alves', local: 'Porto Alegre' },
+    { nome: 'Hipermercado Sul', meta: 35000, fatAtual: 38500, fatM1: 36200, fatM2: 35800, vendedor: 'Maria Costa', local: 'Cachoeirinha' },
+    { nome: 'Padaria do Centro', meta: 9000, fatAtual: 10500, fatM1: 9800, fatM2: 10200, vendedor: 'Maria Costa', local: 'Porto Alegre' }
+  ];
+  
+  exemplos.forEach((e, i) => {
+    const id = 'c_seed_' + i;
+    clientes.push({
+      id, nome: e.nome, meta: e.meta, local: e.local, vendedor: e.vendedor,
+      obs: '', criadoEm: Date.now(), atualizadoEm: Date.now()
+    });
+    // Faturamento mês atual
+    faturamentos.push({ clienteId: id, mes: hoje, valor: e.fatAtual, lancadoEm: Date.now() });
+    // Histórico
+    faturamentos.push({ clienteId: id, mes: mes1, valor: e.fatM1, lancadoEm: Date.now() });
+    faturamentos.push({ clienteId: id, mes: mes2, valor: e.fatM2, lancadoEm: Date.now() });
+  });
+  
+  salvarLocal();
+}
+
+
+// ==== INIT ====
+function init() {
+  carregarDadosExemplo();
+  carregarLocal();
+  mesAtivo = getMesAtual();
+  document.getElementById('month-picker').value = mesAtivo;
+  document.getElementById('month-picker').addEventListener('change', e => {
+    mesAtivo = e.target.value;
+    document.getElementById('topbar-sub').textContent = nomeMes(mesAtivo);
+    renderDashboard();
+    renderClientes();
+  });
+  document.getElementById('topbar-sub').textContent = nomeMes(mesAtivo);
+  renderDashboard();
+}
+
+init();
+
+// Expor globals
+window.goTo = goTo;
+window.setFiltro = setFiltro;
+window.abrirDetalhe = abrirDetalhe;
+window.abrirModalNovoCliente = abrirModalNovoCliente;
+window.editarCliente = editarCliente;
+window.excluirCliente = excluirCliente;
+window.salvarCliente = salvarCliente;
+window.abrirModalLancarFat = abrirModalLancarFat;
+window.salvarFaturamento = salvarFaturamento;
+window.downloadModelo = downloadModelo;
+window.handleFileImport = handleFileImport;
+window.confirmarImport = confirmarImport;
+window.fecharModal = fecharModal;
+window.abrirModal = abrirModal;
+
+</script>
+</body>
+</html>
