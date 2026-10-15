@@ -164,6 +164,28 @@ h1{margin:0;font-size:21px;font-weight:700;letter-spacing:-.4px}
     border-radius:14px;padding:12px 15px;margin-bottom:9px;cursor:pointer;position:relative}
 .it:hover{border-color:var(--muted)}
 .it-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.meta-card{margin-bottom:16px;border-color:var(--primary)}
+.meta-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.meta-pct{font-size:30px;font-weight:800;letter-spacing:-.6px}
+.oport{display:grid;gap:8px;margin-bottom:13px}
+.op{background:var(--card-2);border-left:3px solid var(--blue);border-radius:10px;padding:9px 12px}
+.op.op-parou{border-left-color:var(--amber)}
+.op b{display:block;font-size:13.5px}
+.op span{font-size:12px;color:var(--muted)}
+.funil-linha{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:13px}
+.funil-linha i{color:var(--muted);font-style:normal}
+.fn{font-size:12.5px;font-weight:600;color:var(--muted);background:var(--card-2);border:1px solid var(--border);border-radius:20px;padding:4px 11px}
+.fn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.fn.perd.on{background:var(--muted);border-color:var(--muted)}
+.prod-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.prod{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+.prod:hover{border-color:var(--muted)}
+.prod img,.prod-sem{width:100%;aspect-ratio:4/3;object-fit:cover;background:#fff;display:block}
+.prod-sem{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;background:var(--card-2)}
+.prod-c{padding:10px 12px 12px}
+.prod-c b{display:block;font-size:14px;line-height:1.3}
+.prod-c span{font-size:12px;color:var(--muted)}
+.ficha-img{width:100%;max-height:300px;object-fit:contain;background:#fff;border-radius:12px;margin-bottom:12px;cursor:zoom-in}
 .promos{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(260px,340px);gap:12px;overflow-x:auto;margin-bottom:20px;padding-bottom:4px}
 .promo{background:linear-gradient(135deg,var(--prim-suave),var(--card) 70%);border:1px solid var(--primary);border-radius:16px;cursor:pointer;overflow:hidden;display:flex;flex-direction:column}
 .promo img{width:100%;height:120px;object-fit:cover;display:block}
@@ -375,7 +397,8 @@ details.mais[open]{padding-bottom:4px}
     <button class="navbtn on com-only" data-p="hoje" onclick="nav('hoje')"><span class="side-ico">◷</span><span class="lbl lab-d">Hoje</span><span class="lab-m">Hoje</span></button>
     <button class="navbtn com-only" data-p="carteira" onclick="nav('carteira')"><span class="side-ico">▤</span><span class="lbl lab-d">Carteira</span><span class="lab-m">Carteira</span></button>
     <button class="navbtn com-only" data-p="visitas" onclick="nav('visitas')"><span class="side-ico">⌖</span><span class="lbl lab-d">Visitas e contatos</span><span class="lab-m">Visitas</span></button>
-    <button class="navbtn gestor-only" data-p="equipe" onclick="nav('equipe')" style="display:none"><span class="side-ico">◫</span><span class="lbl lab-d">Equipe</span><span class="lab-m">Equipe</span></button>
+    <button class="navbtn com-only" data-p="produtos" onclick="nav('produtos')"><span class="side-ico">▦</span><span class="lbl lab-d">Produtos</span><span class="lab-m">Produtos</span></button>
+    <button class="navbtn gestor-only so-desk" data-p="equipe" onclick="nav('equipe')" style="display:none"><span class="side-ico">◫</span><span class="lbl lab-d">Equipe</span><span class="lab-m">Equipe</span></button>
     <div class="side-sec lbl">Pedidos</div>
     <button class="navbtn" data-p="solic" onclick="nav('solic')"><span class="side-ico">✉</span><span class="lbl lab-d">Solicitações</span><span class="lab-m">Pedidos</span><span class="cnt" id="cntSol" hidden>0</span></button>
     <div class="side-sec lbl admin-only">Ajustes</div>
@@ -417,6 +440,7 @@ details.mais[open]{padding-bottom:4px}
         <button onclick="nav('carteira')"><span>▤</span>Minha carteira</button>
       </div>
       <div id="h-promos"></div>
+      <div id="h-meta"></div>
       <div class="kpis" id="kpis"></div>
       <div class="cols">
         <div><div class="sect">Agenda de contatos</div><div id="h-agenda"></div></div>
@@ -479,6 +503,8 @@ details.mais[open]{padding-bottom:4px}
       <div id="eq-kpis" class="kpis"></div>
       <div class="sect">Por vendedor</div>
       <div class="tscroll" style="max-height:none"><div id="eq-tab"></div></div>
+      <div class="sect">Funil de prospects <span class="mini" style="font-weight:500">viraram cliente no período escolhido</span></div>
+      <div class="tscroll" style="max-height:none;margin-bottom:6px"><div id="eq-funil"></div></div>
       <div class="sect">Tempo de resposta das solicitações</div>
       <div class="tscroll" style="max-height:none"><div id="eq-resp"></div></div>
     </div>
@@ -515,6 +541,16 @@ details.mais[open]{padding-bottom:4px}
         <div id="imp-p3"></div>
         <div id="imp-p4"></div>
       </div>
+    </div>
+
+    <!-- PRODUTOS E FICHAS TÉCNICAS -->
+    <div class="page" id="page-produtos">
+      <div class="tools">
+        <input type="search" placeholder="Buscar produto, código de barras, ingrediente…" oninput="setFichaBusca(this.value)">
+        <label class="btn btn-sm" id="prod-imp" style="display:none;cursor:pointer">⇪ Importar fichas (.docx)
+          <input type="file" accept=".docx" multiple style="display:none" onchange="importarFichas(this)"></label>
+      </div>
+      <div id="prod-lista"></div>
     </div>
 
     <!-- USUÁRIOS E NÍVEIS (admin) -->
@@ -812,6 +848,7 @@ function ouvir(){
         erroLeitura('solicitações')));
     }
     lerErp();
+    ouvirMetas(); ouvirFichas();
     if(U.gestor){
       lerFaturamento();
       subs.push(onSnapshot(doc(db,'comVendResumo','_meta'), function(s){ resumoMeta=s.exists()?s.data():{}; autoResumo(); render(); },
@@ -857,7 +894,7 @@ function lerFaturamento(){
   fatMeses=mesesAtras(4).reverse();
   Promise.all(fatMeses.map(function(m){ return getDoc(doc(db,'comercialClienteMes',m)); })).then(function(rs){
     var idx={}; cmDocs=[]; prodErp={};
-    var ult2=fatMeses.slice(-2);
+    var ult2=fatMeses.slice(); popProd=null;     /* os 4 meses: base das oportunidades */
     rs.forEach(function(s, i){
       if(!s.exists()) return;
       var cs=(s.data()||{}).clientes||{};
@@ -899,7 +936,8 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   config:['Configurações','Só a diretoria vê esta tela'],
   importar:['Carteira pelo ERP','A carteira segue o representante cadastrado no ERP'],
   equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
-  usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'] };
+  usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'],
+  produtos:['Produtos','Fichas técnicas para consultar e mandar ao cliente'] };
 var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };
 function nav(p){
   pagina=p;
@@ -932,6 +970,7 @@ function render(){
   else if(pagina==='config') renderConfig();
   else if(pagina==='equipe') renderEquipe();
   else if(pagina==='usuarios') renderUsuarios();
+  else if(pagina==='produtos') renderProdutos();
   else if(pagina==='importar') renderImpStatus();
   $('frescor').textContent=erpEstado==='ok' ? 'Base do ERP: '+Object.keys(erp).length+' clientes' : (erpEstado==='lendo'?'Lendo a base do ERP…':'');
 }
@@ -944,7 +983,7 @@ function stTag(st){ var x=ST[st]||[st,'muted']; return '<span class="st st-'+x[1
 
 function cartaoCliente(c){
   var tags=[], borda='', d=diasSemComprar(c), u=ultimaCompra(c);
-  if(c.situacao==='prospect') tags.push('<span class="tag t-blue">Prospect</span>');
+  if(c.situacao==='prospect') tags.push('<span class="tag t-blue">Prospect · '+funilNome(funilDe(c))+'</span>');
   if(c.situacao==='inativo') tags.push('<span class="tag">Inativo</span>');
   if(c.erpId && u) tags.push('<span class="tag'+(emAlerta(c)?' t-red':'')+'">Última compra '+fmtDiaCurto(u)+' · '+d+' dia'+(d===1?'':'s')+'</span>');
   else if(c.erpId && erpEstado==='ok') tags.push('<span class="tag t-red">Sem compra no ERP</span>');
@@ -1001,11 +1040,14 @@ function renderHoje(){
   k.push(kpi('Sem comprar', alerta.length, 'há mais de '+CFG.diasAlerta+' dias', "filtroCart='alerta';nav('carteira')", alerta.length?'var(--red)':''));
   k.push(kpi('Comprou menos', caiu, mesesFat().length?'queda de 30% ou mais em '+nomeMes(mesesFat()[mesesFat().length-2]):'aguardando o resumo de vendas', "filtroCart='queda';nav('carteira')", caiu?'var(--red)':''));
   k.push(kpi('Sem próximo contato', semCtt, 'clientes sem data marcada', "filtroCart='semctt';nav('carteira')", ''));
+  var pros=ativos.filter(function(c){ var f=funilDe(c); return f && f!=='cliente' && f!=='perdido'; });
+  k.push(kpi('Prospects em andamento', pros.length, pros.filter(function(c){ return funilDe(c)==='proposta'; }).length+' com proposta', "filtroCart='prospect';nav('carteira')", ''));
   if(meusTipos.length) k.push(kpi('Para responder', paraResp, 'solicitações em aberto', "segSol='responder';nav('solic')", paraResp?'var(--amber)':''));
   else k.push(kpi('Minhas solicitações', minhasAb, 'em aberto', "segSol='minhas';nav('solic')", ''));
   $('kpis').innerHTML=k.join('');
 
   renderPromos();
+  $('h-meta').innerHTML=metaCardHtml();
   $('h-agenda').innerHTML=agenda.length ? agenda.slice(0,30).map(cartaoCliente).join('')
     : '<div class="empty">Nenhum contato marcado para os próximos 7 dias.</div>';
   $('h-alerta-tit').textContent='Sem comprar há mais de '+CFG.diasAlerta+' dias';
@@ -1296,7 +1338,7 @@ function verCliente(id){
     var qd=queda(c);
     if(qd) corpo+='<div class="alert a-err">↓ Comprou '+qd.pct+'% menos em '+nomeMes(qd.mes)+' ('+fmtRS(qd.ult)+') do que no mês anterior ('+fmtRS(qd.ant)+').</div>';
   }
-  corpo+=comprasRecentesHtml(c);
+  corpo+=funilFichaHtml(c)+oportunidadesHtml(c)+comprasRecentesHtml(c);
   corpo+='<div class="det-sec">Contato</div><div class="det">'
     +'<div><span>Situação</span><b>'+({cliente:'Cliente',prospect:'Prospect',inativo:'Inativo'}[c.situacao]||'Cliente')+'</b></div>'
     +'<div><span>Cidade · rota</span><b>'+esc([c.cidade, c.rota?'rota '+c.rota:''].filter(Boolean).join(' · ')||'—')+'</b></div>'
@@ -1599,6 +1641,7 @@ function salvarVisita(el){
       endereco:$('fv-n-end').value.trim(), fornecedor:forn, totalMensal:numBR($('fv-n-tot').value),
       precos:fc.precos.filter(function(p){ return p.p; }), obs:$('fv-n-obs').value.trim(),
       proxContato:prox, proxObs:proxObs, ultimoContato:data, origem:'novo no registro de contato',
+      funil:funilPeloResultado($('fv-res').value), prospectDesde:data,
       donoUid:U.uid, donoNome:U.nome, donoEmail:U.email, criadoEm:agora, atualizadoEm:agora, atualizadoPor:U.email });
     cid=nref.id; sel.cidade=nCid;
   }
@@ -1621,6 +1664,7 @@ function salvarVisita(el){
   /* a ficha do cliente acompanha: último contato e o próximo, no mesmo lote */
   if(c && podeEditar(c)){
     var up={ atualizadoEm:agora, atualizadoPor:U.email, proxContato:prox };
+    if(c.situacao==='prospect'){ up.funil=funilAvanca(c.funil||'novo', funilPeloResultado($('fv-res').value)); if(!c.prospectDesde) up.prospectDesde=String(c.criadoEm||data).slice(0,10); }
     if(proxObs) up.proxObs=proxObs;
     if(!c.ultimoContato || data>=c.ultimoContato) up.ultimoContato=data;
     b.update(doc(db,'comClientes',c.id), up);
@@ -1946,7 +1990,8 @@ function calcularPlano(semErp){
     if(!u) it.acao='ignorar', it.obs=(IMP.fonte==='erp'?IMP.rotulo:'vendedor')+' marcado para não importar';
     else if(atual){ it.cliId=atual.id; it.acao=(atual.donoUid===u.uid)?'igual':'transferir'; it.de=atual.donoNome||'';
       /* vínculo velho: ligado a um cadastro do ERP de mesmo nome que parou de comprar */
-      if(it.erpId && melhorVinculo(atual.erpId, it.erpId)){ it.novoErp=true; if(it.acao==='igual') it.acao='vincular'; it.obs='vínculo com o ERP corrigido (cadastro de compra mais recente)'; } }
+      if(it.erpId && melhorVinculo(atual.erpId, it.erpId)){ it.novoErp=true; if(it.acao==='igual') it.acao='vincular'; it.obs='vínculo com o ERP corrigido (cadastro de compra mais recente)'; }
+      if(atual.situacao==='prospect' && it.erpId){ it.virou=true; it.novoErp=true; if(it.acao==='igual') it.acao='vincular'; it.obs='prospect virou cliente no ERP'; } }
     else if(it.erpId || semErp) it.acao='novo';
     else it.acao='ignorar', it.obs='não achado no ERP';
     if(!it.erpId && it.acao==='novo' && !it.obs) it.obs='não achado no ERP';
@@ -2001,7 +2046,8 @@ function gravarPlano(ops, aoAvancar){
         if(x.acao==='transferir' || x.acao==='vincular'){
           var c=clientePorId(x.cliId)||{}, up=x.acao==='transferir'?Object.assign({}, dono):{ atualizadoEm:agora, atualizadoPor:U.email };
           if(x.erpId && (!c.erpId || x.novoErp)){ var e0=erp[x.erpId]||{}; up.erpId=x.erpId; up.erpNome=e0.nErp||e0.n||''; }
-          if(x.acao==='transferir' && c.situacao==='prospect') up.situacao='cliente';     /* prospect que virou cliente no ERP */
+          if(c.situacao==='prospect' && (x.acao==='transferir' || x.virou)){     /* prospect que virou cliente no ERP */
+            up.situacao='cliente'; up.funil='cliente'; up.convertidoEm=agora; if(!c.prospectDesde) up.prospectDesde=String(c.criadoEm||agora).slice(0,10); }
           b.update(doc(db,'comClientes',x.cliId), up);
         } else {
           var e=x.erpId?(erp[x.erpId]||{}):{};
@@ -2093,7 +2139,7 @@ function queda(c){
 var resumoRodando=false;
 function autoResumo(){
   if(!U.gestor || !fatErp || !clientesOk || resumoMeta===null || resumoMeta.erro || resumoRodando) return;
-  var t=Date.parse(resumoMeta.atualizadoEm||''); if(t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===2) return;
+  var t=Date.parse(resumoMeta.atualizadoEm||''); if(t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===3) return;
   gerarResumo(false);
 }
 function gerarResumo(manual, el){
@@ -2114,11 +2160,16 @@ function gerarResumo(manual, el){
     var a=fatMeses.map(function(m){ return Math.round((f[m]||0)*100)/100; });
     if(a.some(function(x){ return x; })) por[c.donoUid][c.id]=a;
   });
+  var vd=vendasPorRep(), sug={};
+  if(vd) Object.keys(vd.por).forEach(function(u){ if(!por[u]){ por[u]={}; prodPor[u]=prodPor[u]||{}; } });
+  calcPopProd();
+  clientes.forEach(function(c){ if(!c.donoUid) return; var s=sugestoesCalc(prodDe(c)); if(s && (s.parou.length||s.falta.length)){ (sug[c.donoUid]=sug[c.donoUid]||{})[c.id]=s; } });
   var uids=Object.keys(por);
   ((resumoMeta&&resumoMeta.uids)||[]).forEach(function(u){ if(uids.indexOf(u)<0){ uids.push(u); por[u]={}; } });   /* carteira que esvaziou */
   var agora=agoraISO(), b=writeBatch(db);
-  uids.forEach(function(u){ b.set(doc(db,'comVendResumo',u), { meses:fatMeses, cli:por[u], prod:prodPor[u]||{}, atualizadoEm:agora, por:U.email, versao:2 }); });
-  b.set(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:2 });
+  uids.forEach(function(u){ b.set(doc(db,'comVendResumo',u), { meses:fatMeses, cli:por[u], prod:prodPor[u]||{}, sug:sug[u]||{},
+    vendido:(vd&&vd.por[u])||{}, atualizadoEm:agora, por:U.email, versao:3 }); });
+  b.set(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:3 });
   var pare=el?ocupado(el,'Atualizando…'):function(){};
   b.commit().then(function(){ resumoRodando=false; pare(); if(manual) toast('Valores atualizados para '+uids.length+' vendedor'+(uids.length===1?'':'es')+'.'); })
     .catch(function(e){ resumoRodando=false; pare(); if(manual) falha('atualizar os valores dos vendedores')(e); else console.warn('resumo:', e); });
@@ -2233,7 +2284,7 @@ function renderEquipe(){
   var media=function(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; };
   var totA=0, tot1=0; lista.forEach(function(x){ if(x.vendas){ totA+=x.vendas[mA]||0; tot1+=x.vendas[m1]||0; } });
   $('eq-kpis').innerHTML=[
-    vd ? kpiEq('Vendido em '+nomeMes(mA), fmtRS0(totA), 'até hoje · '+nomeMes(m1)+': '+fmtRS0(tot1)+(vd.semRep?' · sem representante: '+fmtRS0(vd.semRep[mA]||0):''), '')
+    vd ? kpiEq('Vendido em '+nomeMes(mA), fmtRS0(totA), (function(){ var tm=0; Object.keys(metas).forEach(function(k){ tm+=metas[k]||0; }); return tm?'meta '+fmtRS0(tm)+' ('+Math.round(totA/tm*100)+'%) · ':''; })()+nomeMes(m1)+': '+fmtRS0(tot1)+(vd.semRep?' · sem representante: '+fmtRS0(vd.semRep[mA]||0):''), '')
        : kpiEq('Vendido', '—', fatErp===false?'sem acesso ao faturamento':'carregando o faturamento…', ''),
     kpiEq('Contatos no período', tot.ctt, tot.vis+' visita'+(tot.vis===1?'':'s')+' presencia'+(tot.vis===1?'l':'is')),
     kpiEq('Carteira contatada', tot.cart?Math.round(tot.cob/tot.cart*100)+'%':'—', tot.cob+' de '+tot.cart+' clientes'),
@@ -2242,17 +2293,23 @@ function renderEquipe(){
     kpiEq('Resposta média', fmtHoras(media(todasH)), tot.abertas+' solicitaç'+(tot.abertas===1?'ão':'ões')+' em aberto', '')
   ].join('');
   $('eq-tab').innerHTML=lista.length ? '<table class="tb eq-tab"><tr><th>Vendedor</th>'
-    +(vd?'<th class="r">Vendido em '+nomeMes(mA)+'<br><span class="mini">até hoje</span></th><th class="r">Vendido em '+nomeMes(m1)+'</th><th class="r">'+nomeMes(m1)+' × '+nomeMes(m2)+'</th>':'')
+    +(vd?'<th class="r">Vendido em '+nomeMes(mA)+'<br><span class="mini">até hoje</span></th><th class="r">Meta '+nomeMes(mA)+(U.admin?'<br><span class="mini">toque para definir</span>':'')+'</th><th class="r">% da meta</th><th class="r">Vendido em '+nomeMes(m1)+'</th><th class="r">'+nomeMes(m1)+' × '+nomeMes(m2)+'</th>':'')
     +'<th class="r">Carteira</th><th class="r">Contatos</th><th class="r">Visitas</th><th>Clientes contatados</th>'
     +'<th class="r">Contato atrasado</th><th class="r">Sem comprar</th><th class="r">Comprou menos</th><th class="r">Visita longe</th><th class="r">Pedidos abertos</th></tr>'
     +lista.map(function(x){ var cob=Object.keys(x.cli).length, pc=x.cart?Math.round(cob/x.cart*100):0;
       var n=function(val, cor){ return '<td class="r">'+(val?'<b'+(cor?' style="color:'+cor+'"':'')+'>'+val+'</b>':'<span class="mini">0</span>')+'</td>'; };
       return '<tr style="cursor:pointer" onclick="verVendedor(\''+x.uid+'\')"><td><b>'+esc(x.nome)+'</b>'+(String(x.uid).indexOf('erp:')===0?' <span class="mini">sem login</span>':'')+'</td>'
-        +(vd?colVendas(x.vendas, mA, m1, m2):'')
+        +(vd?colVendas(x.vendas, mA, m1, m2, x):'')
         +'<td class="r">'+x.cart+'</td>'+n(x.ctt)+n(x.vis)
         +'<td><div style="display:flex;align-items:center;gap:8px"><div class="barra" style="flex:1"><i style="width:'+pc+'%"></i></div><span class="mini">'+cob+' · '+pc+'%</span></div></td>'
         +n(x.atras,'var(--red)')+n(x.sem,'var(--red)')+n(x.caiu,'var(--red)')+n(x.longe,'var(--amber)')+n(x.abertas,'var(--amber)')+'</tr>'; }).join('')
     +'</table>' : '<div class="empty">Nenhum vendedor com carteira ainda.</div>';
+  var fv=funilPorVendedor(desdeISO), fk=Object.keys(fv);
+  $('eq-funil').innerHTML=fk.length ? '<table class="tb"><tr><th>Vendedor</th><th class="r">Novo</th><th class="r">Visitado</th><th class="r">Proposta</th><th class="r">Viraram cliente</th><th class="r">Perdidos</th><th class="r">Conversão</th></tr>'
+    +fk.sort(function(a,b){ return String(fv[a].nome).localeCompare(String(fv[b].nome),'pt-BR'); }).map(function(k){ var x=fv[k], tot=x.novo+x.visitado+x.proposta+x.cliente+x.perdido;
+      return '<tr><td><b>'+esc(x.nome)+'</b></td><td class="r">'+x.novo+'</td><td class="r">'+x.visitado+'</td><td class="r">'+x.proposta+'</td><td class="r"><b style="color:var(--green)">'+x.cliente+'</b></td><td class="r">'+x.perdido+'</td>'
+        +'<td class="r">'+(tot?Math.round(x.cliente/tot*100)+'%':'—')+'</td></tr>'; }).join('')+'</table>'
+    : '<div class="empty">Nenhum prospect ainda. Cliente novo entra pelo Registrar contato.</div>';
   $('eq-resp').innerHTML='<table class="tb"><tr><th>Tipo</th><th class="r">Abertas no período</th><th class="r">Primeira resposta (média)</th><th class="r">Em aberto agora</th><th>A mais antiga em aberto</th></tr>'
     +TIPO_IDS.map(function(tp){ var p=porTipo[tp]||{ n:0, abertas:0, horas:[], maisAntiga:'' };
       return '<tr><td>'+TIPOS[tp].ico+' '+TIPOS[tp].nome+'</td><td class="r">'+p.n+'</td><td class="r">'+fmtHoras(media(p.horas))+'</td><td class="r">'+(p.abertas?'<b style="color:var(--amber)">'+p.abertas+'</b>':'0')+'</td>'
@@ -2276,11 +2333,14 @@ function vendasPorRep(){
     var uid=uidDoRep(rep, porNomeDono); por[uid]=por[uid]||{}; por[uid][d.mes]=(por[uid][d.mes]||0)+f; if(!nomes[uid]) nomes[uid]=rep; }); });
   return { por:por, nomes:nomes, semRep:Object.keys(semRep).length?semRep:null };
 }
-function colVendas(vv, mA, m1, m2){
+function colVendas(vv, mA, m1, m2, x){
   vv=vv||{};
   var a=vv[mA]||0, b=vv[m1]||0, c=vv[m2]||0, var_='<span class="mini">—</span>';
   if(c>0){ var p=Math.round((b/c-1)*100); var_='<b style="color:'+(p<=-10?'var(--red)':(p>=10?'var(--green)':'var(--muted)'))+'">'+(p>0?'+':'')+p+'%</b>'; }
-  return '<td class="r"><b>'+(a?fmtRS0(a):'<span class="mini">—</span>')+'</b></td><td class="r">'+(b?fmtRS0(b):'<span class="mini">—</span>')+'</td><td class="r">'+var_+'</td>';
+  var mt=metas[x.uid]||0, pm=mt?Math.round(a/mt*100):null;
+  var metaTd='<td class="r"'+(U.admin?' style="cursor:pointer" onclick="event.stopPropagation();editarMeta(\''+x.uid+'\',\''+esc(x.nome).replace(/'/g,'')+'\')"':'')+'>'+(mt?fmtRS0(mt):'<span class="mini">'+(U.admin?'+ definir':'—')+'</span>')+'</td>';
+  var pctTd='<td class="r">'+(pm==null?'<span class="mini">—</span>':'<b style="color:'+(pm>=100?'var(--green)':'var(--text)')+'">'+pm+'%</b>')+'</td>';
+  return '<td class="r"><b>'+(a?fmtRS0(a):'<span class="mini">—</span>')+'</b></td>'+metaTd+pctTd+'<td class="r">'+(b?fmtRS0(b):'<span class="mini">—</span>')+'</td><td class="r">'+var_+'</td>';
 }
 function kpiEq(rot, val, dica, cor){ return '<div class="card"><div class="klabel">'+rot+'</div><div class="kval"'+(cor?' style="color:'+cor+'"':'')+'>'+val+'</div><div class="khint">'+dica+'</div></div>'; }
 function verVendedor(uid){ filtroCart='todos'; nav('carteira'); var s=$('c-vend'); if(s){ s.value=uid; renderCarteira(); } }
@@ -2575,6 +2635,323 @@ function renderImpStatus(){
     : '<span style="color:var(--amber)">Faça a primeira conferência (botão abaixo) para ligar os representantes; depois disso a sincronização é automática.</span>'; return; }
   el.innerHTML='Última sincronização ('+esc(s.modo||'')+'): <b>'+fmtQuando(s.em)+'</b> · '+(s.novos||0)+' novos, '+(s.transferidos||0)+' mudaram de carteira, '+(s.vinculos||0)+' vínculos corrigidos.';
 }
+
+/* =====================================================================
+   METAS POR VENDEDOR — comMetas/{AAAA-MM}_{uid}: um documento por vendedor
+   e mês, para o vendedor ler só a dele. Quem define é a diretoria.
+   ===================================================================== */
+var metas={}, metaMes='';
+function mesCorrente(){ return hoje().slice(0,7); }
+function ouvirMetas(){
+  metaMes=mesCorrente();
+  var q=U.gestor ? query(collection(db,'comMetas'), where('mes','==',metaMes)) : null;
+  if(q) subs.push(onSnapshot(q, function(s){ metas={}; s.docs.forEach(function(d){ var x=d.data()||{}; if(x.uid) metas[x.uid]=x.valor||0; }); render(); },
+    function(e){ console.warn('comMetas:', e); }));
+  else subs.push(onSnapshot(doc(db,'comMetas', metaMes+'_'+U.uid), function(s){ metas={}; if(s.exists()) metas[U.uid]=(s.data()||{}).valor||0; render(); },
+    function(e){ console.warn('comMetas:', e); }));
+}
+/* dias de venda que faltam no mês, contando hoje (segunda a sábado) */
+function diasUteisRestantes(){
+  var d=new Date(), m=d.getMonth(), n=0;
+  for(var x=new Date(d.getFullYear(), m, d.getDate()); x.getMonth()===m; x.setDate(x.getDate()+1)) if(x.getDay()!==0) n++;
+  return n;
+}
+function vendidoNoMes(uid){
+  var m=mesCorrente();
+  if(U.gestor){ var vd=vendasPorRep(); return vd && vd.por[uid] ? (vd.por[uid][m]||0) : null; }
+  return (fatVend && fatVend.vendido) ? (fatVend.vendido[m]||0) : null;
+}
+function metaCardHtml(){
+  var meta=metas[U.uid]; if(!meta) return '';
+  var v=vendidoNoMes(U.uid); if(v==null) return '';
+  var pct=Math.round(v/meta*100), falta=Math.max(0, meta-v), dias=diasUteisRestantes();
+  return '<div class="card meta-card"><div class="meta-top"><div><div class="klabel">Meta de '+nomeMes(mesCorrente())+'</div>'
+    +'<div class="kval">'+fmtRS0(v)+' <span class="mini" style="font-weight:600">de '+fmtRS0(meta)+'</span></div></div>'
+    +'<div class="meta-pct" style="color:'+(pct>=100?'var(--green)':'var(--text)')+'">'+pct+'%</div></div>'
+    +'<div class="barra" style="height:10px;margin:10px 0 8px"><i style="width:'+Math.min(100,pct)+'%;background:'+(pct>=100?'var(--green)':'var(--primary)')+'"></i></div>'
+    +'<div class="khint">'+(falta ? 'Faltam <b>'+fmtRS0(falta)+'</b> · '+(dias?'<b>'+fmtRS0(falta/dias)+'</b> por dia de venda ('+dias+' dia'+(dias>1?'s':'')+', seg a sáb)':'último dia do mês') : 'Meta batida. 🎉')+'</div></div>';
+}
+function editarMeta(uid, nome){
+  if(!U.admin) return;
+  var atual=metas[uid]||0;
+  var t=prompt('Meta de '+nomeMes(mesCorrente())+' para '+nome+' (R$):', atual?String(atual).replace('.',','):'');
+  if(t===null) return;
+  var v=numBR(t); if(v==null || v<0){ toast('Valor inválido.', true); return; }
+  setDoc(doc(db,'comMetas', mesCorrente()+'_'+uid), { mes:mesCorrente(), uid:uid, nome:nome, valor:v, atualizadoEm:agoraISO(), por:U.email })
+    .then(function(){ toast('Meta de '+nome+': '+fmtRS0(v)+'.'); }).catch(falha('salvar a meta'));
+}
+
+/* =====================================================================
+   OPORTUNIDADES POR CLIENTE
+   - parou de comprar: produto que ele comprava nos 2 meses mais antigos e
+     não comprou nos 2 mais recentes (cliente que segue comprando outras coisas);
+   - o que mais sai: produtos que muitos clientes compram e ele não.
+   ===================================================================== */
+var popProd=null;
+function calcPopProd(){
+  if(!fatErp || !fatMeses.length) return null;
+  var rec=fatMeses.slice(-2), cont={}, total=0;
+  Object.keys(prodErp).forEach(function(n){ var p=prodErp[n], vistos={}, comprou=false;
+    rec.forEach(function(m){ Object.keys(p[m]||{}).forEach(function(x){ comprou=true; vistos[x]=1; }); });
+    if(comprou){ total++; Object.keys(vistos).forEach(function(x){ cont[x]=(cont[x]||0)+1; }); } });
+  popProd={ total:total, lista:Object.keys(cont).map(function(x){ return { p:x, n:cont[x], pct:total?Math.round(cont[x]/total*100):0 }; }).sort(function(a,b){ return b.n-a.n; }) };
+  return popProd;
+}
+function sugestoesCalc(pr){
+  if(!pr) return null;
+  var ms=fatMeses; if(ms.length<4) return null;
+  var antigos=ms.slice(0,2), recentes=ms.slice(-2), comprouRec=false, todos={};
+  recentes.forEach(function(m){ if(Object.keys(pr[m]||{}).length) comprouRec=true; });
+  ms.forEach(function(m){ Object.keys(pr[m]||{}).forEach(function(x){ todos[x]=1; }); });
+  var parou=[];
+  if(comprouRec){
+    var cand={};
+    antigos.forEach(function(m){ Object.keys(pr[m]||{}).forEach(function(x){ var v=(pr[m][x]||[0])[0]||0; cand[x]=cand[x]||{ v:0, ult:m }; cand[x].v+=v; if(m>cand[x].ult) cand[x].ult=m; }); });
+    Object.keys(cand).forEach(function(x){ if(!recentes.some(function(m){ return (pr[m]||{})[x]; })) parou.push({ p:x, v:Math.round(cand[x].v), ult:cand[x].ult }); });
+    parou.sort(function(a,b){ return b.v-a.v; });
+  }
+  var pop=popProd||calcPopProd(), falta=[];
+  if(pop) pop.lista.some(function(o){ if(o.pct<15) return true; if(!todos[o.p]) falta.push({ p:o.p, pct:o.pct }); return falta.length>=3; });
+  return { parou:parou.slice(0,3), falta:falta };
+}
+function sugestoesDe(c){
+  if(c.situacao==='prospect') return null;
+  if(U.gestor) return sugestoesCalc(prodDe(c));
+  return (fatVend && fatVend.sug && fatVend.sug[c.id]) || null;
+}
+function oportunidadesHtml(c){
+  var s=sugestoesDe(c); if(!s || (!s.parou.length && !s.falta.length)) return '';
+  return '<div class="det-sec">💡 Oportunidades</div><div class="oport">'
+    +s.parou.map(function(x){ return '<div class="op op-parou"><b>Parou de comprar: '+esc(x.p)+'</b><span>comprava até '+nomeMes(x.ult)+(x.v?' · '+fmtRS0(x.v)+' naqueles meses':'')+'</span></div>'; }).join('')
+    +s.falta.map(function(x){ return '<div class="op"><b>Ainda não compra: '+esc(x.p)+'</b><span>'+x.pct+'% dos clientes compram</span></div>'; }).join('')
+    +'</div>';
+}
+
+/* =====================================================================
+   FUNIL DE PROSPECTS
+   novo → visitado → proposta → virou cliente (no ERP) · ou perdido.
+   A etapa anda sozinha com o resultado de cada contato; o vendedor
+   também pode ajustar na ficha. Virar cliente é quando aparece no ERP.
+   ===================================================================== */
+var FUNIL=[['novo','Novo'],['visitado','Visitado'],['proposta','Proposta'],['cliente','Virou cliente'],['perdido','Perdido']];
+var FUNIL_ORDEM={ novo:0, visitado:1, proposta:2, cliente:3, perdido:-1 };
+function funilDe(c){
+  if(c.situacao==='prospect') return c.funil||'novo';
+  if(c.prospectDesde && c.situacao==='cliente') return 'cliente';
+  return null;
+}
+function funilPeloResultado(res){
+  if(res==='Sem interesse') return 'perdido';
+  if(res==='Pediu proposta' || res==='Vai pensar / retornar' || res==='Fez pedido') return 'proposta';
+  return 'visitado';
+}
+function funilAvanca(atual, novo){
+  if(novo==='perdido') return 'perdido';
+  if(!atual || atual==='perdido') return novo;
+  return (FUNIL_ORDEM[novo]||0) > (FUNIL_ORDEM[atual]||0) ? novo : atual;
+}
+function funilNome(k){ var f=FUNIL.filter(function(x){ return x[0]===k; })[0]; return f?f[1]:k; }
+function mudarFunil(id, sel){
+  var c=clientePorId(id); if(!c || !podeEditar(c)) return;
+  updateDoc(doc(db,'comClientes',id), { funil:sel.value, atualizadoEm:agoraISO(), atualizadoPor:U.email })
+    .then(function(){ toast('Etapa: '+funilNome(sel.value)+'.'); }).catch(falha('mudar a etapa'));
+}
+function funilFichaHtml(c){
+  var f=funilDe(c); if(!f) return '';
+  if(f==='cliente') return '<div class="alert a-ok">✓ Era prospect'+(c.prospectDesde?' desde '+fmtDia(c.prospectDesde):'')+' e virou cliente no ERP'+(c.convertidoEm?' em '+fmtDia(c.convertidoEm):'')+'.</div>';
+  return '<div class="det-sec">Etapa do prospect</div><div class="funil-linha">'
+    +FUNIL.filter(function(x){ return x[0]!=='cliente'; }).map(function(x){
+      return '<span class="fn'+(x[0]===f?' on':'')+(x[0]==='perdido'?' perd':'')+'">'+x[1]+'</span>'; }).join('<i>›</i>')
+    +(podeEditar(c)?'<select onchange="mudarFunil(\''+c.id+'\',this)" style="width:auto;margin-left:auto">'
+      +FUNIL.filter(function(x){ return x[0]!=='cliente'; }).map(function(x){ return '<option value="'+x[0]+'"'+(x[0]===f?' selected':'')+'>'+x[1]+'</option>'; }).join('')+'</select>':'')
+    +'</div>';
+}
+/* contagem por vendedor (painel da equipe) */
+function funilPorVendedor(desdeISO){
+  var V={};
+  clientes.forEach(function(c){ var f=funilDe(c); if(!f || !c.donoUid) return;
+    if(f==='cliente' && String(c.convertidoEm||'')<desdeISO) return;
+    var x=V[c.donoUid]=V[c.donoUid]||{ nome:c.donoNome||'—', novo:0, visitado:0, proposta:0, cliente:0, perdido:0 };
+    x[f]++; });
+  return V;
+}
+
+/* =====================================================================
+   PRODUTOS E FICHAS TÉCNICAS — comFichas/{id}
+   A diretoria importa os arquivos Word (.docx) como estão: o app lê os
+   campos pelo nome ("Nome do produto:", "Peso", "Código de barras"…), a
+   tabela nutricional e a foto. Importar de novo o mesmo produto atualiza.
+   ===================================================================== */
+var fichas=[], fichasLidas=false, fichaBusca='';
+function ouvirFichas(){
+  subs.push(onSnapshot(collection(db,'comFichas'), function(s){
+    fichas=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); })
+      .sort(function(a,b){ return String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
+    fichasLidas=true; if(pagina==='produtos') renderProdutos();
+  }, function(e){ console.warn('comFichas:', e); fichasLidas=true; }));
+}
+function renderProdutos(){
+  var box=$('prod-lista'); if(!box) return;
+  $('prod-imp').style.display=U.admin?'':'none';
+  if(!fichasLidas){ box.innerHTML='<div class="empty">Carregando…</div>'; return; }
+  var q=norm(fichaBusca).split(' ').filter(Boolean);
+  var l=fichas.filter(function(f){ var t=norm([f.nome,f.ean,f.peso,f.ingredientes].join(' ')); return q.every(function(x){ return t.indexOf(x)>=0; }); });
+  $('psub').textContent=fichas.length+' produto'+(fichas.length===1?'':'s')+' com ficha técnica';
+  box.innerHTML=l.length ? '<div class="prod-grade">'+l.map(function(f){
+      return '<div class="prod" onclick="verFicha(\''+f.id+'\')">'+(f.img?'<img src="'+f.img+'" alt="" loading="lazy">':'<div class="prod-sem">sem foto</div>')
+        +'<div class="prod-c"><b>'+esc(f.nome)+'</b><span>'+esc([f.peso, f.ean?'EAN '+f.ean:''].filter(Boolean).join(' · '))+'</span></div></div>'; }).join('')+'</div>'
+    : '<div class="empty">'+(fichas.length?'Nenhum produto com esse nome.':(U.admin?'Nenhuma ficha ainda. Use <b>Importar fichas (.docx)</b>.':'Nenhuma ficha técnica cadastrada ainda.'))+'</div>';
+}
+function setFichaBusca(v){ fichaBusca=v; renderProdutos(); }
+function fichaTexto(f){
+  var L=[f.nome+(f.peso?' — '+f.peso:'')];
+  if(f.ean) L.push('Código de barras: '+f.ean);
+  if(f.ingredientes) L.push('', 'Ingredientes: '+f.ingredientes);
+  if(f.alergenicos) L.push('', f.alergenicos);
+  if((f.alertas||[]).length) L.push('', f.alertas.join('\n'));
+  if((f.conservacao||[]).length) L.push('', 'Conservação:', f.conservacao.join('\n'));
+  if((f.preparo||[]).length) L.push('', 'Modo de preparo:', f.preparo.map(function(x){ return x.charAt(0)==='§'?x.slice(1):x; }).join('\n'));
+  return L.join('\n');
+}
+function verFicha(id){
+  var f=fichas.filter(function(x){ return x.id===id; })[0]; if(!f) return;
+  var n=f.nutri||{}, corpo='';
+  if(f.img) corpo+='<img src="'+f.img+'" class="ficha-img" onclick="zoom(this.src)">';
+  corpo+='<div class="det"><div><span>Peso</span><b>'+esc(f.peso||'—')+'</b></div><div><span>Código de barras</span><b class="mono">'+esc(f.ean||'—')+'</b></div>'
+    +(n.porcoes?'<div><span>Porções</span><b>'+esc(n.porcoes)+'</b></div>':'')+'</div>';
+  if(f.alergenicos) corpo+='<div class="alert a-warn">⚠ '+esc(f.alergenicos)+'</div>';
+  if((f.alertas||[]).length) corpo+='<div class="chips" style="margin-bottom:13px">'+f.alertas.map(function(a){ return '<span class="tag t-red" style="font-size:12.5px">'+esc(a.replace(/^[-–\s]+/,''))+'</span>'; }).join('')+'</div>';
+  if(f.ingredientes) corpo+='<div class="det-sec">Ingredientes</div><div class="det-txt">'+esc(f.ingredientes)+'</div>';
+  if((n.linhas||[]).length) corpo+='<div class="det-sec">Informação nutricional</div><div class="tscroll" style="max-height:none;margin-bottom:13px"><table class="tb"><tr>'
+    +(n.cab||['','100g','Porção','%VD*']).map(function(h,i){ return '<th'+(i?' class="r"':'')+'>'+esc(h)+'</th>'; }).join('')+'</tr>'
+    +n.linhas.map(function(r){ return '<tr>'+r.map(function(c,i){ return '<td'+(i?' class="r"':'')+'>'+esc(c)+'</td>'; }).join('')+'</tr>'; }).join('')
+    +'</table></div>'+(n.nota?'<div class="mini" style="margin:-6px 0 13px">'+esc(n.nota)+'</div>':'');
+  if((f.conservacao||[]).length) corpo+='<div class="det-sec">Conservação</div><div class="det-txt">'+esc(f.conservacao.join('\n'))+'</div>';
+  if((f.preparo||[]).length) corpo+='<div class="det-sec">Modo de preparo</div><div class="det-txt">'
+    +f.preparo.map(function(x){ return x.charAt(0)==='§'?'<b>'+esc(x.slice(1))+'</b>':esc(x); }).join('\n')+'</div>';
+  abrirModal({ titulo:esc(f.nome), sub:esc(f.arquivo?'Ficha técnica · '+f.arquivo:'Ficha técnica'), wide:true, corpo:corpo,
+    botoes:[{ txt:'Copiar texto', cls:'btn-ghost', fn:function(){ copiarFicha(f); } }].concat(navigator.share?[{ txt:'Compartilhar', fn:function(){ navigator.share({ title:f.nome, text:fichaTexto(f) }).catch(function(){}); } }]:[]) });
+}
+function copiarFicha(f){
+  var t=fichaTexto(f);
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function(){ toast('Ficha copiada. É só colar no WhatsApp.'); })
+    .catch(function(){ toast('Não foi possível copiar neste aparelho.', true); });
+}
+
+/* ---- importação dos arquivos Word ---- */
+function carregarMammoth(){
+  if(window.mammoth) return Promise.resolve();
+  return new Promise(function(ok, falhou){
+    var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js';
+    s.onload=function(){ ok(); }; s.onerror=function(){ falhou(new Error('não carregou o leitor de Word')); }; document.head.appendChild(s);
+  });
+}
+/* lê a ficha pelo NOME de cada campo — a ordem e a formatação podem variar */
+var FICHA_ROTULOS=[['nome','NOME DO PRODUTO'],['ingredientes','INGREDIENTES'],['imagem','IMAGEM DO PRODUTO'],['peso','PESO'],['nutri','INFORMACOES NUTRICIONAIS'],
+  ['ean','CODIGO DE BARRAS'],['alergenicos','INFORMACAO SOBRE GLUTEN'],['alertas','INFORMACAO SOBRE TEOR'],['conservacao','MODO DE CONSERVACAO'],
+  ['preparo','MODO DE PREPARO'],['_fim','LOGO DA MONTE CASTELO'],['_fim','INFORMACOES DE CONTATO'],['_fim','EXISTE UM CANAL'],['_fim','CNPJ'],['_fim','TIPO DE IMPRESSAO']];
+function parseFicha(html){
+  var raiz=new DOMParser().parseFromString('<div>'+html+'</div>','text/html').body.firstChild;
+  var f={ nome:'', ingredientes:'', peso:'', ean:'', alergenicos:'', alertas:[], conservacao:[], preparo:[], nutri:null, img:'' };
+  var h1=raiz.querySelector('h1'); var titulo=h1?h1.textContent.trim():'';
+  var im=raiz.querySelector('img'); if(im) f.img=im.getAttribute('src')||'';
+  var tb=raiz.querySelector('table');
+  if(tb){
+    var rows=Array.prototype.map.call(tb.querySelectorAll('tr'), function(tr){ return Array.prototype.map.call(tr.children, function(td){
+      return Array.prototype.map.call(td.querySelectorAll('p'), function(p){ return p.textContent.trim(); }).filter(Boolean).join(' · ') || td.textContent.trim(); }); });
+    var nt={ porcoes:'', cab:null, linhas:[], nota:'' };
+    rows.forEach(function(r){
+      var t=r.join(' ').trim(); if(!t) return;
+      if(/INFORMA/.test(norm(t)) && r.filter(Boolean).length===1) return;
+      if(/^PORC/.test(norm(r[0]))){ nt.porcoes=r[0]; return; }
+      if(!r[0] && r.length>=3){ nt.cab=['']; for(var i=1;i<r.length;i++) nt.cab.push(r[i].replace(/\*+$/,'*')); return; }
+      if(/^\*/.test(r[0])){ nt.nota=r[0]; return; }
+      if(r.length>=3) nt.linhas.push(r.map(function(x){ return x||''; }));
+    });
+    f.nutri=nt;
+  }
+  /* blocos de texto, na ordem: itens de lista e parágrafos fora da tabela */
+  var blocos=[];
+  raiz.querySelectorAll('p, li').forEach(function(el){
+    if(el.closest('table')) return;
+    var t=el.textContent.replace(/\s+/g,' ').trim(); if(!t) return;
+    var forte=el.querySelector('strong'), soForte=forte && forte.textContent.replace(/\s+/g,' ').trim()===t;
+    blocos.push({ t:t, forte:soForte });
+  });
+  var atual=null;
+  blocos.forEach(function(b){
+    var nb=norm(b.t), rot=null;
+    FICHA_ROTULOS.some(function(r){ if(nb.indexOf(r[1])===0){ rot=r[0]; return true; } return false; });
+    if(rot){
+      atual=rot;
+      var i=b.t.indexOf(':'), resto=i>=0?b.t.slice(i+1).trim():'';
+      if(rot==='nome' || rot==='ingredientes' || rot==='peso' || rot==='ean' || rot==='alergenicos'){ if(resto) f[rot]=resto; }
+      else if((rot==='alertas' || rot==='conservacao' || rot==='preparo') && resto) f[rot].push(resto);
+      return;
+    }
+    if(atual==='alertas') f.alertas.push(b.t);
+    else if(atual==='conservacao') f.conservacao.push(b.t);
+    else if(atual==='preparo') f.preparo.push((b.forte?'§':'')+b.t);
+    else if(atual==='ingredientes' && !f.ingredientes) f.ingredientes=b.t;
+  });
+  if(!f.nome) f.nome=titulo;
+  f.ean=(f.ean.match(/\d{8,14}/)||[f.ean])[0];
+  f.peso=f.peso.replace(/^[:\s]+/,'');
+  return f;
+}
+function reduzirDataURL(src, max){
+  return new Promise(function(ok){
+    if(!src){ ok(''); return; }
+    var img=new Image();
+    img.onload=function(){ var r=Math.min(1, max/Math.max(img.naturalWidth,img.naturalHeight)), cv=document.createElement('canvas');
+      cv.width=Math.round(img.naturalWidth*r); cv.height=Math.round(img.naturalHeight*r);
+      var cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height); cx.drawImage(img,0,0,cv.width,cv.height);
+      ok(cv.toDataURL('image/jpeg',0.8)); };
+    img.onerror=function(){ ok(''); }; img.src=src;
+  });
+}
+var fichasNovas=[];
+function importarFichas(inp){
+  var arqs=Array.prototype.slice.call(inp.files||[]); inp.value=''; if(!arqs.length) return;
+  toast('Lendo '+arqs.length+' arquivo'+(arqs.length>1?'s':'')+'…');
+  carregarMammoth().then(function(){
+    return Promise.all(arqs.map(function(a){
+      return a.arrayBuffer().then(function(buf){ return mammoth.convertToHtml({ arrayBuffer:buf }); })
+        .then(function(r){ var f=parseFicha(r.value); f.arquivo=a.name; return reduzirDataURL(f.img, 900).then(function(d){ f.img=d; return f; }); })
+        .catch(function(e){ return { erro:(e&&e.message)||String(e), arquivo:a.name }; });
+    }));
+  }).then(function(lista){
+    fichasNovas=lista;
+    var ok=lista.filter(function(f){ return !f.erro && f.nome; });
+    var corpo='<table class="tb"><tr><th>Arquivo</th><th>Produto</th><th>EAN</th><th>Peso</th><th>Tabela</th><th>Foto</th></tr>'
+      +lista.map(function(f){ if(f.erro || !f.nome) return '<tr><td class="mini">'+esc(f.arquivo)+'</td><td colspan="5" style="color:var(--red)">Não deu para ler'+(f.erro?': '+esc(f.erro):'')+'</td></tr>';
+        var sim='<span style="color:var(--green)">✓</span>', nao='<span style="color:var(--amber)">falta</span>';
+        return '<tr><td class="mini">'+esc(f.arquivo)+'</td><td><b>'+esc(f.nome)+'</b></td><td class="mono">'+(f.ean?esc(f.ean):nao)+'</td><td>'+(f.peso?esc(f.peso):nao)+'</td>'
+          +'<td>'+(f.nutri&&f.nutri.linhas.length?sim+' '+f.nutri.linhas.length+' linhas':nao)+'</td><td>'+(f.img?sim:nao)+'</td></tr>'; }).join('')+'</table>'
+      +'<p class="mini">Produto que já existe (mesmo código de barras ou mesmo nome) é atualizado; os demais entram novos.</p>';
+    abrirModal({ titulo:'Importar fichas técnicas', sub:ok.length+' de '+lista.length+' prontas', wide:true, corpo:'<div class="tscroll">'+corpo+'</div>',
+      botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Gravar '+ok.length+' ficha'+(ok.length===1?'':'s'), fn:gravarFichas }] });
+  }).catch(falha('ler os arquivos'));
+}
+function idFicha(f){
+  if(f.ean) return 'ean_'+f.ean;
+  return 'n_'+norm(f.nome).replace(/ /g,'_').slice(0,80);
+}
+function gravarFichas(el){
+  var ok=fichasNovas.filter(function(f){ return !f.erro && f.nome; }); if(!ok.length) return;
+  var pare=ocupado(el,'Gravando…'), agora=agoraISO();
+  /* uma por vez: cada ficha com foto pode chegar perto do limite de um documento */
+  var feitas=0;
+  ok.reduce(function(p, f){ return p.then(function(){
+    var d={ nome:f.nome, ean:f.ean||'', peso:f.peso||'', ingredientes:f.ingredientes||'', alergenicos:f.alergenicos||'',
+            alertas:f.alertas||[], conservacao:f.conservacao||[], preparo:f.preparo||[], nutri:f.nutri||null, img:f.img||'',
+            arquivo:f.arquivo||'', atualizadoEm:agora, atualizadoPor:U.email };
+    return setDoc(doc(db,'comFichas', idFicha(f)), d).then(function(){ feitas++; });
+  }); }, Promise.resolve())
+    .then(function(){ toast(feitas+' ficha'+(feitas===1?'':'s')+' gravada'+(feitas===1?'':'s')+'.'); fecharModal(); })
+    .catch(function(e){ pare(); falha('gravar as fichas ('+feitas+' gravadas)')(e); });
+}
+Object.assign(window, { editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas });
 </script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
