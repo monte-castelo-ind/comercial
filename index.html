@@ -1007,7 +1007,7 @@ function kpi(rot, val, dica, acao, cor){
 var FILTROS=[['todos','Todos'],['agenda','Contato atrasado/hoje'],['alerta','Sem comprar'],['queda','Comprou menos'],['semctt','Sem próximo contato'],['prospect','Prospects'],['semerp','Sem vínculo ERP'],['inativo','Inativos']];
 function selVendedor(id, lista){
   var el=$(id); if(!el || !U.gestor) return '';
-  var nomes={}; lista.forEach(function(x){ if(x.donoUid) nomes[x.donoUid]=x.donoNome||x.donoEmail||'?'; });
+  var nomes={}; lista.forEach(function(x){ if(x.donoUid) nomes[x.donoUid]=(x.donoNome||x.donoEmail||'?')+(String(x.donoUid).indexOf('erp:')===0?' (sem login)':''); });
   var atual=el.value, ids=Object.keys(nomes).sort(function(a,b){ return String(nomes[a]).localeCompare(String(nomes[b]),'pt-BR'); });
   var html='<option value="">Todos os vendedores</option>'+ids.map(function(u){ return '<option value="'+u+'">'+esc(nomes[u])+'</option>'; }).join('');
   if(el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html; el.value=atual; }
@@ -1773,17 +1773,19 @@ function impPintarP3(){
     if(IMP.mapa[v]!==undefined) return;
     var salvo=(CFG.vendMapa||{})[normEmp(v)];
     if(salvo!==undefined && (salvo==='' || IMP.usuarios.some(function(u){ return u.uid===salvo; }))){ IMP.mapa[v]=salvo; return; }
+    /* "#nome" guardado: se a pessoa já ganhou login, a sugestão automática abaixo tem preferência */
     var n=norm(v), ach=IMP.usuarios.filter(function(u){
       var nn=norm(u.nome), ne=norm(u.email), np=norm(String(u.email).split('@')[0]);
       return n && (n===nn || n===ne || n===np || (nn && (nn.indexOf(n)===0 || n.indexOf(nn)===0)));
     });
     if(ach.length!==1){ var p1=n.split(' ')[0]; ach=IMP.usuarios.filter(function(u){ return p1 && norm(u.nome).split(' ')[0]===p1; }); }
-    IMP.mapa[v]=ach.length===1?ach[0].uid:'';
+    IMP.mapa[v]=ach.length===1?ach[0].uid:'#nome';
   });
   var opU=function(v){ return '<select onchange="impMapa(this)" data-v="'+esc(v)+'"><option value="">— não importar —</option>'
+    +'<option value="#nome"'+(IMP.mapa[v]==='#nome'?' selected':'')+'>Carteira no nome “'+esc(v)+'” (sem login, por enquanto)</option>'
     +IMP.usuarios.map(function(u){ return '<option value="'+u.uid+'"'+(IMP.mapa[v]===u.uid?' selected':'')+'>'+esc(impNomeU(u))+(u.com?'':' (sem acesso ao Comercial)')+'</option>'; }).join('')+'</select>'; };
   box.innerHTML='<div class="passo"><b>'+(IMP.fonte==='erp'?'1':'3')+'</b> Quem é quem</div>'
-    +'<p class="mini" style="margin-top:0">Ligue cada '+(IMP.fonte==='erp'?IMP.rotulo+' do ERP':'vendedor da planilha')+' a uma pessoa do app. A ligação fica guardada para a próxima vez. Quem não aparece na lista ainda não entrou no app nenhuma vez — peça para entrar uma vez e recarregue esta tela.</p>'
+    +'<p class="mini" style="margin-top:0">Ligue cada '+(IMP.fonte==='erp'?IMP.rotulo+' do ERP':'vendedor da planilha')+' a uma pessoa do app. Quem ainda não tem login pode ficar com a carteira <b>no próprio nome</b>: os clientes já aparecem separados para a diretoria e os gerentes, e no dia em que a pessoa tiver login é só ligá-la aqui e gravar de novo — a carteira passa para ela. A ligação fica guardada para a próxima vez.</p>'
     +'<div class="tscroll" style="max-height:40vh"><table class="tb"><tr><th>'+(IMP.fonte==='erp'?'No ERP':'Na planilha')+'</th><th class="r">Clientes</th><th>No app</th></tr>'
     +vals.map(function(v){ return '<tr><td>'+esc(v)+'</td><td class="r">'+cont[v]+'</td><td>'+opU(v)+'</td></tr>'; }).join('')+'</table></div>'
     +'<label class="chk" style="margin-top:13px"><input type="checkbox" id="imp-semerp" checked> Cadastrar também os clientes que não forem achados no ERP (ficam "sem vínculo")</label>'
@@ -1807,8 +1809,10 @@ function impConferir(){
     if(ids.length>1 && cid){ var f=ids.filter(function(k){ return norm(erp[k].c)===norm(cid); }); if(f.length) ids=f; }
     if(ids.length){ it.erpId=ids[0]; if(ids.length>1) it.obs='nome repetido no ERP — usado o primeiro'; }
     var u=uPor[IMP.mapa[vend]||''];
+    /* carteira só com o nome (sem login): dono provisório "erp:NOME", trocado quando a pessoa ganhar login */
+    if(!u && IMP.mapa[vend]==='#nome' && vend) u={ uid:'erp:'+normEmp(vend).replace(/ /g,'_'), nome:vend, email:'', semLogin:true };
     var atual=(it.erpId&&porErp[it.erpId]) || porNome[normEmp(nome)] || null;
-    if(!u) it.acao='ignorar', it.obs='vendedor sem correspondência';
+    if(!u) it.acao='ignorar', it.obs=(IMP.fonte==='erp'?IMP.rotulo:'vendedor')+' marcado para não importar';
     else if(atual){ it.cliId=atual.id; it.acao=(atual.donoUid===u.uid)?'igual':'transferir'; it.de=atual.donoNome||''; }
     else if(it.erpId || semErp) it.acao='novo';
     else it.acao='ignorar', it.obs='não achado no ERP';
@@ -1831,7 +1835,7 @@ function impConferir(){
     +(semV?'<div class="alert a-warn">⚠ '+semV+' cliente'+(semV>1?'s':'')+' entram sem vínculo com o ERP (nome diferente). Dá para ligar depois, editando cada um.</div>':'')
     +'<div class="tscroll"><table class="tb"><tr><th>#</th><th>Cliente</th><th>Vendedor</th><th>O que acontece</th><th>Obs.</th></tr>'
     +itens.slice(0,600).map(function(x){ var r=ROT[x.acao];
-      return '<tr><td class="mini">'+x.linha+'</td><td>'+esc(x.nome)+(x.erpId?'':'')+'</td><td>'+esc(x.u?impNomeU(x.u):x.vend)+'</td>'
+      return '<tr><td class="mini">'+x.linha+'</td><td>'+esc(x.nome)+(x.erpId?'':'')+'</td><td>'+esc(x.u?impNomeU(x.u):x.vend)+(x.u&&x.u.semLogin?' <span class="mini">(sem login)</span>':'')+'</td>'
         +'<td><span class="st st-'+r[1]+'">'+r[0]+'</span>'+(x.acao==='transferir'&&x.de?' <span class="mini">de '+esc(x.de)+'</span>':'')+'</td><td class="mini">'+esc(x.obs)+'</td></tr>'; }).join('')
     +'</table></div>'+(itens.length>600?'<div class="mini">Mostrando 600 de '+itens.length+' linhas.</div>':'')
     +'<div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
@@ -2052,7 +2056,7 @@ function renderEquipe(){
     +'<th class="r">Contato atrasado</th><th class="r">Sem comprar</th><th class="r">Comprou menos</th><th class="r">Visita longe</th><th class="r">Pedidos abertos</th></tr>'
     +lista.map(function(x){ var cob=Object.keys(x.cli).length, pc=x.cart?Math.round(cob/x.cart*100):0;
       var n=function(val, cor){ return '<td class="r">'+(val?'<b'+(cor?' style="color:'+cor+'"':'')+'>'+val+'</b>':'<span class="mini">0</span>')+'</td>'; };
-      return '<tr style="cursor:pointer" onclick="verVendedor(\''+x.uid+'\')"><td><b>'+esc(x.nome)+'</b></td><td class="r">'+x.cart+'</td>'+n(x.ctt)+n(x.vis)
+      return '<tr style="cursor:pointer" onclick="verVendedor(\''+x.uid+'\')"><td><b>'+esc(x.nome)+'</b>'+(String(x.uid).indexOf('erp:')===0?' <span class="mini">sem login</span>':'')+'</td><td class="r">'+x.cart+'</td>'+n(x.ctt)+n(x.vis)
         +'<td><div style="display:flex;align-items:center;gap:8px"><div class="barra" style="flex:1"><i style="width:'+pc+'%"></i></div><span class="mini">'+cob+' · '+pc+'%</span></div></td>'
         +n(x.atras,'var(--red)')+n(x.sem,'var(--red)')+n(x.caiu,'var(--red)')+n(x.longe,'var(--amber)')+n(x.abertas,'var(--amber)')+'</tr>'; }).join('')
     +'</table>' : '<div class="empty">Nenhum vendedor com carteira ainda.</div>';
