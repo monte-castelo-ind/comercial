@@ -379,7 +379,7 @@ details.mais[open]{padding-bottom:4px}
     <div class="side-sec lbl">Pedidos</div>
     <button class="navbtn" data-p="solic" onclick="nav('solic')"><span class="side-ico">✉</span><span class="lbl lab-d">Solicitações</span><span class="lab-m">Pedidos</span><span class="cnt" id="cntSol" hidden>0</span></button>
     <div class="side-sec lbl admin-only">Ajustes</div>
-    <button class="navbtn so-desk admin-only" data-p="importar" onclick="nav('importar')"><span class="side-ico">⇪</span><span class="lbl">Separar carteira</span></button>
+    <button class="navbtn so-desk admin-only" data-p="importar" onclick="nav('importar')"><span class="side-ico">⇪</span><span class="lbl">Carteira pelo ERP</span></button>
     <button class="navbtn so-desk admin-only" data-p="usuarios" onclick="nav('usuarios')"><span class="side-ico">☺</span><span class="lbl">Usuários e níveis</span></button>
     <button class="navbtn so-desk admin-only" data-p="config" onclick="nav('config')"><span class="side-ico">⚙</span><span class="lbl">Configurações</span></button>
     <div class="side-foot">
@@ -414,7 +414,7 @@ details.mais[open]{padding-bottom:4px}
       <div class="acoes-cel">
         <button class="prim" onclick="abrirVisita()"><span>⌖</span> Registrar visita ou contato</button>
         <button onclick="abrirSolic()"><span>✉</span>Pedir algo</button>
-        <button onclick="abrirCliente()"><span>＋</span>Novo cliente</button>
+        <button onclick="nav('carteira')"><span>▤</span>Minha carteira</button>
       </div>
       <div id="h-promos"></div>
       <div class="kpis" id="kpis"></div>
@@ -437,7 +437,7 @@ details.mais[open]{padding-bottom:4px}
           <option value="fatd">Ordem: maior faturamento</option>
           <option value="fata">Ordem: menor faturamento</option>
         </select>
-        <button class="btn btn-sm btn-novo" onclick="abrirCliente()">+ Novo cliente</button>
+
       </div>
       <div class="chips" id="c-filtros" style="margin-bottom:14px"></div>
       <div id="c-lista"></div>
@@ -500,33 +500,14 @@ details.mais[open]{padding-bottom:4px}
 
     <!-- IMPORTAR CARTEIRA (admin) -->
     <div class="page" id="page-importar">
-      <div class="card" style="max-width:980px;margin-bottom:16px">
-        <div class="sect">Direto do ERP</div>
-        <p class="mini" style="margin-top:0">O faturamento do ERP já diz qual representante atende cada cliente. Este botão monta a carteira
-          a partir dele (mês mais recente em que o cliente comprou). Na primeira vez você liga cada representante do ERP a uma pessoa do app;
-          a ligação fica guardada e, das próximas vezes, é só conferir e gravar.</p>
-        <div class="tools" style="margin:0">
-          <select id="imp-erp-campo">
-            <option value="rep" selected>Separar por representante</option>
-            <option value="vend">Separar pelo vendedor do ERP</option>
-          </select>
-          <select id="imp-erp-dias">
-            <option value="30" selected>Só quem comprou nos últimos 30 dias</option>
-            <option value="60">Só quem comprou nos últimos 60 dias</option>
-            <option value="90">Só quem comprou nos últimos 90 dias</option>
-            <option value="0">Todos os clientes do faturamento</option>
-          </select>
-          <button class="btn" onclick="impDoErp(this)">⇣ Ler do ERP</button>
-        </div>
-      </div>
       <div class="card" style="max-width:980px">
-        <div class="sect">Por planilha</div>
-        <p class="mini" style="margin-top:0">Separa a carteira por vendedor a partir de uma planilha (Excel ou CSV) com, no mínimo,
-          uma coluna com o <b>nome do cliente</b> e outra com o <b>vendedor</b>. O cliente é procurado na base do ERP pelo nome;
-          se já estiver numa carteira, passa para o vendedor da planilha. Nada é gravado antes de você conferir.</p>
-        <div class="passo"><b>1</b> Planilha</div>
-        <div class="imp-drop" onclick="$('imp-file').click()" id="imp-drop">Toque para escolher a planilha (.xlsx, .xls ou .csv)</div>
-        <input type="file" id="imp-file" accept=".xlsx,.xls,.csv,text/csv" style="display:none" onchange="impArquivo(this)">
+        <p class="mini" style="margin-top:0">Quem define o representante de cada cliente é o <b>ERP</b>; o app só lê, para não existir
+          uma segunda informação. Entram os clientes <b>ativos</b> (compraram nos últimos 30 dias). A sincronização é <b>automática</b>:
+          quando a diretoria abre o app, no máximo a cada 12 horas, a carteira volta a espelhar o ERP.</p>
+        <div id="imp-status" class="mini" style="margin-bottom:12px"></div>
+        <p class="mini">Aqui você liga cada representante do ERP a uma pessoa do app (quem ainda não tem login fica com a carteira no próprio nome)
+          e pode conferir o que mudaria antes de gravar.</p>
+        <button class="btn" onclick="impDoErp(this)">⇣ Conferir agora</button>
       </div>
       <div class="card" id="imp-passos" style="display:none;max-width:980px;margin-top:16px">
         <div id="imp-fonte" class="mini"></div>
@@ -600,7 +581,7 @@ const app=initializeApp(cfg), auth=getAuth(app), db=getFirestore(app);
    ===================================================================== */
 
 var U={ uid:'', email:'', nome:'', admin:false, gestor:false, comercial:false };
-var CFG={ respondem:{}, diasAlerta:30 }, cfgExiste=false;
+var CFG={ respondem:{}, diasAlerta:30 }, cfgExiste=false, cfgLido=false;
 var meusTipos=[];                 /* tipos de solicitação que esta pessoa responde */
 var clientes=[], visitas=[], concorrentes=[];
 var solFontes={};                 /* id da consulta -> lista; juntadas em sols */
@@ -773,6 +754,7 @@ function aplicarCfg(c){
   CFG.diasAlerta=(c&&c.diasAlerta>0)?c.diasAlerta:30;
   CFG.vendMapa=(c&&c.vendMapa)||{};
   CFG.gerenteNao=(c&&c.gerenteNao)||[];
+  CFG.carteiraSync=(c&&c.carteiraSync)||null;
   var em=String(U.email||'').toLowerCase();
   meusTipos=TIPO_IDS.filter(function(t){
     if(U.admin) return true;
@@ -795,15 +777,15 @@ function ouvir(){
   pararTudo();
   /* configuração: quem responde muda na hora para todo mundo */
   subs.push(onSnapshot(doc(db,'comConfig','app'), function(s){
-    cfgExiste=s.exists(); var antes=meusTipos.join(','); aplicarCfg(s.exists()?s.data():{});
+    cfgExiste=s.exists(); cfgLido=true; var antes=meusTipos.join(','); aplicarCfg(s.exists()?s.data():{});
     if(meusTipos.join(',')!==antes) ouvirResp();
-    render();
+    render(); tentarSyncCarteira();
   }, function(e){ console.warn('comConfig:', e); }));
 
   if(U.comercial){
     var cc=collection(db,'comClientes');
     subs.push(onSnapshot(U.gestor ? query(cc, limit(3000)) : query(cc, where('donoUid','==',U.uid)),
-      function(s){ delete erros.clientes; clientes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); clientesOk=true; render(); autoResumo(); },
+      function(s){ delete erros.clientes; clientes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); clientesOk=true; render(); autoResumo(); tentarSyncCarteira(); },
       erroLeitura('clientes')));
     /* visitas dos últimos 3 meses: "mes" com in dispensa índice composto */
     var cv=collection(db,'comVisitas'), m3=mesesAtras(3);
@@ -866,7 +848,7 @@ function lerErp(){
     var b={};
     r.docs.forEach(function(d){ var cl=(d.data()||{}).clientes||{}; Object.keys(cl).forEach(function(k){ b[k]=cl[k]; }); });
     Object.keys(b).forEach(function(k){ var c=b[k]; c._busca=norm([c.n,c.nErp,c.c,c.r,c.e].join(' ')); });
-    erp=b; erpEstado='ok'; render();
+    erp=b; erpEstado='ok'; render(); tentarSyncCarteira();
   }).catch(function(e){ console.warn('logClientesMapa:', e); erpEstado='erro'; render(); });
 }
 /* gestor: faturamento por cliente nos últimos 3 meses. O ERP não guarda o mesmo
@@ -887,7 +869,7 @@ function lerFaturamento(){
       Object.keys(cs).forEach(function(k){ var c=cs[k]||{}; var n=normEmp(c.nome||k); if(!n) return;
         idx[n]=idx[n]||{}; idx[n][fatMeses[i]]=(idx[n][fatMeses[i]]||0)+(c.fat||0); });
     });
-    fatErp=idx; render(); autoResumo();
+    fatErp=idx; render(); autoResumo(); tentarSyncCarteira();
   }).catch(function(e){ console.warn('comercialClienteMes:', e); fatErp=false; render(); });
 }
 
@@ -915,10 +897,10 @@ function respondo(s){ return meusTipos.indexOf(s.tipo)>=0; }
 var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:['Carteira','Clientes e prospects'],
   visitas:['Visitas e contatos','Visitas, ligações e WhatsApp registrados'], solic:['Solicitações','Pedidos de preço, bonificação, equipamento e outros'],
   config:['Configurações','Só a diretoria vê esta tela'],
-  importar:['Separar carteira','Clientes por vendedor: direto do ERP ou por planilha'],
+  importar:['Carteira pelo ERP','A carteira segue o representante cadastrado no ERP'],
   equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
   usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'] };
-var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Novo cliente','cliente'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };
+var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };
 function nav(p){
   pagina=p;
   document.querySelectorAll('.navbtn').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-p')===p); });
@@ -950,6 +932,7 @@ function render(){
   else if(pagina==='config') renderConfig();
   else if(pagina==='equipe') renderEquipe();
   else if(pagina==='usuarios') renderUsuarios();
+  else if(pagina==='importar') renderImpStatus();
   $('frescor').textContent=erpEstado==='ok' ? 'Base do ERP: '+Object.keys(erp).length+' clientes' : (erpEstado==='lendo'?'Lendo a base do ERP…':'');
 }
 function badge(){
@@ -1074,7 +1057,7 @@ function renderCarteira(){
   $('psub').textContent=l.length+' cliente'+(l.length===1?'':'s')+(l.length!==clientes.length?' de '+clientes.length:'')
     +(U.gestor&&!$('c-vend').value?' em todas as carteiras':'')+(temVal&&pf?' · '+fmtRS0(tot)+' faturados em '+pf.longo:'');
   $('c-lista').innerHTML=l.length ? l.slice(0,400).map(cartaoCliente).join('')+(l.length>400?'<div class="empty">Mostrando 400 de '+l.length+'. Use a busca.</div>':'')
-    : '<div class="empty">'+(clientes.length?'Nenhum cliente neste filtro.':'Sua carteira está vazia. Toque em <b>+ Novo cliente</b> para começar.')+'</div>';
+    : '<div class="empty">'+(clientes.length?'Nenhum cliente neste filtro.':'Sua carteira está vazia. Ela vem do ERP (clientes em que você é o representante). Cliente novo entra por <b>Registrar contato</b>.')+'</div>';
 }
 function setFiltroCart(f){ filtroCart=f; renderCarteira(); }
 
@@ -1377,8 +1360,7 @@ function abrirCliente(id){
   var opF='<option value="">— não sabe / não informado —</option>'+concorrentes.map(function(x){ return '<option'+(c&&c.fornecedor===x.nome?' selected':'')+'>'+esc(x.nome)+'</option>'; }).join('')
     +(c&&c.fornecedor&&!concorrentes.some(function(x){ return x.nome===c.fornecedor; })?'<option selected>'+esc(c.fornecedor)+'</option>':'')
     +'<option value="__novo">+ Cadastrar outro fornecedor…</option>';
-  var corpo=(U.admin?'<div class="fld"><label>Carteira de</label><select id="fc-dono"><option value="">Carregando…</option></select></div>':'')
-    +'<div class="fld"><label>Procure na base do ERP <span class="mini">— traz nome, cidade, rota e última compra</span></label><div id="fc-erp"></div></div>'
+  var corpo='<div class="fld"><label>Procure na base do ERP <span class="mini">— traz nome, cidade, rota e última compra</span></label><div id="fc-erp"></div></div>'
     +'<div class="fld"><label>Nome do cliente *</label><input type="text" id="fc-nome" value="'+esc(c?c.nome:'')+'"></div>'
     +'<div class="fld"><label>Situação</label><div class="chips" id="fc-sit">'
     +[['cliente','Cliente'],['prospect','Prospect'],['inativo','Inativo']].map(function(s){ return '<button type="button" class="chip'+(sit===s[0]?' on':'')+'" data-v="'+s[0]+'" onclick="fcSit(this)">'+s[1]+'</button>'; }).join('')+'</div></div>'
@@ -1397,12 +1379,6 @@ function abrirCliente(id){
   abrirModal({ titulo:c?'Editar cliente':'Novo cliente', wide:true, corpo:corpo,
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Salvar', fn:salvarCliente }] });
   fcPintarErp(); fcPintarPrecos(); proxPintar('fc-prox');
-  if(U.admin) carregarUsuarios().then(function(){
-    var sel=$('fc-dono'); if(!sel) return;
-    var atual=c?c.donoUid:U.uid;
-    var vs=usuariosLista.filter(function(u){ return u.ativo && (u.comercial || u.admin || u.uid===atual); });
-    sel.innerHTML=vs.map(function(u){ return '<option value="'+u.uid+'"'+(u.uid===atual?' selected':'')+'>'+esc(u.nome||u.email)+' · '+NIVEL_NOME[nivelDe(u)]+'</option>'; }).join('');
-  }).catch(function(){ var sel=$('fc-dono'); if(sel) sel.innerHTML='<option value="">(não foi possível ler os usuários)</option>'; });
 }
 function podeEditar(c){ return !!c && (U.admin || souDono(c)); }
 function fcSit(b){ document.querySelectorAll('#fc-sit .chip').forEach(function(x){ x.classList.toggle('on', x===b); }); }
@@ -1532,15 +1508,27 @@ function fvSelCli(sel){
   var box=$('fv-add'); if(!box) return;
   /* cliente novo: o mínimo para achar de novo; a ficha completa de cadastro vem depois */
   if(sel && sel.novo){
-    box.innerHTML='<div class="grid2" style="margin-top:10px"><div class="fld"><label>Cidade *</label><input type="text" id="fv-n-cid"></div>'
+    /* os mesmos dados do cadastro de cliente; o essencial à vista, o resto em "Mais detalhes" */
+    fc={ id:null, erpId:'', erpNome:'', precos:[{p:'',v:null,u:''}] };
+    var opF='<option value="">— não sabe / não informado —</option>'+concorrentes.map(function(x){ return '<option>'+esc(x.nome)+'</option>'; }).join('')
+      +'<option value="__novo">+ Cadastrar outro fornecedor…</option>';
+    box.innerHTML='<div class="grid2" style="margin-top:10px">'
       +'<div class="fld"><label>Telefone / WhatsApp *</label><input type="tel" id="fv-n-tel"></div>'
+      +'<div class="fld"><label>Cidade *</label><input type="text" id="fv-n-cid"></div>'
       +'<div class="fld"><label>Pessoa de contato</label><input type="text" id="fv-n-ctt"></div>'
-      +'<div class="fld"><label>Endereço</label><input type="text" id="fv-n-end" placeholder="rua, número, bairro"></div></div>'
-      +'<div class="mini">Entra na sua carteira como <b>prospect</b>.</div>';
+      +'<div class="fld"><label>Hoje compra de</label><select id="fv-n-forn" onchange="fcForn(this)">'+opF+'</select></div></div>'
+      +maisDetalhes('Mais detalhes do cliente (endereço, preços que paga, observações)',
+         '<div class="grid2"><div class="fld"><label>Endereço</label><input type="text" id="fv-n-end" placeholder="rua, número, bairro"></div>'
+        +'<div class="fld"><label>Total mensal estimado (R$)</label><input type="text" inputmode="decimal" id="fv-n-tot"></div></div>'
+        +'<label>Preços que paga hoje</label><div id="fc-precos"></div>'
+        +'<button type="button" class="btn btn-sm btn-ghost" onclick="fcAddPreco()" style="margin-bottom:13px">+ produto</button>'
+        +'<div class="fld"><label>Observações sobre o cliente</label><textarea id="fv-n-obs" style="min-height:62px"></textarea></div>')
+      +'<div class="mini">Entra na sua carteira como <b>prospect</b>. Quando virar cliente no ERP, passa a seguir o representante de lá.</div>';
+    fcPintarPrecos();
     return;
   }
   box.innerHTML=(sel && !sel.clienteId)
-    ? '<label class="chk" style="margin:9px 0 0"><input type="checkbox" id="fv-addcart"> Colocar este cliente na minha carteira</label>' : '';
+    ? '<div class="mini" style="margin-top:8px">Cliente do ERP fora da sua carteira: o contato fica registrado; a carteira segue o representante do ERP.</div>' : '';
   var c=sel&&sel.clienteId?clientePorId(sel.clienteId):null;
   if(c && c.proxContato && c.proxContato>hoje()){ $('fv-prox').value=c.proxContato; proxPintar('fv-prox'); }
 }
@@ -1603,10 +1591,13 @@ function salvarVisita(el){
   var add=$('fv-addcart');
   if(sel.novo){
     var nCid=$('fv-n-cid').value.trim(), nTel=$('fv-n-tel').value.trim();
-    if(!nCid || !nTel){ toast('Cliente novo: informe cidade e telefone.', true); return; }
+    if(!nTel || !nCid){ toast('Cliente novo: informe telefone e cidade.', true); return; }
+    fcLerPrecos();
+    var forn=$('fv-n-forn').value; if(forn==='__novo') forn='';
     var nref=doc(collection(db,'comClientes'));
     b.set(nref, { nome:sel.nome, situacao:'prospect', erpId:'', erpNome:'', cidade:nCid, rota:'', contato:$('fv-n-ctt').value.trim(), telefone:nTel,
-      endereco:$('fv-n-end').value.trim(), fornecedor:'', totalMensal:null, precos:[], obs:'',
+      endereco:$('fv-n-end').value.trim(), fornecedor:forn, totalMensal:numBR($('fv-n-tot').value),
+      precos:fc.precos.filter(function(p){ return p.p; }), obs:$('fv-n-obs').value.trim(),
       proxContato:prox, proxObs:proxObs, ultimoContato:data, origem:'novo no registro de contato',
       donoUid:U.uid, donoNome:U.nome, donoEmail:U.email, criadoEm:agora, atualizadoEm:agora, atualizadoPor:U.email });
     cid=nref.id; sel.cidade=nCid;
@@ -1831,34 +1822,34 @@ function impGuardarMapa(){
   setDoc(doc(db,'comConfig','app'), { vendMapa:m }, { merge:true }).catch(function(e){ console.warn('vendMapa:', e); });
 }
 /* monta as "linhas" a partir do faturamento: vendedor do mês mais recente em que o cliente apareceu */
-function impDoErp(el){
-  if(!U.admin) return;
-  if(!cmDocs.length){ toast(fatErp===false?'Sem acesso ao faturamento do ERP.':'O faturamento ainda está carregando. Tente em alguns segundos.', true); return; }
-  /* rep = representante (coluna de representantes do ERP); vend = vendedor interno do pedido */
-  var campo=($('imp-erp-campo')&&$('imp-erp-campo').value)||'rep', rot=campo==='rep'?'representante':'vendedor';
+/* Clientes ATIVOS (compraram nos últimos 30 dias) e o representante de cada um,
+   pelo faturamento do ERP. O representante é decidido no ERP; o app só lê. */
+var DIAS_ATIVO=30;
+function linhasErpAtivas(){
   var ult={}, todos={};
   cmDocs.forEach(function(d){ Object.keys(d.clientes).forEach(function(k){ var c=d.clientes[k]||{}; todos[k]=1;
-    var v=String(c[campo]||'').trim(); if(v) ult[k]={ nome:c.nome||k, quem:v }; }); });
+    var v=String(c.rep||'').trim(); if(v) ult[k]={ nome:c.nome||k, quem:v }; }); });
   var comCampo=Object.keys(ult);
-  if(!comCampo.length){ toast('O faturamento não trouxe o '+rot+' dos clientes.', true); return; }
-  /* só clientes ativos: última compra (base do ERP, ligada pelo nome) dentro do período.
-     Nome que não está na base: vale ter comprado no mês atual, se o período cobre o mês. */
-  var dias=+(($('imp-erp-dias')&&$('imp-erp-dias').value)||30), limite=dias?somaDias(hoje(), -dias):'';
-  var uPorNome={};
+  var limite=somaDias(hoje(), -DIAS_ATIVO), uPorNome={};
   Object.keys(erp).forEach(function(id){ var e=erp[id]; if(!e.u) return;
     [e.n, e.nErp].forEach(function(n){ n=normEmp(n); if(n && (!uPorNome[n] || e.u>uPorNome[n])) uPorNome[n]=String(e.u).slice(0,10); }); });
   var mesAtual=hoje().slice(0,7), docAtual=cmDocs.filter(function(d){ return d.mes===mesAtual; })[0], diaHoje=+hoje().slice(8,10);
   var ativos=comCampo.filter(function(k){
-    if(!limite) return true;
     var u=uPorNome[normEmp(ult[k].nome)];
     if(u) return u>=limite;
     var c=docAtual&&docAtual.clientes[k];
-    return !!(c && (c.fat||0)>0 && diaHoje<=dias);
+    return !!(c && (c.fat||0)>0 && diaHoje<=DIAS_ATIVO);
   });
-  var linhas=ativos.map(function(k){ return [ult[k].nome, ult[k].quem]; });
-  if(!linhas.length){ toast('Nenhum cliente com '+rot+' comprou nos últimos '+dias+' dias.', true); return; }
-  IMP={ cab:['Cliente', rot], linhas:linhas, col:{ cli:0, vend:1, cid:-1 }, mapa:{}, usuarios:IMP.usuarios, plano:null, nomeArq:'ERP', fonte:'erp',
-        rotulo:rot, semCampo:Object.keys(todos).length-comCampo.length, parados:comCampo.length-ativos.length, dias:dias };
+  return { linhas:ativos.map(function(k){ return [ult[k].nome, ult[k].quem]; }), semCampo:Object.keys(todos).length-comCampo.length, parados:comCampo.length-ativos.length };
+}
+function impDoErp(el){
+  if(!U.admin) return;
+  if(!cmDocs.length){ toast(fatErp===false?'Sem acesso ao faturamento do ERP.':'O faturamento ainda está carregando. Tente em alguns segundos.', true); return; }
+  if(erpEstado!=='ok'){ toast('A base de clientes do ERP ainda está carregando. Tente em alguns segundos.', true); return; }
+  var r=linhasErpAtivas();
+  if(!r.linhas.length){ toast('Nenhum cliente com representante comprou nos últimos '+DIAS_ATIVO+' dias.', true); return; }
+  IMP={ cab:['Cliente','representante'], linhas:r.linhas, col:{ cli:0, vend:1, cid:-1 }, mapa:{}, usuarios:IMP.usuarios, plano:null, nomeArq:'ERP', fonte:'erp',
+        rotulo:'representante', semCampo:r.semCampo, parados:r.parados, dias:DIAS_ATIVO };
   $('imp-p3').innerHTML=''; $('imp-p4').innerHTML='';
   var pare=ocupado(el,'Lendo…');
   impUsuarios().then(function(){ pare(); impPintarP2(); $('imp-passos').scrollIntoView({ behavior:'smooth', block:'start' }); })
@@ -1920,10 +1911,20 @@ function impPintarP3(){
     +'<label class="chk" style="margin-top:13px"><input type="checkbox" id="imp-semerp" checked> Cadastrar também os clientes que não forem achados no ERP (ficam "sem vínculo")</label>'
     +'<button class="btn" onclick="impConferir()">Conferir antes de gravar</button>';
 }
-function impMapa(sel){ IMP.mapa[sel.getAttribute('data-v')]=sel.value; IMP.plano=null; $('imp-p4').innerHTML=''; }
+function impMapa(sel){
+  var v=sel.getAttribute('data-v'); IMP.mapa[v]=sel.value; IMP.plano=null; $('imp-p4').innerHTML='';
+  /* a ligação vale para a sincronização automática: guarda na hora */
+  var m={}; m[normEmp(v)]=sel.value; CFG.vendMapa[normEmp(v)]=sel.value;
+  setDoc(doc(db,'comConfig','app'), { vendMapa:m }, { merge:true }).catch(falha('guardar a ligação'));
+}
 function impConferir(){
   if(erpEstado!=='ok'){ toast('A base do ERP ainda não carregou. Espere alguns segundos.', true); return; }
-  var semErp=$('imp-semerp').checked;
+  var itens=calcularPlano($('imp-semerp').checked);
+  IMP.plano=itens;
+  pintarPlano(itens);
+}
+/* o que muda na carteira: usado na conferência e na sincronização automática */
+function calcularPlano(semErp){
   var idxErp={};
   Object.keys(erp).forEach(function(k){ var e=erp[k]; [e.n,e.nErp].forEach(function(n){ n=normEmp(n); if(!n) return; (idxErp[n]=idxErp[n]||[]); if(idxErp[n].indexOf(k)<0) idxErp[n].push(k); }); });
   var porErp={}, porNome={};
@@ -1954,7 +1955,9 @@ function impConferir(){
     if(vistos[chave]){ it.acao='ignorar'; it.obs='repetido na planilha (linha '+vistos[chave]+')'; } else vistos[chave]=it.linha;
     itens.push(it);
   });
-  IMP.plano=itens;
+  return itens;
+}
+function pintarPlano(itens){
   var n=function(a){ return itens.filter(function(x){ return x.acao===a; }).length; };
   var semV=itens.filter(function(x){ return x.acao==='novo' && !x.erpId; }).length;
   var ROT={ novo:['Novo','green'], transferir:['Muda de carteira','amber'], vincular:['Vínculo corrigido','blue'], igual:['Já está certo','muted'], ignorar:['Fica de fora','red'] };
@@ -1980,33 +1983,71 @@ function impGravar(el){
   if(!ops.length) return;
   if(!confirm('Gravar '+ops.length+' alterações na carteira?')) return;
   el.disabled=true;
-  var agora=agoraISO(), lotes=[], i;
-  for(i=0;i<ops.length;i+=400) lotes.push(ops.slice(i,i+400));
-  var feitos=0, prog=$('imp-prog');
-  var roda=function(k){
-    if(k>=lotes.length){ prog.textContent=''; toast(feitos+' clientes gravados.'); impGuardarMapa(); $('imp-p4').innerHTML='<div class="alert a-ok">✓ Importação concluída: '+feitos+' clientes gravados. A carteira de cada vendedor já está atualizada.</div>'; IMP.plano=null; return; }
-    var b=writeBatch(db);
-    lotes[k].forEach(function(x){
-      var u=x.u, dono={ donoUid:u.uid, donoNome:impNomeU(u), donoEmail:u.email||'', atualizadoEm:agora, atualizadoPor:U.email };
-      if(x.acao==='transferir' || x.acao==='vincular'){
-        var c=clientePorId(x.cliId)||{}, up=x.acao==='transferir'?Object.assign({}, dono):{ atualizadoEm:agora, atualizadoPor:U.email };
-        if(x.erpId && (!c.erpId || x.novoErp)){ var e0=erp[x.erpId]||{}; up.erpId=x.erpId; up.erpNome=e0.nErp||e0.n||''; }
-        b.update(doc(db,'comClientes',x.cliId), up);
-      } else {
-        var e=x.erpId?(erp[x.erpId]||{}):{};
-        b.set(doc(collection(db,'comClientes')), Object.assign({
-          nome:(e.n||x.nome), situacao:'cliente', erpId:x.erpId||'', erpNome:x.erpId?(e.nErp||e.n||''):'',
-          cidade:e.c||x.cid||'', rota:e.r||'', contato:'', telefone:'', fornecedor:'', totalMensal:null, precos:[], obs:'',
-          proxContato:'', proxObs:'', ultimoContato:'', criadoEm:agora, origem:'planilha: '+IMP.nomeArq }, dono));
-      }
-    });
-    prog.textContent='Gravando… '+feitos+' de '+ops.length;
-    b.commit().then(function(){ feitos+=lotes[k].length; roda(k+1); })
-      .catch(function(e){ el.disabled=false; prog.textContent=''; falha('gravar a importação (gravados '+feitos+' de '+ops.length+')')(e); });
-  };
-  roda(0);
+  var prog=$('imp-prog');
+  gravarPlano(ops, function(f){ prog.textContent='Gravando… '+f+' de '+ops.length; }).then(function(feitos){
+    prog.textContent=''; toast(feitos+' clientes gravados.'); impGuardarMapa(); registrarSync(ops, 'manual');
+    $('imp-p4').innerHTML='<div class="alert a-ok">✓ Pronto: '+feitos+' clientes gravados. A carteira de cada vendedor já está atualizada.</div>'; IMP.plano=null;
+  }).catch(function(e){ el.disabled=false; prog.textContent=''; falha('gravar a carteira ('+(e.feitos||0)+' de '+ops.length+' gravados)')(e); });
 }
-
+function gravarPlano(ops, aoAvancar){
+  var agora=agoraISO(), lotes=[], i, feitos=0;
+  for(i=0;i<ops.length;i+=400) lotes.push(ops.slice(i,i+400));
+  return new Promise(function(ok, falhou){
+    var roda=function(k){
+      if(k>=lotes.length){ ok(feitos); return; }
+      var b=writeBatch(db);
+      lotes[k].forEach(function(x){
+        var u=x.u, dono={ donoUid:u.uid, donoNome:impNomeU(u), donoEmail:u.email||'', atualizadoEm:agora, atualizadoPor:U.email };
+        if(x.acao==='transferir' || x.acao==='vincular'){
+          var c=clientePorId(x.cliId)||{}, up=x.acao==='transferir'?Object.assign({}, dono):{ atualizadoEm:agora, atualizadoPor:U.email };
+          if(x.erpId && (!c.erpId || x.novoErp)){ var e0=erp[x.erpId]||{}; up.erpId=x.erpId; up.erpNome=e0.nErp||e0.n||''; }
+          if(x.acao==='transferir' && c.situacao==='prospect') up.situacao='cliente';     /* prospect que virou cliente no ERP */
+          b.update(doc(db,'comClientes',x.cliId), up);
+        } else {
+          var e=x.erpId?(erp[x.erpId]||{}):{};
+          b.set(doc(collection(db,'comClientes')), Object.assign({
+            nome:(e.n||x.nome), situacao:'cliente', erpId:x.erpId||'', erpNome:x.erpId?(e.nErp||e.n||''):'',
+            cidade:e.c||x.cid||'', rota:e.r||'', contato:'', telefone:'', fornecedor:'', totalMensal:null, precos:[], obs:'',
+            proxContato:'', proxObs:'', ultimoContato:'', criadoEm:agora, origem:'ERP (representante)' }, dono));
+        }
+      });
+      b.commit().then(function(){ feitos+=lotes[k].length; if(aoAvancar) aoAvancar(feitos); roda(k+1); })
+        .catch(function(e){ e.feitos=feitos; falhou(e); });
+    };
+    roda(0);
+  });
+}
+function registrarSync(ops, modo){
+  var n=function(a){ return ops.filter(function(x){ return x.acao===a; }).length; };
+  return setDoc(doc(db,'comConfig','app'), { carteiraSync:{ em:agoraISO(), por:U.email, modo:modo, novos:n('novo'), transferidos:n('transferir'), vinculos:n('vincular') } }, { merge:true })
+    .catch(function(e){ console.warn('carteiraSync:', e); });
+}
+/* SINCRONIZAÇÃO AUTOMÁTICA: quando a diretoria abre o app, no máximo a cada
+   12 h, a carteira volta a espelhar o representante do ERP. Só roda depois da
+   primeira conferência manual (precisa da ligação "representante → pessoa"). */
+var syncRodando=false, syncFeito=false;
+function tentarSyncCarteira(){
+  if(!U.admin || syncRodando || syncFeito || !cfgLido) return;
+  if(!cmDocs.length || erpEstado!=='ok' || !clientesOk) return;
+  if(!Object.keys(CFG.vendMapa||{}).length) return;
+  var t=Date.parse((CFG.carteiraSync&&CFG.carteiraSync.em)||'');
+  if(t && Date.now()-t < 12*3600*1000){ syncFeito=true; return; }
+  syncRodando=true;
+  carregarUsuarios().then(function(lista){
+    var r=linhasErpAtivas(), mapa={}, ok={};
+    lista.forEach(function(u){ if(u.ativo) ok[u.uid]=u; });
+    r.linhas.forEach(function(l){ var v=l[1], s=CFG.vendMapa[normEmp(v)]; mapa[v]=(s==='')?'':((s && ok[s])?s:'#nome'); });
+    var guard=IMP;
+    IMP={ cab:['Cliente','representante'], linhas:r.linhas, col:{ cli:0, vend:1, cid:-1 }, mapa:mapa,
+          usuarios:lista.filter(function(u){ return u.ativo; }).map(function(u){ return { uid:u.uid, nome:u.nome, email:u.email }; }), fonte:'erp', rotulo:'representante' };
+    var itens=calcularPlano(true); IMP=guard;
+    var ops=itens.filter(function(x){ return x.acao==='novo' || x.acao==='transferir' || x.acao==='vincular'; });
+    return (ops.length ? gravarPlano(ops) : Promise.resolve(0)).then(function(f){
+      syncRodando=false; syncFeito=true; registrarSync(ops, 'automática');
+      if(f) toast('Carteira atualizada pelo ERP: '+f+' cliente'+(f>1?'s':'')+'.');
+    });
+  }).catch(function(e){ syncRodando=false; syncFeito=true; console.warn('sincronizar carteira:', e); });
+}
 /* ---------- funções chamadas pelo HTML (o script é módulo) ---------- */
 Object.assign(window, {
   $:$, nav:nav, sair:sair, fabAcao:fabAcao, fecharModal:fecharModal, mbClick:mbClick, zoom:zoom,
@@ -2525,6 +2566,15 @@ function gerenciarPromos(){
   abrirModal({ titulo:'Promoções', sub:'Toque para editar ou republicar', corpo:corpo, botoes:[{ txt:'+ Nova promoção', fn:function(){ abrirPromo(); } }] });
 }
 Object.assign(window, { verPromo:verPromo, abrirPromo:abrirPromo, gerenciarPromos:gerenciarPromos, fpFoto:fpFoto, fpTirar:fpTirar });
+
+/* ---- tela "Carteira pelo ERP": situação da última sincronização ---- */
+function renderImpStatus(){
+  var el=$('imp-status'); if(!el) return;
+  var s=CFG.carteiraSync;
+  if(!s){ el.innerHTML=Object.keys(CFG.vendMapa||{}).length ? 'Ainda não houve sincronização automática — acontece na próxima vez que a diretoria abrir o app.'
+    : '<span style="color:var(--amber)">Faça a primeira conferência (botão abaixo) para ligar os representantes; depois disso a sincronização é automática.</span>'; return; }
+  el.innerHTML='Última sincronização ('+esc(s.modo||'')+'): <b>'+fmtQuando(s.em)+'</b> · '+(s.novos||0)+' novos, '+(s.transferidos||0)+' mudaram de carteira, '+(s.vinculos||0)+' vínculos corrigidos.';
+}
 </script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
