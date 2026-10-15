@@ -41,7 +41,7 @@ html,body{margin:0;padding:0;height:100%}
 body{background:var(--bg);color:var(--text);font-family:'Archivo',system-ui,sans-serif;
      font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 .mono{letter-spacing:.02em}
-.brand-logo-box{height:44px;width:100%;background:var(--logo-light) no-repeat left center;background-size:contain}
+.brand-logo-box{height:44px;width:100%;background:var(--logo-light) no-repeat center center;background-size:contain}
 html[data-theme="dark"] .brand-logo-box{background-image:var(--logo-gold)}
 
 /* ---- login ---- */
@@ -59,7 +59,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)
 textarea{min-height:88px;resize:vertical;line-height:1.55}
 .fld{margin-bottom:13px}
 .btn{background:var(--primary);border:none;color:#fff;font-family:inherit;font-weight:700;
-     font-size:14px;padding:10px 17px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+     font-size:14px;padding:10px 17px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;
      box-shadow:0 6px 18px var(--prim-sombra)}
 .btn:hover{filter:brightness(1.08)} .btn:disabled{opacity:.5;cursor:default}
 .btn-sm{font-size:12.5px;padding:7px 13px;border-radius:9px}
@@ -82,11 +82,11 @@ textarea{min-height:88px;resize:vertical;line-height:1.55}
 html[data-theme="light"] .side:hover:not(.pin){box-shadow:14px 0 40px rgba(20,20,40,.14)}
 .side .lbl{transition:opacity .12s}
 .side:not(.pin):not(:hover) .lbl{opacity:0}
-.side-logo{padding:0 4px 12px;cursor:pointer}
+.side-logo{padding:0 30px 12px;cursor:pointer}
 .side-logo .logo-mini{display:none;font-size:20px;text-align:center}
 .side:not(.pin):not(:hover) .side-logo .brand-logo-box,.side:not(.pin):not(:hover) .side-logo .brand-cap{display:none}
 .side:not(.pin):not(:hover) .side-logo .logo-mini{display:block}
-.brand-cap{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.brand-cap{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:6px;text-align:center}
 .pinbtn{position:absolute;top:20px;right:12px;width:30px;height:30px;padding:0;font-size:16px;border-radius:8px;
         background:none;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .pinbtn:hover{background:var(--card-2);color:var(--text)}
@@ -143,6 +143,18 @@ h1{margin:0;font-size:21px;font-weight:700;letter-spacing:-.4px}
 .empty{text-align:center;color:var(--muted);padding:26px 0;font-size:13.5px}
 .sect{font-size:15px;font-weight:700;margin:24px 0 11px}
 .sect:first-child{margin-top:0}
+.sec{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+.sec:first-child{margin-top:0}
+/* mapa das visitas (Leaflet + OpenStreetMap) */
+#v-mapa{height:62vh;min-height:360px;border-radius:16px;border:1px solid var(--border);z-index:1;background:var(--card-2)}
+.leg{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--muted)}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.leaflet-popup-content{font:13px/1.45 'Archivo',sans-serif}
+/* painel da equipe */
+.eq-tab td,.eq-tab th{white-space:nowrap}
+.eq-tab td.r b{font-weight:700}
+.barra{height:6px;border-radius:3px;background:var(--card-2);overflow:hidden;min-width:60px}
+.barra i{display:block;height:100%;background:var(--primary)}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px}
 .acoes-cel{display:none}
 
@@ -262,6 +274,7 @@ details.mais[open]{padding-bottom:4px}
 .toast.erro-t{border-color:var(--red);color:var(--red)}
 .lab-m{display:none}
 .fab{display:none}
+.tools .btn-novo{display:none}      /* a ação fica no botão do topo (computador) ou no botão redondo (celular) */
 .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin:0 0 13px;cursor:pointer}
 .chk input{width:18px;height:18px;accent-color:var(--primary)}
 .imp-drop{border:2px dashed var(--border);border-radius:16px;padding:28px;text-align:center;color:var(--muted);cursor:pointer}
@@ -287,22 +300,22 @@ details.mais[open]{padding-bottom:4px}
   #topo-m{display:flex;align-items:center;gap:8px;margin-bottom:12px}
   #topo-m .tm-marca{flex:1;font-size:12px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
   .topbar .top-r{display:none}
+  .fab{display:flex;position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:790;
+       width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;border:none;font-size:28px;
+       align-items:center;justify-content:center;box-shadow:0 8px 22px var(--prim-sombra);cursor:pointer}
   .topbar{margin-bottom:14px}
   h1{font-size:24px}
 }
 @media(max-width:600px){
   .kpis{grid-template-columns:1fr 1fr;gap:8px}
   .kval{font-size:23px}
-  .tools .btn-novo{display:none}
+  .kpis>.card:last-child:nth-child(odd){grid-column:1/-1}
   .acoes-cel{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
   .acoes-cel button{background:var(--card);border:1px solid var(--border);border-radius:16px;color:var(--text);font:700 14px 'Archivo',sans-serif;
      padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
   .acoes-cel button span{font-size:22px}
   .acoes-cel button.prim{grid-column:1/-1;background:var(--primary);border-color:var(--primary);color:#fff;flex-direction:row;justify-content:center;
      font-size:16px;padding:16px;box-shadow:0 6px 18px var(--prim-sombra)}
-  .fab{display:flex;position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:790;
-       width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;border:none;font-size:28px;
-       align-items:center;justify-content:center;box-shadow:0 8px 22px var(--prim-sombra);cursor:pointer}
   .mask{align-items:flex-end;padding:0}
   .modal,.modal.wide{max-width:none;width:100%;max-height:94vh;border-radius:20px 20px 0 0;border-bottom:none}
   .mbody{padding:14px 16px}
@@ -349,10 +362,12 @@ details.mais[open]{padding-bottom:4px}
     <button class="navbtn on com-only" data-p="hoje" onclick="nav('hoje')"><span class="side-ico">◷</span><span class="lbl lab-d">Hoje</span><span class="lab-m">Hoje</span></button>
     <button class="navbtn com-only" data-p="carteira" onclick="nav('carteira')"><span class="side-ico">▤</span><span class="lbl lab-d">Carteira</span><span class="lab-m">Carteira</span></button>
     <button class="navbtn com-only" data-p="visitas" onclick="nav('visitas')"><span class="side-ico">⌖</span><span class="lbl lab-d">Visitas e contatos</span><span class="lab-m">Visitas</span></button>
+    <button class="navbtn gestor-only" data-p="equipe" onclick="nav('equipe')" style="display:none"><span class="side-ico">◫</span><span class="lbl lab-d">Equipe</span><span class="lab-m">Equipe</span></button>
     <div class="side-sec lbl">Pedidos</div>
     <button class="navbtn" data-p="solic" onclick="nav('solic')"><span class="side-ico">✉</span><span class="lbl lab-d">Solicitações</span><span class="lab-m">Pedidos</span><span class="cnt" id="cntSol" hidden>0</span></button>
     <div class="side-sec lbl admin-only">Ajustes</div>
-    <button class="navbtn so-desk admin-only" data-p="importar" onclick="nav('importar')"><span class="side-ico">⇪</span><span class="lbl">Importar carteira</span></button>
+    <button class="navbtn so-desk admin-only" data-p="importar" onclick="nav('importar')"><span class="side-ico">⇪</span><span class="lbl">Separar carteira</span></button>
+    <button class="navbtn so-desk admin-only" data-p="usuarios" onclick="nav('usuarios')"><span class="side-ico">☺</span><span class="lbl">Usuários e níveis</span></button>
     <button class="navbtn so-desk admin-only" data-p="config" onclick="nav('config')"><span class="side-ico">⚙</span><span class="lbl">Configurações</span></button>
     <div class="side-foot">
       <div class="uline">
@@ -410,6 +425,12 @@ details.mais[open]{padding-bottom:4px}
     <!-- VISITAS -->
     <div class="page" id="page-visitas">
       <div class="tools">
+        <div class="seg" id="v-modo"><button class="on" data-m="lista" onclick="setModoVis('lista')">Lista</button><button data-m="mapa" onclick="setModoVis('mapa')">Mapa</button></div>
+        <select id="v-per" onchange="renderVisitas()">
+          <option value="7">Últimos 7 dias</option>
+          <option value="30" selected>Últimos 30 dias</option>
+          <option value="90">Últimos 3 meses</option>
+        </select>
         <select id="v-vend" onchange="renderVisitas()" class="gestor-only" style="display:none"></select>
         <select id="v-tipo" onchange="renderVisitas()">
           <option value="">Todos os contatos</option>
@@ -420,6 +441,25 @@ details.mais[open]{padding-bottom:4px}
         <button class="btn btn-sm btn-novo" onclick="abrirVisita()">+ Registrar contato</button>
       </div>
       <div id="v-lista"></div>
+      <div id="v-mapa-box" style="display:none"><div id="v-mapa"></div><div class="leg" id="v-leg"></div></div>
+    </div>
+
+    <!-- EQUIPE (gestor) -->
+    <div class="page" id="page-equipe">
+      <div class="tools">
+        <select id="eq-per" onchange="renderEquipe()">
+          <option value="7">Últimos 7 dias</option>
+          <option value="30" selected>Últimos 30 dias</option>
+          <option value="90">Últimos 3 meses</option>
+        </select>
+        <span class="mini" id="eq-resumo"></span>
+        <button class="btn btn-sm btn-ghost" onclick="gerarResumo(true,this)">↻ Atualizar valores dos vendedores</button>
+      </div>
+      <div id="eq-kpis" class="kpis"></div>
+      <div class="sect">Por vendedor</div>
+      <div class="tscroll" style="max-height:none"><div id="eq-tab"></div></div>
+      <div class="sect">Tempo de resposta das solicitações</div>
+      <div class="tscroll" style="max-height:none"><div id="eq-resp"></div></div>
     </div>
 
     <!-- SOLICITAÇÕES -->
@@ -439,25 +479,49 @@ details.mais[open]{padding-bottom:4px}
 
     <!-- IMPORTAR CARTEIRA (admin) -->
     <div class="page" id="page-importar">
+      <div class="card" style="max-width:980px;margin-bottom:16px">
+        <div class="sect">Direto do ERP</div>
+        <p class="mini" style="margin-top:0">O faturamento do ERP já diz qual vendedor atende cada cliente. Este botão monta a carteira
+          a partir dele (mês mais recente em que o cliente comprou). Na primeira vez você liga cada vendedor do ERP a uma pessoa do app;
+          a ligação fica guardada e, das próximas vezes, é só conferir e gravar.</p>
+        <button class="btn" onclick="impDoErp(this)">⇣ Ler vendedores do ERP</button>
+      </div>
       <div class="card" style="max-width:980px">
+        <div class="sect">Por planilha</div>
         <p class="mini" style="margin-top:0">Separa a carteira por vendedor a partir de uma planilha (Excel ou CSV) com, no mínimo,
           uma coluna com o <b>nome do cliente</b> e outra com o <b>vendedor</b>. O cliente é procurado na base do ERP pelo nome;
           se já estiver numa carteira, passa para o vendedor da planilha. Nada é gravado antes de você conferir.</p>
         <div class="passo"><b>1</b> Planilha</div>
         <div class="imp-drop" onclick="$('imp-file').click()" id="imp-drop">Toque para escolher a planilha (.xlsx, .xls ou .csv)</div>
         <input type="file" id="imp-file" accept=".xlsx,.xls,.csv,text/csv" style="display:none" onchange="impArquivo(this)">
+      </div>
+      <div class="card" id="imp-passos" style="display:none;max-width:980px;margin-top:16px">
+        <div id="imp-fonte" class="mini"></div>
         <div id="imp-p2"></div>
         <div id="imp-p3"></div>
         <div id="imp-p4"></div>
       </div>
     </div>
 
+    <!-- USUÁRIOS E NÍVEIS (admin) -->
+    <div class="page" id="page-usuarios">
+      <div class="card" style="max-width:860px;margin-bottom:16px">
+        <div class="grid2" style="gap:12px">
+          <div><b>Diretoria (admin)</b><div class="mini">Tudo: vê e altera todas as carteiras, passa cliente de um vendedor para outro, separa a carteira, responde todas as solicitações, define níveis e configura o app.</div></div>
+          <div><b>Gerente</b><div class="mini">Vê todas as carteiras, a Equipe, as visitas e o valor comprado de todos. Responde solicitações (os tipos ligados em Configurações). Não altera cliente de outro vendedor.</div></div>
+          <div><b>Vendedor / operador</b><div class="mini">Cuida só da própria carteira: cadastra cliente, registra visita e contato, faz solicitações e vê o valor comprado pelos clientes dele.</div></div>
+        </div>
+      </div>
+      <div class="tools"><input type="search" placeholder="Buscar pessoa…" oninput="setUsuBusca(this.value)"><span class="mini" id="usu-cont"></span></div>
+      <div class="card" style="max-width:860px;padding:6px 8px" id="usu-lista"></div>
+    </div>
+
     <!-- CONFIGURAÇÕES (admin) -->
     <div class="page" id="page-config">
       <div class="card" style="max-width:640px">
         <div class="sect">Quem responde cada tipo de solicitação</div>
-        <p class="mini" style="margin-top:0">Um e-mail por linha. A diretoria (admin) responde todos os tipos mesmo sem estar na lista.
-          Quem estiver aqui e não for do comercial entra no app só para responder.</p>
+        <p class="mini" style="margin-top:0">A diretoria responde todos os tipos. O gerente responde os tipos marcados. Na caixa, outras pessoas
+          (um e-mail por linha) — quem não for do comercial entra no app só para responder.</p>
         <div id="cfg-tipos"></div>
         <div class="sect">Alerta de cliente sem comprar</div>
         <div class="fld" style="max-width:260px"><label>Avisar depois de quantos dias sem compra</label>
@@ -478,7 +542,7 @@ import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
          setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, onSnapshot, doc, getDoc, getDocs, setDoc, updateDoc,
-         query, where, orderBy, limit, writeBatch }
+         query, where, orderBy, limit, writeBatch, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const cfg={ apiKey:"AIzaSyCH_t074MvkJn-qVMvCtLfEMaQHf_e_d7M",
@@ -509,7 +573,10 @@ var clientes=[], visitas=[], concorrentes=[];
 var solFontes={};                 /* id da consulta -> lista; juntadas em sols */
 var sols=[];
 var erp={}, erpEstado='nao';      /* nao | lendo | ok | erro */
-var fatErp=null, fatMeses=[];     /* gestor: nome normalizado -> {mes: fat} */
+var fatErp=null, fatMeses=[];     /* gestor: nome normalizado -> {mes: fat}; meses do mais antigo ao atual */
+var cmDocs=[];                    /* gestor: comercialClienteMes lidos (para puxar o vendedor do ERP) */
+var fatVend=null;                 /* vendedor: comVendResumo/{uid} — o valor comprado pelos clientes dele */
+var resumoMeta=null, clientesOk=false;
 var pagina='hoje', filtroCart='todos', segSol='minhas';
 var subs=[], subsResp=[];
 var erros={};
@@ -644,7 +711,7 @@ onAuthStateChanged(auth, async function(u){
   $('auth').style.display='none'; $('app').style.display='block';
   $('uav').textContent=(U.nome[0]||'?').toUpperCase();
   $('unome').textContent=U.nome;
-  $('upapel').textContent=U.admin?'Diretoria':(U.gestor?'Gestor comercial':(U.comercial?'Vendedor':'Responde solicitações'));
+  $('upapel').textContent=U.admin?'Diretoria · admin':(U.gestor?'Gerente':(U.comercial?'Vendedor':'Responde solicitações'));
   document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display=U.admin?'':'none'; });
   document.querySelectorAll('.com-only').forEach(function(el){ el.style.display=U.comercial?'':'none'; });
   document.querySelectorAll('.gestor-only').forEach(function(el){ el.style.display=U.gestor?'':'none'; });
@@ -654,16 +721,19 @@ onAuthStateChanged(auth, async function(u){
 });
 
 function pararTudo(){ subs.forEach(function(f){ try{ f(); }catch(e){} }); subs=[]; pararResp();
-  clientes=[]; visitas=[]; concorrentes=[]; solFontes={}; sols=[]; erp={}; erpEstado='nao'; fatErp=null; erros={}; }
+  clientes=[]; visitas=[]; concorrentes=[]; solFontes={}; sols=[]; erp={}; erpEstado='nao'; fatErp=null; cmDocs=[]; fatVend=null; resumoMeta=null; clientesOk=false; erros={}; }
 function pararResp(){ subsResp.forEach(function(f){ try{ f(); }catch(e){} }); subsResp=[];
   Object.keys(solFontes).forEach(function(k){ if(k.indexOf('resp_')===0) delete solFontes[k]; }); }
 
 function aplicarCfg(c){
   CFG.respondem=(c&&c.respondem)||{};
   CFG.diasAlerta=(c&&c.diasAlerta>0)?c.diasAlerta:30;
+  CFG.vendMapa=(c&&c.vendMapa)||{};
+  CFG.gerenteNao=(c&&c.gerenteNao)||[];
   var em=String(U.email||'').toLowerCase();
   meusTipos=TIPO_IDS.filter(function(t){
     if(U.admin) return true;
+    if(U.gestor && CFG.gerenteNao.indexOf(t)<0) return true;     /* gerente responde, salvo os tipos desligados */
     return (CFG.respondem[t]||[]).some(function(x){ return String(x).toLowerCase()===em; });
   });
 }
@@ -690,7 +760,7 @@ function ouvir(){
   if(U.comercial){
     var cc=collection(db,'comClientes');
     subs.push(onSnapshot(U.gestor ? query(cc, limit(3000)) : query(cc, where('donoUid','==',U.uid)),
-      function(s){ delete erros.clientes; clientes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); render(); },
+      function(s){ delete erros.clientes; clientes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); clientesOk=true; render(); autoResumo(); },
       erroLeitura('clientes')));
     /* visitas dos últimos 3 meses: "mes" com in dispensa índice composto */
     var cv=collection(db,'comVisitas'), m3=mesesAtras(3);
@@ -712,7 +782,15 @@ function ouvir(){
         erroLeitura('solicitações')));
     }
     lerErp();
-    if(U.gestor) lerFaturamento();
+    if(U.gestor){
+      lerFaturamento();
+      subs.push(onSnapshot(doc(db,'comVendResumo','_meta'), function(s){ resumoMeta=s.exists()?s.data():{}; autoResumo(); render(); },
+        function(e){ console.warn('comVendResumo/_meta:', e); resumoMeta={ erro:e.code||e.message }; }));
+    } else {
+      /* o valor comprado pelos clientes do vendedor: só o resumo dele */
+      subs.push(onSnapshot(doc(db,'comVendResumo',U.uid), function(s){ fatVend=s.exists()?s.data():null; render(); },
+        function(e){ console.warn('comVendResumo:', e); }));
+    }
   }
   ouvirResp();
 }
@@ -746,16 +824,17 @@ function lerErp(){
 /* gestor: faturamento por cliente nos últimos 3 meses. O ERP não guarda o mesmo
    código nas duas bases, então a ligação é pelo NOME (normalizado). */
 function lerFaturamento(){
-  fatMeses=mesesAtras(3);
+  fatMeses=mesesAtras(4).reverse();
   Promise.all(fatMeses.map(function(m){ return getDoc(doc(db,'comercialClienteMes',m)); })).then(function(rs){
-    var idx={};
+    var idx={}; cmDocs=[];
     rs.forEach(function(s, i){
       if(!s.exists()) return;
       var cs=(s.data()||{}).clientes||{};
-      Object.keys(cs).forEach(function(k){ var c=cs[k]||{}; var n=norm(c.nome||k); if(!n) return;
+      cmDocs.push({ mes:fatMeses[i], clientes:cs });
+      Object.keys(cs).forEach(function(k){ var c=cs[k]||{}; var n=normEmp(c.nome||k); if(!n) return;
         idx[n]=idx[n]||{}; idx[n][fatMeses[i]]=(idx[n][fatMeses[i]]||0)+(c.fat||0); });
     });
-    fatErp=idx; render();
+    fatErp=idx; render(); autoResumo();
   }).catch(function(e){ console.warn('comercialClienteMes:', e); fatErp=false; render(); });
 }
 
@@ -771,7 +850,7 @@ function contatoAtrasado(c){ return c.proxContato && c.proxContato<hoje(); }
 function contatoHoje(c){ return c.proxContato===hoje(); }
 function fatDe(c){
   if(!fatErp) return null;
-  var e=erpDe(c), nomes=[c.nome, c.erpNome, e&&e.n, e&&e.nErp].filter(Boolean).map(norm);
+  var e=erpDe(c), nomes=[c.nome, c.erpNome, e&&e.n, e&&e.nErp].filter(Boolean).map(normEmp);
   for(var i=0;i<nomes.length;i++) if(fatErp[nomes[i]]) return fatErp[nomes[i]];
   return null;
 }
@@ -781,9 +860,11 @@ function respondo(s){ return meusTipos.indexOf(s.tipo)>=0; }
 
 /* ---------- navegação ---------- */
 var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:['Carteira','Clientes e prospects'],
-  visitas:['Visitas e contatos','Últimos 3 meses'], solic:['Solicitações','Pedidos de preço, bonificação, equipamento e outros'],
+  visitas:['Visitas e contatos','Visitas, ligações e WhatsApp registrados'], solic:['Solicitações','Pedidos de preço, bonificação, equipamento e outros'],
   config:['Configurações','Só a diretoria vê esta tela'],
-  importar:['Importar carteira','Separa os clientes por vendedor a partir de uma planilha'] };
+  importar:['Separar carteira','Clientes por vendedor: direto do ERP ou por planilha'],
+  equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
+  usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'] };
 var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Novo cliente','cliente'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };
 function nav(p){
   pagina=p;
@@ -814,6 +895,8 @@ function render(){
   else if(pagina==='visitas') renderVisitas();
   else if(pagina==='solic') renderSolic();
   else if(pagina==='config') renderConfig();
+  else if(pagina==='equipe') renderEquipe();
+  else if(pagina==='usuarios') renderUsuarios();
   $('frescor').textContent=erpEstado==='ok' ? 'Base do ERP: '+Object.keys(erp).length+' clientes' : (erpEstado==='lendo'?'Lendo a base do ERP…':'');
 }
 function badge(){
@@ -834,8 +917,10 @@ function cartaoCliente(c){
     var cls=contatoAtrasado(c)?' t-red':(contatoHoje(c)?' t-amber':'');
     tags.push('<span class="tag'+cls+'">Contato '+quandoRelativo(c.proxContato)+'</span>');
   }
+  var qd=queda(c);
+  if(qd) tags.push('<span class="tag t-red">↓ '+qd.pct+'% em '+nomeMes(qd.mes)+'</span>');
   if(c.fornecedor) tags.push('<span class="tag">Compra de: '+esc(c.fornecedor)+'</span>');
-  if(emAlerta(c) || contatoAtrasado(c)) borda=' b-red'; else if(contatoHoje(c)) borda=' b-amber';
+  if(emAlerta(c) || contatoAtrasado(c) || qd) borda=' b-red'; else if(contatoHoje(c)) borda=' b-amber';
   else if(c.situacao==='prospect') borda=' b-blue';
   var meta=[c.cidade, c.rota?'rota '+c.rota:'', (U.gestor&&c.donoNome)?'carteira de '+c.donoNome:''].filter(Boolean).join(' · ');
   return '<div class="it'+borda+(c.situacao==='inativo'?' b-muted':'')+'" onclick="verCliente(\''+c.id+'\')">'
@@ -848,6 +933,7 @@ function cartaoVisita(v){
   return '<div class="it" onclick="verVisita(\''+v.id+'\')">'
     +'<div class="it-top"><div class="it-tit">'+esc(v.clienteNome||(c&&c.nome)||'—')+'</div><span class="tag">'+esc(CONTATO[v.tipo]||v.tipo)+'</span></div>'
     +'<div class="it-meta">'+fmtDia(v.data)+(U.gestor&&v.donoNome?' · '+esc(v.donoNome):'')+(v.fotos?' · 📷 '+v.fotos:'')+(v.lat!=null?' · 📍':'')+'</div>'
+    +(function(){ var d=distVisita(v); return (d!=null && d>LONGE_KM) ? '<div class="it-tags"><span class="tag t-amber">📍 a '+fmtKm(d)+' do cliente</span></div>' : ''; })()
     +(v.resumo?'<div class="it-txt">'+esc(v.resumo)+'</div>':'')+'</div>';
 }
 function cartaoSol(s){
@@ -869,11 +955,13 @@ function renderHoje(){
   var atras=agenda.filter(contatoAtrasado).length, deHoje=agenda.filter(contatoHoje).length;
   var alerta=ativos.filter(emAlerta).sort(function(a,b){ var x=diasSemComprar(a), y=diasSemComprar(b); return (y==null?1e9:y)-(x==null?1e9:x); });
   var semCtt=ativos.filter(function(c){ return !c.proxContato; }).length;
+  var caiu=ativos.filter(function(c){ return !!queda(c); }).length;
   var minhasAb=sols.filter(function(s){ return souDono(s) && ABERTAS.includes(s.status); }).length;
   var paraResp=sols.filter(function(s){ return respondo(s) && ABERTAS.includes(s.status); }).length;
   var k=[];
   k.push(kpi('Contatos atrasados', atras, 'mais '+deHoje+' para hoje', "filtroCart='agenda';nav('carteira')", atras?'var(--red)':''));
   k.push(kpi('Sem comprar', alerta.length, 'há mais de '+CFG.diasAlerta+' dias', "filtroCart='alerta';nav('carteira')", alerta.length?'var(--red)':''));
+  k.push(kpi('Comprou menos', caiu, mesesFat().length?'queda de 30% ou mais em '+nomeMes(mesesFat()[mesesFat().length-2]):'aguardando o resumo de vendas', "filtroCart='queda';nav('carteira')", caiu?'var(--red)':''));
   k.push(kpi('Sem próximo contato', semCtt, 'clientes sem data marcada', "filtroCart='semctt';nav('carteira')", ''));
   if(meusTipos.length) k.push(kpi('Para responder', paraResp, 'solicitações em aberto', "segSol='responder';nav('solic')", paraResp?'var(--amber)':''));
   else k.push(kpi('Minhas solicitações', minhasAb, 'em aberto', "segSol='minhas';nav('solic')", ''));
@@ -894,7 +982,7 @@ function kpi(rot, val, dica, acao, cor){
 }
 
 /* ---- CARTEIRA ---- */
-var FILTROS=[['todos','Todos'],['agenda','Contato atrasado/hoje'],['alerta','Sem comprar'],['semctt','Sem próximo contato'],['prospect','Prospects'],['semerp','Sem vínculo ERP'],['inativo','Inativos']];
+var FILTROS=[['todos','Todos'],['agenda','Contato atrasado/hoje'],['alerta','Sem comprar'],['queda','Comprou menos'],['semctt','Sem próximo contato'],['prospect','Prospects'],['semerp','Sem vínculo ERP'],['inativo','Inativos']];
 function selVendedor(id, lista){
   var el=$(id); if(!el || !U.gestor) return '';
   var nomes={}; lista.forEach(function(x){ if(x.donoUid) nomes[x.donoUid]=x.donoNome||x.donoEmail||'?'; });
@@ -913,6 +1001,7 @@ function renderCarteira(){
     if(filtroCart==='inativo' && c.situacao!=='inativo') return false;
     if(filtroCart==='agenda' && !(contatoAtrasado(c)||contatoHoje(c))) return false;
     if(filtroCart==='alerta' && !emAlerta(c)) return false;
+    if(filtroCart==='queda' && !queda(c)) return false;
     if(filtroCart==='semctt' && c.proxContato) return false;
     if(filtroCart==='prospect' && c.situacao!=='prospect') return false;
     if(filtroCart==='semerp' && (c.erpId || c.situacao==='prospect')) return false;
@@ -925,15 +1014,24 @@ function renderCarteira(){
 function setFiltroCart(f){ filtroCart=f; renderCarteira(); }
 
 /* ---- VISITAS ---- */
-function renderVisitas(){
-  var vend=selVendedor('v-vend', visitas), tp=$('v-tipo').value;
-  var l=visitas.filter(function(v){ return (!vend||v.donoUid===vend) && (!tp||v.tipo===tp); })
+function visitasFiltradas(){
+  var vend=selVendedor('v-vend', visitas), tp=$('v-tipo').value, dias=+($('v-per').value||90), desde=somaDias(hoje(), -dias);
+  return visitas.filter(function(v){ return (!vend||v.donoUid===vend) && (!tp||v.tipo===tp) && String(v.data||'')>=desde; })
     .sort(function(a,b){ return String(b.data+b.em).localeCompare(String(a.data+a.em)); });
-  if(!l.length){ $('v-lista').innerHTML='<div class="empty">Nenhum contato registrado nos últimos 3 meses.</div>'; return; }
+}
+function renderVisitas(){
+  var l=visitasFiltradas();
+  document.querySelectorAll('#v-modo button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-m')===modoVis); });
+  $('v-lista').style.display=modoVis==='lista'?'':'none';
+  $('v-mapa-box').style.display=modoVis==='mapa'?'':'none';
+  if(modoVis==='mapa'){ desenharMapa(l); return; }
+  if(!l.length){ $('v-lista').innerHTML='<div class="empty">Nenhum contato registrado neste período.</div>'; return; }
   var html='', dia='';
   l.forEach(function(v){ if(v.data!==dia){ dia=v.data; html+='<div class="sec">'+fmtDia(dia)+' · '+quandoRelativo(dia)+'</div>'; } html+=cartaoVisita(v); });
   $('v-lista').innerHTML=html;
 }
+var modoVis='lista';
+function setModoVis(m){ modoVis=m; renderVisitas(); }
 
 /* ---- SOLICITAÇÕES ---- */
 function renderSolic(){
@@ -971,7 +1069,9 @@ function renderConfig(){
   var box=$('cfg-tipos');
   if(document.activeElement && box.contains(document.activeElement)) return;   /* não apaga o que está sendo digitado */
   box.innerHTML=TIPO_IDS.map(function(t){
-    return '<div class="fld"><label>'+TIPOS[t].ico+' '+TIPOS[t].nome+'</label><textarea id="cfg-r-'+t+'" style="min-height:62px" placeholder="email@montecastelo.ind.br">'
+    return '<div class="fld"><label>'+TIPOS[t].ico+' '+TIPOS[t].nome+'</label>'
+      +'<label class="chk" style="margin:4px 0 7px"><input type="checkbox" id="cfg-g-'+t+'"'+(CFG.gerenteNao.indexOf(t)<0?' checked':'')+'> O gerente responde</label>'
+      +'<textarea id="cfg-r-'+t+'" style="min-height:62px" placeholder="Outros que respondem: um e-mail por linha">'
       +esc((CFG.respondem[t]||[]).join('\n'))+'</textarea></div>';
   }).join('');
   if(document.activeElement!==$('cfg-dias')) $('cfg-dias').value=CFG.diasAlerta;
@@ -984,7 +1084,8 @@ function salvarConfig(){
   });
   if(ruim.length){ toast('E-mail inválido: '+ruim.join(', '), true); return; }
   var d=parseInt($('cfg-dias').value,10); if(!(d>=5 && d<=365)){ toast('Dias para o alerta: entre 5 e 365.', true); return; }
-  setDoc(doc(db,'comConfig','app'), { respondem:r, diasAlerta:d, atualizadoEm:agoraISO(), atualizadoPor:U.email }, { merge:true })
+  var gNao=TIPO_IDS.filter(function(t){ return !$('cfg-g-'+t).checked; });
+  setDoc(doc(db,'comConfig','app'), { respondem:r, gerenteNao:gNao, diasAlerta:d, atualizadoEm:agoraISO(), atualizadoPor:U.email }, { merge:true })
     .then(function(){ toast('Configurações salvas.'); })
     .catch(falha('salvar as configurações'));
 }
@@ -1072,11 +1173,13 @@ function verCliente(id){
   else {
     corpo+='<div class="det"><div><span>Nome no ERP</span><b>'+esc((e&&(e.nErp||e.n))||c.erpNome||'—')+'</b></div>'
       +'<div><span>Última compra</span><b'+(emAlerta(c)?' style="color:var(--red)"':'')+'>'+(u?fmtDia(u)+' · '+d+' dia'+(d===1?'':'s'):(erpEstado==='ok'?'nenhuma registrada':'…'))+'</b></div>';
-    if(U.gestor){
-      if(f) fatMeses.slice().reverse().forEach(function(m){ corpo+='<div><span>Faturado '+nomeMes(m)+'</span><b class="mono">'+(f[m]?fmtRS(f[m]):'—')+'</b></div>'; });
-      else corpo+='<div><span>Faturamento</span><b class="mini">'+(fatErp===false?'sem acesso ao faturamento (regra)':(fatErp?'nome não encontrado no faturamento':'lendo…'))+'</b></div>';
-    }
+    var fc2=fatCliente(c), ms=mesesFat();
+    if(fc2 && ms.length) ms.forEach(function(m, i){ corpo+='<div><span>'+(i===ms.length-1?nomeMes(m)+' (até hoje)':'Comprou em '+nomeMes(m))+'</span><b class="mono">'+(fc2[m]?fmtRS(fc2[m]):'—')+'</b></div>'; });
+    else if(U.gestor) corpo+='<div><span>Valor comprado</span><b class="mini">'+(fatErp===false?'sem acesso ao faturamento (regra)':(fatErp?'nome não encontrado no faturamento':'lendo…'))+'</b></div>';
+    else corpo+='<div><span>Valor comprado</span><b class="mini">'+(fatVend?'sem compras nos últimos meses':'aguardando o resumo de vendas')+'</b></div>';
     corpo+='</div>';
+    var qd=queda(c);
+    if(qd) corpo+='<div class="alert a-err">↓ Comprou '+qd.pct+'% menos em '+nomeMes(qd.mes)+' ('+fmtRS(qd.ult)+') do que no mês anterior ('+fmtRS(qd.ant)+').</div>';
   }
   corpo+='<div class="det-sec">Contato</div><div class="det">'
     +'<div><span>Situação</span><b>'+({cliente:'Cliente',prospect:'Prospect',inativo:'Inativo'}[c.situacao]||'Cliente')+'</b></div>'
@@ -1095,18 +1198,17 @@ function verCliente(id){
     +'<div class="det"><div><span>Data</span><b'+(contatoAtrasado(c)?' style="color:var(--red)"':'')+'>'+(c.proxContato?fmtDia(c.proxContato)+' · '+quandoRelativo(c.proxContato):'sem data')+'</b></div>'
     +'<div><span>Último contato</span><b>'+(c.ultimoContato?fmtDia(c.ultimoContato)+' · '+quandoRelativo(c.ultimoContato):'—')+'</b></div>'
     +(c.proxObs?'<div style="grid-column:1/-1"><span>Lembrete</span><b>'+esc(c.proxObs)+'</b></div>':'')+'</div>'
-    +'<div class="chips" style="margin:-4px 0 6px"><span class="mini" style="align-self:center">Remarcar:</span>'
-    +[7,15,30].map(function(n){ return '<button class="chip" onclick="remarcar(\''+c.id+'\','+n+',this)">+'+n+' dias</button>'; }).join('')+'</div>';
+    +(podeEditar(c)?'<div class="chips" style="margin:-4px 0 6px"><span class="mini" style="align-self:center">Remarcar:</span>'
+    +[7,15,30].map(function(n){ return '<button class="chip" onclick="remarcar(\''+c.id+'\','+n+',this)">+'+n+' dias</button>'; }).join('')+'</div>':'');
   var ss=sols.filter(function(s){ return s.clienteId===c.id || (c.erpId && s.clienteErpId===c.erpId); });
   if(ss.length) corpo+='<div class="det-sec">Solicitações</div>'+ss.slice(0,10).map(cartaoSol).join('');
   corpo+='<div class="det-sec">Histórico de contatos</div><div id="cli-hist"><div class="empty">Carregando…</div></div>';
 
   abrirModal({ titulo:esc(c.nome), sub:esc([c.cidade, c.situacao==='prospect'?'prospect':''].filter(Boolean).join(' · ')), wide:true, corpo:corpo,
-    botoes:[
-      { txt:'✎ Editar', cls:'btn-ghost', fn:function(){ abrirCliente(c.id); } },
+    botoes:[].concat(podeEditar(c)?[{ txt:'✎ Editar', cls:'btn-ghost', fn:function(){ abrirCliente(c.id); } }]:[], [
       { txt:'✉ Solicitação', cls:'btn-ghost', fn:function(){ abrirSolic(null, c.id); } },
       { txt:'⌖ Registrar contato', fn:function(){ abrirVisita(c.id); } }
-    ]});
+    ])});
   /* todo o histórico: pela ficha e, se ligado ao ERP, também os contatos
      feitos quando o cliente ainda não estava na carteira */
   var cv=collection(db,'comVisitas'), dono=U.gestor?[]:[where('donoUid','==',U.uid)];
@@ -1135,14 +1237,14 @@ var fc=null;
 function abrirCliente(id){
   if(!U.comercial) return;
   var c=id?clientePorId(id):null;
-  if(c && !souDono(c) && !U.gestor){ toast('Só quem cadastrou ou o gestor altera este cliente.', true); return; }
+  if(c && !podeEditar(c)){ toast('Só o vendedor da carteira ou a diretoria altera este cliente.', true); return; }
   fc={ id:id||null, erpId:c?c.erpId||'':'', erpNome:c?c.erpNome||'':'', precos:((c&&c.precos)||[]).map(function(p){ return {p:p.p||'',v:p.v,u:p.u||''}; }) };
   if(!fc.precos.length) fc.precos.push({p:'',v:null,u:''});
   var sit=(c&&c.situacao)||'cliente';
   var opF='<option value="">— não sabe / não informado —</option>'+concorrentes.map(function(x){ return '<option'+(c&&c.fornecedor===x.nome?' selected':'')+'>'+esc(x.nome)+'</option>'; }).join('')
     +(c&&c.fornecedor&&!concorrentes.some(function(x){ return x.nome===c.fornecedor; })?'<option selected>'+esc(c.fornecedor)+'</option>':'')
     +'<option value="__novo">+ Cadastrar outro fornecedor…</option>';
-  var corpo=''
+  var corpo=(U.admin?'<div class="fld"><label>Carteira de</label><select id="fc-dono"><option value="">Carregando…</option></select></div>':'')
     +'<div class="fld"><label>Procure na base do ERP <span class="mini">— traz nome, cidade, rota e última compra</span></label><div id="fc-erp"></div></div>'
     +'<div class="fld"><label>Nome do cliente *</label><input type="text" id="fc-nome" value="'+esc(c?c.nome:'')+'"></div>'
     +'<div class="fld"><label>Situação</label><div class="chips" id="fc-sit">'
@@ -1162,7 +1264,14 @@ function abrirCliente(id){
   abrirModal({ titulo:c?'Editar cliente':'Novo cliente', wide:true, corpo:corpo,
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Salvar', fn:salvarCliente }] });
   fcPintarErp(); fcPintarPrecos(); proxPintar('fc-prox');
+  if(U.admin) carregarUsuarios().then(function(){
+    var sel=$('fc-dono'); if(!sel) return;
+    var atual=c?c.donoUid:U.uid;
+    var vs=usuariosLista.filter(function(u){ return u.ativo && (u.comercial || u.admin || u.uid===atual); });
+    sel.innerHTML=vs.map(function(u){ return '<option value="'+u.uid+'"'+(u.uid===atual?' selected':'')+'>'+esc(u.nome||u.email)+' · '+NIVEL_NOME[nivelDe(u)]+'</option>'; }).join('');
+  }).catch(function(){ var sel=$('fc-dono'); if(sel) sel.innerHTML='<option value="">(não foi possível ler os usuários)</option>'; });
 }
+function podeEditar(c){ return !!c && (U.admin || souDono(c)); }
 function fcSit(b){ document.querySelectorAll('#fc-sit .chip').forEach(function(x){ x.classList.toggle('on', x===b); }); }
 function fcForn(sel){
   if(sel.value!=='__novo') return;
@@ -1242,9 +1351,15 @@ function salvarCliente(el){
   };
   var pare=ocupado(el);
   var p;
+  /* só a diretoria passa o cliente para outra carteira */
+  var donoSel=U.admin && $('fc-dono') ? $('fc-dono').value : '';
+  var novoDono=donoSel ? usuariosLista.filter(function(u){ return u.uid===donoSel; })[0] : null;
+  var antes=fc.id?clientePorId(fc.id):null;
+  if(novoDono && (!antes || antes.donoUid!==novoDono.uid)){ d.donoUid=novoDono.uid; d.donoNome=novoDono.nome||novoDono.email; d.donoEmail=novoDono.email||''; }
   if(fc.id){ p=updateDoc(doc(db,'comClientes',fc.id), d); }
   else {
-    d.donoUid=U.uid; d.donoNome=U.nome; d.donoEmail=U.email; d.criadoEm=agoraISO(); d.ultimoContato='';
+    if(!d.donoUid){ d.donoUid=U.uid; d.donoNome=U.nome; d.donoEmail=U.email; }
+    d.criadoEm=agoraISO(); d.ultimoContato='';
     p=setDoc(doc(collection(db,'comClientes')), d);
   }
   p.then(function(){ toast(fc.id?'Cliente atualizado.':'Cliente cadastrado.'); fecharModal(); })
@@ -1361,7 +1476,7 @@ function salvarVisita(el){
   b.set(vref, v);
   fotos.forEach(function(f){ b.set(doc(collection(db,'comVisitaFotos')), { visitaId:vref.id, clienteId:cid, donoUid:U.uid, img:f, em:agora }); });
   /* a ficha do cliente acompanha: último contato e o próximo, no mesmo lote */
-  if(c && (souDono(c) || U.gestor)){
+  if(c && podeEditar(c)){
     var up={ atualizadoEm:agora, atualizadoPor:U.email, proxContato:prox };
     if(proxObs) up.proxObs=proxObs;
     if(!c.ultimoContato || data>=c.ultimoContato) up.ultimoContato=data;
@@ -1379,6 +1494,8 @@ function verVisita(id){
     +(v.proxContato?'<div><span>Próximo contato</span><b>'+fmtDia(v.proxContato)+'</b></div>':'')+'</div>'
     +'<div class="det-txt">'+esc(v.resumo||'')+'</div>'
     +(v.lat!=null?'<div class="fld"><a class="btn btn-sm btn-ghost" target="_blank" rel="noopener" href="https://www.google.com/maps?q='+v.lat+','+v.lng+'">📍 Ver no mapa</a> <span class="mini">precisão ~'+(v.prec||'?')+' m</span></div>':'')
+    +(function(){ var d=distVisita(v); if(d==null) return (v.lat!=null?'<div class="mini" style="margin-bottom:10px">Cliente sem posição exata na base do ERP: não dá para conferir a distância.</div>':'');
+        return '<div class="alert '+(d>LONGE_KM?'a-warn':'a-ok')+'">'+(d>LONGE_KM?'⚠ Registrada a '+fmtKm(d)+' do endereço do cliente.':'✓ Registrada no cliente (a '+fmtKm(d)+').')+'</div>'; })()
     +(v.fotos?'<div class="fotos" id="vv-fotos"><span class="mini">Carregando fotos…</span></div>':'');
   abrirModal({ titulo:esc(v.clienteNome||'Contato'), sub:'Registrado em '+fmtQuando(v.em), corpo:corpo,
     botoes:[{ txt:'Abrir cliente', cls:'btn-ghost', fn:function(){ if(clientePorId(v.clienteId)) verCliente(v.clienteId); else toast('Este cliente não está na sua carteira.', true); } }] });
@@ -1446,6 +1563,7 @@ function verSolic(id){
     +'<div><span>Pedido por</span><b>'+esc(s.donoNome||s.donoEmail||'—')+'</b></div>'
     +'<div><span>Cliente</span><b>'+esc([s.clienteNome, s.clienteCidade].filter(Boolean).join(' · ')||'—')+'</b></div>';
   (t.campos||[]).forEach(function(c){ var v=(s.campos||{})[c[0]]; if(v) corpo+='<div><span>'+esc(c[1])+'</span><b>'+esc(v)+'</b></div>'; });
+  if(s.ordemId) corpo+='<div><span>OS no Campo</span><b id="sv-os">lendo…</b></div>';
   corpo+='</div>';
   if(s.descricao) corpo+='<div class="det-txt">'+esc(s.descricao)+'</div>';
   corpo+='<div class="det-sec">Andamento</div><div class="hist">'
@@ -1453,6 +1571,7 @@ function verSolic(id){
   if(resp || (dono && aberta)) corpo+='<div class="fld"><label>'+(resp?'Resposta / comentário':'Acrescentar informação')+'</label><textarea id="sv-txt"></textarea></div>';
   var bts=[];
   if(resp){
+    if(s.tipo==='equipamento' && !s.ordemId) bts.push({ txt:'🛠 Abrir OS no Campo', cls:'btn-ghost', fn:function(){ abrirOS(s.id); } });
     if(s.status==='aberta') bts.push({ txt:'Em andamento', cls:'btn-ghost', fn:function(el){ responder(s,'andamento',el); } });
     bts.push({ txt:'Só comentar', cls:'btn-ghost', fn:function(el){ responder(s,null,el); } });
     if(t.fim.indexOf('recusada')>=0) bts.push({ txt:'✕ Recusar', cls:'btn-red', fn:function(el){ responder(s,'recusada',el); } });
@@ -1462,6 +1581,7 @@ function verSolic(id){
     bts.push({ txt:'Enviar informação', fn:function(el){ comentarDono(s,el); } });
   }
   abrirModal({ titulo:(t.ico?t.ico+' ':'')+esc(s.titulo||t.nome), sub:'Aberta em '+fmtQuando(s.criadoEm), wide:true, corpo:corpo, botoes:bts });
+  if(s.ordemId) lerOS(s.ordemId);
 }
 function responder(s, st, el){
   var txt=($('sv-txt')&&$('sv-txt').value.trim())||'';
@@ -1526,7 +1646,7 @@ function lerCSV(txt){
 }
 function impArquivo(inp){
   var f=inp.files&&inp.files[0]; inp.value=''; if(!f) return;
-  IMP.nomeArq=f.name; IMP.plano=null; $('imp-p3').innerHTML=''; $('imp-p4').innerHTML='';
+  IMP.nomeArq=f.name; IMP.fonte='planilha'; IMP.mapa={}; IMP.plano=null; $('imp-p3').innerHTML=''; $('imp-p4').innerHTML='';
   $('imp-drop').textContent='Lendo '+f.name+'…';
   var csv=/\.csv$/i.test(f.name);
   var p=csv ? f.text().then(lerCSV)
@@ -1552,10 +1672,35 @@ function impUsuarios(){
       .sort(function(a,b){ return (b.com-a.com) || String(a.nome||a.email).localeCompare(String(b.nome||b.email),'pt-BR'); });
   });
 }
+/* a ligação "vendedor do ERP/planilha → pessoa do app" fica guardada para a próxima vez */
+function impGuardarMapa(){
+  var m={}; Object.keys(IMP.mapa).forEach(function(v){ var k=normEmp(v); if(k) m[k]=IMP.mapa[v]; });
+  if(!Object.keys(m).length) return;
+  setDoc(doc(db,'comConfig','app'), { vendMapa:m }, { merge:true }).catch(function(e){ console.warn('vendMapa:', e); });
+}
+/* monta as "linhas" a partir do faturamento: vendedor do mês mais recente em que o cliente apareceu */
+function impDoErp(el){
+  if(!U.admin) return;
+  if(!cmDocs.length){ toast(fatErp===false?'Sem acesso ao faturamento do ERP.':'O faturamento ainda está carregando. Tente em alguns segundos.', true); return; }
+  var ult={};
+  cmDocs.forEach(function(d){ Object.keys(d.clientes).forEach(function(k){ var c=d.clientes[k]||{}; if(c.vend) ult[k]={ nome:c.nome||k, vend:String(c.vend).trim() }; }); });
+  var linhas=Object.keys(ult).map(function(k){ return [ult[k].nome, ult[k].vend]; });
+  if(!linhas.length){ toast('O faturamento não trouxe o vendedor dos clientes.', true); return; }
+  IMP={ cab:['Cliente','Vendedor'], linhas:linhas, col:{ cli:0, vend:1, cid:-1 }, mapa:{}, usuarios:IMP.usuarios, plano:null, nomeArq:'ERP', fonte:'erp' };
+  $('imp-p3').innerHTML=''; $('imp-p4').innerHTML='';
+  var pare=ocupado(el,'Lendo…');
+  impUsuarios().then(function(){ pare(); impPintarP2(); $('imp-passos').scrollIntoView({ behavior:'smooth', block:'start' }); })
+    .catch(function(e){ pare(); falha('ler a lista de usuários')(e); });
+}
 /* nome de empresa sem o tipo societário: "PADARIA CENTRAL LTDA" = "Padaria Central" */
 function normEmp(s){ return norm(s).replace(/\b(LTDA|ME|EPP|EIRELI|MEI|S A|SA|CIA)\b/g,' ').replace(/\s+/g,' ').trim(); }
 function impSelCol(k, el){ IMP.col[k]=+el.value; IMP.plano=null; $('imp-p4').innerHTML=''; impPintarP3(); }
 function impPintarP2(){
+  $('imp-passos').style.display='';
+  $('imp-fonte').innerHTML=IMP.fonte==='erp'
+    ? '<b>Fonte: ERP</b> · '+IMP.linhas.length+' clientes com vendedor no faturamento de '+cmDocs.map(function(d){ return nomeMes(d.mes); }).join(', ')
+    : '<b>Fonte: planilha</b> '+esc(IMP.nomeArq)+' · '+IMP.linhas.length+' linhas';
+  if(IMP.fonte==='erp'){ $('imp-p2').innerHTML=''; impPintarP3(); return; }
   var op=function(k, opc){ return '<select onchange="impSelCol(\''+k+'\',this)"><option value="-1">'+(opc?'— não tem —':'— escolha —')+'</option>'
     +IMP.cab.map(function(c,i){ return '<option value="'+i+'"'+(IMP.col[k]===i?' selected':'')+'>'+esc(c||('Coluna '+(i+1)))+'</option>'; }).join('')+'</select>'; };
   $('imp-p2').innerHTML='<div class="passo"><b>2</b> Colunas</div><div class="grid2">'
@@ -1573,6 +1718,8 @@ function impPintarP3(){
   var vals=Object.keys(cont).sort(function(a,b){ return cont[b]-cont[a]; });
   vals.forEach(function(v){
     if(IMP.mapa[v]!==undefined) return;
+    var salvo=(CFG.vendMapa||{})[normEmp(v)];
+    if(salvo!==undefined && (salvo==='' || IMP.usuarios.some(function(u){ return u.uid===salvo; }))){ IMP.mapa[v]=salvo; return; }
     var n=norm(v), ach=IMP.usuarios.filter(function(u){
       var nn=norm(u.nome), ne=norm(u.email), np=norm(String(u.email).split('@')[0]);
       return n && (n===nn || n===ne || n===np || (nn && (nn.indexOf(n)===0 || n.indexOf(nn)===0)));
@@ -1582,9 +1729,9 @@ function impPintarP3(){
   });
   var opU=function(v){ return '<select onchange="impMapa(this)" data-v="'+esc(v)+'"><option value="">— não importar —</option>'
     +IMP.usuarios.map(function(u){ return '<option value="'+u.uid+'"'+(IMP.mapa[v]===u.uid?' selected':'')+'>'+esc(impNomeU(u))+(u.com?'':' (sem acesso ao Comercial)')+'</option>'; }).join('')+'</select>'; };
-  box.innerHTML='<div class="passo"><b>3</b> Quem é quem</div>'
-    +'<p class="mini" style="margin-top:0">Ligue cada vendedor da planilha a uma pessoa do app. Quem não aparece na lista ainda não entrou no app nenhuma vez — peça para entrar uma vez e recarregue esta tela.</p>'
-    +'<div class="tscroll" style="max-height:40vh"><table class="tb"><tr><th>Na planilha</th><th class="r">Clientes</th><th>No app</th></tr>'
+  box.innerHTML='<div class="passo"><b>'+(IMP.fonte==='erp'?'1':'3')+'</b> Quem é quem</div>'
+    +'<p class="mini" style="margin-top:0">Ligue cada vendedor '+(IMP.fonte==='erp'?'do ERP':'da planilha')+' a uma pessoa do app. A ligação fica guardada para a próxima vez. Quem não aparece na lista ainda não entrou no app nenhuma vez — peça para entrar uma vez e recarregue esta tela.</p>'
+    +'<div class="tscroll" style="max-height:40vh"><table class="tb"><tr><th>'+(IMP.fonte==='erp'?'No ERP':'Na planilha')+'</th><th class="r">Clientes</th><th>No app</th></tr>'
     +vals.map(function(v){ return '<tr><td>'+esc(v)+'</td><td class="r">'+cont[v]+'</td><td>'+opU(v)+'</td></tr>'; }).join('')+'</table></div>'
     +'<label class="chk" style="margin-top:13px"><input type="checkbox" id="imp-semerp" checked> Cadastrar também os clientes que não forem achados no ERP (ficam "sem vínculo")</label>'
     +'<button class="btn" onclick="impConferir()">Conferir antes de gravar</button>';
@@ -1622,7 +1769,7 @@ function impConferir(){
   var n=function(a){ return itens.filter(function(x){ return x.acao===a; }).length; };
   var semV=itens.filter(function(x){ return x.acao==='novo' && !x.erpId; }).length;
   var ROT={ novo:['Novo','green'], transferir:['Muda de carteira','amber'], igual:['Já está certo','muted'], ignorar:['Fica de fora','red'] };
-  $('imp-p4').innerHTML='<div class="passo"><b>4</b> Conferir</div>'
+  $('imp-p4').innerHTML='<div class="passo"><b>'+(IMP.fonte==='erp'?'2':'4')+'</b> Conferir</div>'
     +'<div class="resumo-imp">'
     +'<div class="card"><div class="klabel">Novos na carteira</div><div class="kval">'+n('novo')+'</div></div>'
     +'<div class="card"><div class="klabel">Mudam de carteira</div><div class="kval">'+n('transferir')+'</div></div>'
@@ -1647,7 +1794,7 @@ function impGravar(el){
   for(i=0;i<ops.length;i+=400) lotes.push(ops.slice(i,i+400));
   var feitos=0, prog=$('imp-prog');
   var roda=function(k){
-    if(k>=lotes.length){ prog.textContent=''; toast(feitos+' clientes gravados.'); $('imp-p4').innerHTML='<div class="alert a-ok">✓ Importação concluída: '+feitos+' clientes gravados. A carteira de cada vendedor já está atualizada.</div>'; IMP.plano=null; return; }
+    if(k>=lotes.length){ prog.textContent=''; toast(feitos+' clientes gravados.'); impGuardarMapa(); $('imp-p4').innerHTML='<div class="alert a-ok">✓ Importação concluída: '+feitos+' clientes gravados. A carteira de cada vendedor já está atualizada.</div>'; IMP.plano=null; return; }
     var b=writeBatch(db);
     lotes[k].forEach(function(x){
       var u=x.u, dono={ donoUid:u.uid, donoNome:impNomeU(u), donoEmail:u.email||'', atualizadoEm:agora, atualizadoPor:U.email };
@@ -1682,11 +1829,325 @@ Object.assign(window, {
   pkBusca:pkBusca, pkEscolher:pkEscolher, pkTrocar:pkTrocar, proxSet:proxSet, proxPintar:proxPintar,
   abrirVisita:abrirVisita, fvTipo:fvTipo, fvGeo:fvGeo, fvTirarFoto:fvTirarFoto, fvFoto:fvFoto, verVisita:verVisita,
   abrirSolic:abrirSolic, fsTipo:fsTipo, verSolic:verSolic,
-  impArquivo:impArquivo, impSelCol:impSelCol, impMapa:impMapa, impConferir:impConferir, impGravar:impGravar
+  impArquivo:impArquivo, impSelCol:impSelCol, impMapa:impMapa, impConferir:impConferir, impGravar:impGravar,
+  impDoErp:impDoErp, setModoVis:setModoVis, mudarNivel:mudarNivel, renderUsuarios:renderUsuarios, renderEquipe:renderEquipe, gerarResumo:gerarResumo,
+  abrirOS:abrirOS, verVisita:verVisita
 });
 /* filtroCart e segSol são trocados direto pelos cartões do "Hoje" */
 Object.defineProperty(window,'filtroCart',{ get:function(){ return filtroCart; }, set:function(v){ filtroCart=v; } });
 Object.defineProperty(window,'segSol',{ get:function(){ return segSol; }, set:function(v){ segSol=v; } });
+
+/* =====================================================================
+   VALOR COMPRADO — gestor lê o faturamento direto; o vendedor lê o resumo
+   dele (comVendResumo/{uid}), que o app do gestor grava. Assim cada
+   vendedor vê só os próprios clientes. O resumo é refeito sozinho quando
+   um gestor abre o app e o último tem mais de 12 horas.
+   ===================================================================== */
+function mesesFat(){ return U.gestor ? (fatErp ? fatMeses : []) : ((fatVend&&fatVend.meses)||[]); }
+function fatCliente(c){
+  if(U.gestor) return fatDe(c);
+  if(fatVend && fatVend.cli && fatVend.cli[c.id]){ var o={}, a=fatVend.cli[c.id]; fatVend.meses.forEach(function(m,i){ o[m]=a[i]||0; }); return o; }
+  return null;
+}
+/* queda: último mês FECHADO contra o anterior, 30% ou mais (o mês atual é parcial) */
+var QUEDA=0.3;
+function queda(c){
+  if(c.situacao==='prospect' || c.situacao==='inativo') return null;
+  var ms=mesesFat(); if(ms.length<3) return null;
+  var f=fatCliente(c); if(!f) return null;
+  var ant=f[ms[ms.length-3]]||0, ult=f[ms[ms.length-2]]||0;
+  if(ant>0 && ult<=ant*(1-QUEDA)) return { pct:Math.round((1-ult/ant)*100), mes:ms[ms.length-2], ant:ant, ult:ult };
+  return null;
+}
+var resumoRodando=false;
+function autoResumo(){
+  if(!U.gestor || !fatErp || !clientesOk || resumoMeta===null || resumoMeta.erro || resumoRodando) return;
+  var t=Date.parse(resumoMeta.atualizadoEm||''); if(t && Date.now()-t < 12*3600*1000) return;
+  gerarResumo(false);
+}
+function gerarResumo(manual, el){
+  if(!U.gestor) return;
+  if(!fatErp){ if(manual) toast(fatErp===false?'Sem acesso ao faturamento do ERP.':'O faturamento ainda está carregando.', true); return; }
+  resumoRodando=true;
+  var por={};
+  clientes.forEach(function(c){
+    if(!c.donoUid) return;
+    por[c.donoUid]=por[c.donoUid]||{};
+    var f=fatDe(c); if(!f) return;
+    var a=fatMeses.map(function(m){ return Math.round((f[m]||0)*100)/100; });
+    if(a.some(function(x){ return x; })) por[c.donoUid][c.id]=a;
+  });
+  var uids=Object.keys(por);
+  ((resumoMeta&&resumoMeta.uids)||[]).forEach(function(u){ if(uids.indexOf(u)<0){ uids.push(u); por[u]={}; } });   /* carteira que esvaziou */
+  var agora=agoraISO(), b=writeBatch(db);
+  uids.forEach(function(u){ b.set(doc(db,'comVendResumo',u), { meses:fatMeses, cli:por[u], atualizadoEm:agora, por:U.email }); });
+  b.set(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses });
+  var pare=el?ocupado(el,'Atualizando…'):function(){};
+  b.commit().then(function(){ resumoRodando=false; pare(); if(manual) toast('Valores atualizados para '+uids.length+' vendedor'+(uids.length===1?'':'es')+'.'); })
+    .catch(function(e){ resumoRodando=false; pare(); if(manual) falha('atualizar os valores dos vendedores')(e); else console.warn('resumo:', e); });
+}
+
+/* =====================================================================
+   DISTÂNCIA DA VISITA AO CLIENTE — confere se a visita foi no cliente.
+   Só com posição EXATA do cliente na base do ERP (p === 'ok').
+   ===================================================================== */
+var LONGE_KM=0.5;
+function distKm(a, b){
+  var R=6371, r=Math.PI/180, dLa=(b[0]-a[0])*r, dLo=(b[1]-a[1])*r;
+  var h=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function fmtKm(d){ return d<1 ? Math.round(d*1000)+' m' : d.toFixed(1).replace('.',',')+' km'; }
+function posCliente(v){
+  var id=v.clienteErpId || ((clientePorId(v.clienteId)||{}).erpId) || '';
+  var e=id?erp[id]:null;
+  return (e && e.la!=null && e.lo!=null && e.p==='ok') ? [e.la, e.lo] : null;
+}
+function distVisita(v){ if(v.lat==null || v.tipo!=='visita') return null; var cp=posCliente(v); return cp ? distKm([v.lat,v.lng], cp) : null; }
+
+/* =====================================================================
+   MAPA DAS VISITAS (Leaflet + OpenStreetMap: sem chave, sem custo)
+   ===================================================================== */
+var mapa=null, camada=null, CORES=['#e0303d','#5aa9ff','#3fbf86','#e8b33f','#a78bfa','#f08c3a','#38c5c5','#e86fb0','#9bbf3f','#c9a27a'], corDe={};
+function corVend(uid){ if(!corDe[uid]) corDe[uid]=CORES[Object.keys(corDe).length%CORES.length]; return corDe[uid]; }
+function carregarLeaflet(){
+  if(window.L) return Promise.resolve();
+  return new Promise(function(ok, falhou){
+    var l=document.createElement('link'); l.rel='stylesheet'; l.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(l);
+    var s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    s.onload=function(){ ok(); }; s.onerror=function(){ falhou(new Error('não carregou o mapa')); }; document.head.appendChild(s);
+  });
+}
+function desenharMapa(l){
+  carregarLeaflet().then(function(){
+    if(!mapa){
+      mapa=L.map('v-mapa').setView([-28.64,-53.6], 8);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }).addTo(mapa);
+      camada=L.layerGroup().addTo(mapa);
+    }
+    setTimeout(function(){ mapa.invalidateSize(); }, 0);
+    camada.clearLayers();
+    var pts=[], vendes={}, semLoc=0, longe=0;
+    l.forEach(function(v){
+      if(v.lat==null){ semLoc++; return; }
+      var cor=corVend(v.donoUid||'?'); vendes[v.donoUid||'?']={ cor:cor, nome:v.donoNome||'—' };
+      var pos=[v.lat, v.lng], cp=posCliente(v), d=(cp && v.tipo==='visita')?distKm(pos,cp):null;
+      if(d!=null && d>LONGE_KM) longe++;
+      if(cp){
+        L.polyline([pos,cp], { color:(d>LONGE_KM?'#e8b33f':cor), weight:1.5, dashArray:'4 4', opacity:.85 }).addTo(camada);
+        L.circleMarker(cp, { radius:4, color:'#8d8d95', weight:1, fillColor:'#8d8d95', fillOpacity:.35 }).addTo(camada);
+        pts.push(cp);
+      }
+      L.circleMarker(pos, { radius:8, color:'#ffffff', weight:2, fillColor:cor, fillOpacity:.95 })
+        .bindPopup('<b>'+esc(v.clienteNome||'—')+'</b><br>'+fmtDia(v.data)+' · '+esc(CONTATO[v.tipo]||v.tipo)
+          +(U.gestor?'<br>'+esc(v.donoNome||''):'')
+          +(d!=null?'<br>'+(d>LONGE_KM?'⚠ a '+fmtKm(d)+' do cliente':'✓ no cliente'):'')
+          +'<br><a href="#" onclick="verVisita(\''+v.id+'\');return false">Ver o contato</a>')
+        .addTo(camada);
+      pts.push(pos);
+    });
+    if(pts.length) mapa.fitBounds(pts, { padding:[30,30], maxZoom:15 });
+    $('v-leg').innerHTML=(U.gestor?Object.keys(vendes).map(function(k){ return '<span><i style="background:'+vendes[k].cor+'"></i>'+esc(vendes[k].nome)+'</span>'; }).join(''):'')
+      +'<span>· ponto cinza = endereço do cliente no ERP, ligado à visita pela linha tracejada</span>'
+      +(longe?'<span style="color:var(--amber)">· '+longe+' visita'+(longe>1?'s':'')+' a mais de '+fmtKm(LONGE_KM)+' do cliente</span>':'')
+      +(semLoc?'<span>· '+semLoc+' contato'+(semLoc>1?'s':'')+' sem localização (ligação, WhatsApp ou localização bloqueada)</span>':'')
+      +(!pts.length?'<span>· nenhum contato com localização neste filtro</span>':'');
+  }).catch(function(e){ $('v-leg').innerHTML='<span style="color:var(--red)">Não foi possível carregar o mapa: '+esc(e.message)+'</span>'; });
+}
+
+/* =====================================================================
+   EQUIPE — painel do gestor
+   ===================================================================== */
+function fmtHoras(h){ if(h==null) return '—'; return h<24 ? Math.max(1,Math.round(h))+' h' : (h/24).toFixed(1).replace('.',',')+' dias'; }
+function primeiraResposta(s){
+  var h=(s.historico||[]); for(var i=1;i<h.length;i++){ if(h[i].por && h[i].por!==s.donoEmail) return h[i].em; } return null;
+}
+function renderEquipe(){
+  if(!U.gestor) return;
+  var dias=+($('eq-per').value||30), desde=somaDias(hoje(), -dias), desdeISO=new Date(Date.now()-dias*86400000).toISOString();
+  var t=Date.parse((resumoMeta&&resumoMeta.atualizadoEm)||'');
+  $('eq-resumo').textContent=t ? 'Valores dos vendedores atualizados em '+fmtQuando(resumoMeta.atualizadoEm) : (resumoMeta&&resumoMeta.erro?'Sem acesso ao resumo dos vendedores (regra).':'Valores dos vendedores ainda não gerados.');
+  var V={};
+  function v(uid, nome){ if(!uid) return null; if(!V[uid]) V[uid]={ uid:uid, nome:nome||'—', cart:0, ctt:0, vis:0, cli:{}, carteiraIds:{}, atras:0, sem:0, caiu:0, longe:0, abertas:0 }; if(nome&&V[uid].nome==='—') V[uid].nome=nome; return V[uid]; }
+  clientes.forEach(function(c){ if(c.situacao==='inativo') return; var x=v(c.donoUid, c.donoNome); if(!x) return;
+    x.cart++; x.carteiraIds[c.id]=1; if(contatoAtrasado(c)) x.atras++; if(emAlerta(c)) x.sem++; if(queda(c)) x.caiu++; });
+  visitas.forEach(function(w){ if(String(w.data||'')<desde) return; var x=v(w.donoUid, w.donoNome); if(!x) return;
+    x.ctt++; if(w.tipo==='visita') x.vis++; if(w.clienteId && x.carteiraIds[w.clienteId]) x.cli[w.clienteId]=1;
+    var d=distVisita(w); if(d!=null && d>LONGE_KM) x.longe++; });
+  sols.forEach(function(s){ if(ABERTAS.includes(s.status)){ var x=v(s.donoUid, s.donoNome); if(x) x.abertas++; } });
+  var lista=Object.keys(V).map(function(k){ return V[k]; }).sort(function(a,b){ return b.cart-a.cart || String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
+  var tot={ cart:0, ctt:0, vis:0, cob:0, sem:0, caiu:0, abertas:0 };
+  lista.forEach(function(x){ tot.cart+=x.cart; tot.ctt+=x.ctt; tot.vis+=x.vis; tot.cob+=Object.keys(x.cli).length; tot.sem+=x.sem; tot.caiu+=x.caiu; tot.abertas+=x.abertas; });
+  /* tempo até a primeira resposta, no período */
+  var porTipo={}, todasH=[];
+  sols.forEach(function(s){
+    var pt=porTipo[s.tipo]=porTipo[s.tipo]||{ n:0, abertas:0, horas:[], maisAntiga:'' };
+    if(ABERTAS.includes(s.status)){ pt.abertas++; if(!pt.maisAntiga || s.criadoEm<pt.maisAntiga) pt.maisAntiga=s.criadoEm; }
+    if(String(s.criadoEm||'')<desdeISO) return;
+    pt.n++;
+    var r=primeiraResposta(s); if(r){ var h=(Date.parse(r)-Date.parse(s.criadoEm))/3600000; if(h>=0){ pt.horas.push(h); todasH.push(h); } }
+  });
+  var media=function(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; };
+  $('eq-kpis').innerHTML=[
+    kpiEq('Contatos no período', tot.ctt, tot.vis+' visita'+(tot.vis===1?'':'s')+' presencia'+(tot.vis===1?'l':'is')),
+    kpiEq('Carteira contatada', tot.cart?Math.round(tot.cob/tot.cart*100)+'%':'—', tot.cob+' de '+tot.cart+' clientes'),
+    kpiEq('Sem comprar', tot.sem, 'há mais de '+CFG.diasAlerta+' dias', tot.sem?'var(--red)':''),
+    kpiEq('Comprou menos', tot.caiu, 'queda de '+Math.round(QUEDA*100)+'% ou mais', tot.caiu?'var(--red)':''),
+    kpiEq('Resposta média', fmtHoras(media(todasH)), tot.abertas+' solicitaç'+(tot.abertas===1?'ão':'ões')+' em aberto', '')
+  ].join('');
+  $('eq-tab').innerHTML=lista.length ? '<table class="tb eq-tab"><tr><th>Vendedor</th><th class="r">Carteira</th><th class="r">Contatos</th><th class="r">Visitas</th><th>Clientes contatados</th>'
+    +'<th class="r">Contato atrasado</th><th class="r">Sem comprar</th><th class="r">Comprou menos</th><th class="r">Visita longe</th><th class="r">Pedidos abertos</th></tr>'
+    +lista.map(function(x){ var cob=Object.keys(x.cli).length, pc=x.cart?Math.round(cob/x.cart*100):0;
+      var n=function(val, cor){ return '<td class="r">'+(val?'<b'+(cor?' style="color:'+cor+'"':'')+'>'+val+'</b>':'<span class="mini">0</span>')+'</td>'; };
+      return '<tr style="cursor:pointer" onclick="verVendedor(\''+x.uid+'\')"><td><b>'+esc(x.nome)+'</b></td><td class="r">'+x.cart+'</td>'+n(x.ctt)+n(x.vis)
+        +'<td><div style="display:flex;align-items:center;gap:8px"><div class="barra" style="flex:1"><i style="width:'+pc+'%"></i></div><span class="mini">'+cob+' · '+pc+'%</span></div></td>'
+        +n(x.atras,'var(--red)')+n(x.sem,'var(--red)')+n(x.caiu,'var(--red)')+n(x.longe,'var(--amber)')+n(x.abertas,'var(--amber)')+'</tr>'; }).join('')
+    +'</table>' : '<div class="empty">Nenhum vendedor com carteira ainda.</div>';
+  $('eq-resp').innerHTML='<table class="tb"><tr><th>Tipo</th><th class="r">Abertas no período</th><th class="r">Primeira resposta (média)</th><th class="r">Em aberto agora</th><th>A mais antiga em aberto</th></tr>'
+    +TIPO_IDS.map(function(tp){ var p=porTipo[tp]||{ n:0, abertas:0, horas:[], maisAntiga:'' };
+      return '<tr><td>'+TIPOS[tp].ico+' '+TIPOS[tp].nome+'</td><td class="r">'+p.n+'</td><td class="r">'+fmtHoras(media(p.horas))+'</td><td class="r">'+(p.abertas?'<b style="color:var(--amber)">'+p.abertas+'</b>':'0')+'</td>'
+        +'<td class="mini">'+(p.maisAntiga?fmtQuando(p.maisAntiga):'—')+'</td></tr>'; }).join('')+'</table>';
+}
+function kpiEq(rot, val, dica, cor){ return '<div class="card"><div class="klabel">'+rot+'</div><div class="kval"'+(cor?' style="color:'+cor+'"':'')+'>'+val+'</div><div class="khint">'+dica+'</div></div>'; }
+function verVendedor(uid){ filtroCart='todos'; nav('carteira'); var s=$('c-vend'); if(s){ s.value=uid; renderCarteira(); } }
+
+/* =====================================================================
+   EQUIPAMENTO → OS NO APP "MANUTENÇÃO EM CAMPO"
+   A OS nasce sem técnico (quem coordena o Campo distribui). O cliente é
+   procurado no cadastro do Campo pelo nome; se não houver, é criado. Tudo
+   num lote: cliente do Campo (se preciso) + OS + solicitação em andamento.
+   ===================================================================== */
+var ST_OS={ aberta:'Aberta', a_caminho:'A caminho', em_servico:'Em serviço', concluida:'Concluída' };
+function abrirOS(id){
+  var s=solPorId(id); if(!s) return;
+  if(!s.clienteNome){ toast('A solicitação não tem cliente.', true); return; }
+  var cp=s.campos||{};
+  var desc=[s.titulo, cp.equipamento?'Equipamento: '+cp.equipamento:'', cp.servico?'Serviço: '+cp.servico:'', s.descricao, 'Pedido por '+(s.donoNome||s.donoEmail)+' (app Comercial)'].filter(Boolean).join('\n');
+  abrirModal({ titulo:'🛠 Abrir OS no Campo', sub:esc(s.clienteNome)+(s.clienteCidade?' · '+esc(s.clienteCidade):''), corpo:
+      '<div class="alert a-info">A OS vai para o app Manutenção em Campo sem técnico — quem coordena o Campo distribui. A solicitação fica "em andamento" até você concluir.</div>'
+     +'<div class="fld"><label>Prioridade</label><select id="os-prio"><option value="media">Média</option><option value="alta">Alta</option><option value="baixa">Baixa</option></select></div>'
+     +'<div class="fld"><label>Descrição do serviço</label><textarea id="os-desc" style="min-height:130px">'+esc(desc)+'</textarea></div>',
+    botoes:[{ txt:'Voltar', cls:'btn-ghost', fn:function(){ verSolic(id); } }, { txt:'Abrir OS', fn:function(el){ criarOS(s, el); } }] });
+}
+var endErp=null;
+function enderecoErp(erpId){
+  if(!erpId || !U.admin) return Promise.resolve(null);       /* endereço completo: só o admin (regra) */
+  if(endErp) return Promise.resolve(endErp[erpId]||null);
+  return getDocs(collection(db,'logClientesEndereco')).then(function(r){
+    endErp={}; r.docs.forEach(function(d){ var cl=(d.data()||{}).clientes||{}; Object.keys(cl).forEach(function(k){ endErp[k]=cl[k]; }); });
+    return endErp[erpId]||null;
+  }).catch(function(e){ console.warn('logClientesEndereco:', e); return null; });
+}
+function criarOS(s, el){
+  var prio=$('os-prio').value, desc=$('os-desc').value.trim();
+  if(!desc){ toast('Descreva o serviço.', true); return; }
+  var pare=ocupado(el,'Abrindo…');
+  Promise.all([ getDocs(collection(db,'clientes')), enderecoErp(s.clienteErpId) ]).then(function(r){
+    var alvo=normEmp(s.clienteNome), end=r[1]||{};
+    var cc=null; r[0].docs.some(function(d){ var x=d.data()||{}; if(normEmp(x.nome)===alvo){ cc=Object.assign({ id:d.id }, x); return true; } return false; });
+    var cart=s.clienteId?clientePorId(s.clienteId):null;
+    var b=writeBatch(db), cli=cc;
+    if(!cli){
+      var cref=doc(collection(db,'clientes'));
+      cli={ id:cref.id, codigo:'', nome:s.clienteNome, telefone:(cart&&cart.telefone)||'', endereco:end.end||'', bairro:end.bairro||'',
+            cidade:end.cidade||s.clienteCidade||'', contato:(cart&&cart.contato)||'', obs:'Cadastrado pelo app Comercial' };
+      var dados=Object.assign({}, cli); delete dados.id;
+      b.set(cref, Object.assign(dados, { criadoEm:serverTimestamp(), criadoPor:U.nome }));
+    }
+    var oref=doc(collection(db,'ordens')), agora=agoraISO();
+    b.set(oref, { clienteId:cli.id, clienteNome:cli.nome||s.clienteNome,
+      clienteEndereco:[cli.endereco, cli.bairro, cli.cidade].filter(Boolean).join(', '),
+      clienteTel:cli.telefone||'', clienteContato:cli.contato||'',
+      tecnicoId:'', tecnicoUid:'', tecnicoNome:'', prioridade:prio, descricao:desc, agendadaPara:null, checklist:[],
+      status:'aberta', criadoEm:serverTimestamp(), criadoPor:U.nome,
+      timeline:[{ t:Date.now(), txt:'OS aberta por '+U.nome+' a partir de uma solicitação do Comercial' }],
+      origem:{ app:'comercial', solicitacaoId:s.id } });
+    b.update(doc(db,'comSolicitacoes',s.id), { status:'andamento', ordemId:oref.id, ordemApp:'campo',
+      atualizadoEm:agora, respondidoPor:U.email, respondidoNome:U.nome, respondidoEm:agora,
+      historico:(s.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome, st:'andamento', txt:'OS aberta no app Manutenção em Campo'+(cc?'':' (cliente cadastrado no Campo)') }]) });
+    return b.commit();
+  }).then(function(){ toast('OS aberta no Campo.'); fecharModal(); })
+    .catch(function(e){ pare(); if(e && e.code==='permission-denied') toast('Sem permissão no app Campo. Precisa da flag campo com papel gestor ou comercial.', true); else falha('abrir a OS no Campo')(e); });
+}
+function lerOS(id){
+  getDoc(doc(db,'ordens',id)).then(function(r){
+    var el=$('sv-os'); if(!el) return;
+    if(!r.exists()){ el.textContent='não encontrada'; return; }
+    var o=r.data()||{};
+    el.innerHTML=esc(ST_OS[o.status]||o.status||'—')+' · '+(o.tecnicoNome?esc(o.tecnicoNome):'sem técnico')
+      +' · <a href="https://monte-castelo-ind.github.io/campo/" target="_blank" rel="noopener" style="color:var(--blue)">abrir o Campo</a>';
+  }).catch(function(){ var el=$('sv-os'); if(el) el.textContent='sem acesso ao app Campo'; });
+}
+Object.assign(window, { verVendedor:verVendedor, abrirOS:abrirOS });
+
+/* =====================================================================
+   USUÁRIOS E NÍVEIS (só admin)
+   Diretoria (admin) → Gerente → Vendedor/operador. O nível é gravado no
+   documento usuarios/{uid}, nas mesmas flags que as regras já usam:
+     vendedor = comercial:true
+     gerente  = comercial:true + comercialGestor:true
+   Mudar usuarios é exclusivo do admin (regra); ninguém se autopromove.
+   ===================================================================== */
+var usuariosLista=null, usuariosLendo=null, usuBusca='';
+var NIVEL_NOME={ admin:'Diretoria', gerente:'Gerente', vendedor:'Vendedor', nenhum:'Sem acesso' };
+function nivelDe(u){ return u.admin?'admin':(u.comercial&&u.gerente?'gerente':(u.comercial?'vendedor':'nenhum')); }
+function carregarUsuarios(forcar){
+  if(usuariosLista && !forcar) return Promise.resolve(usuariosLista);
+  if(usuariosLendo && !forcar) return usuariosLendo;
+  usuariosLendo=getDocs(collection(db,'usuarios')).then(function(r){
+    usuariosLista=r.docs.map(function(d){ var x=d.data()||{};
+      return { uid:d.id, nome:x.nome||'', email:x.email||'', ativo:x.ativo===true, admin:x.role==='admin',
+               comercial:x.comercial===true, gerente:x.comercialGestor===true };
+    }).sort(function(a,b){ return String(a.nome||a.email).localeCompare(String(b.nome||b.email),'pt-BR'); });
+    usuariosLendo=null; return usuariosLista;
+  }, function(e){ usuariosLendo=null; throw e; });
+  return usuariosLendo;
+}
+function renderUsuarios(){
+  if(!U.admin) return;
+  var box=$('usu-lista');
+  if(!usuariosLista){
+    box.innerHTML='<div class="empty">Carregando…</div>';
+    carregarUsuarios().then(function(){ if(pagina==='usuarios') renderUsuarios(); })
+      .catch(function(e){ box.innerHTML='<div class="alert a-err">Não foi possível ler os usuários: '+esc(e.code||e.message)+'</div>'; });
+    return;
+  }
+  var q=norm(usuBusca).split(' ').filter(Boolean);
+  var cart={}; clientes.forEach(function(c){ if(c.situacao!=='inativo') cart[c.donoUid]=(cart[c.donoUid]||0)+1; });
+  var vis=function(u){ var t=norm(u.nome+' '+u.email); return !q.length || q.every(function(x){ return t.indexOf(x)>=0; }); };
+  var ativos=usuariosLista.filter(function(u){ return u.ativo && vis(u); });
+  var inativos=usuariosLista.filter(function(u){ return !u.ativo && vis(u); });
+  var cont={ admin:0, gerente:0, vendedor:0 }; usuariosLista.forEach(function(u){ if(u.ativo){ var n=nivelDe(u); if(cont[n]!=null) cont[n]++; } });
+  $('usu-cont').textContent=cont.admin+' na diretoria · '+cont.gerente+' gerente'+(cont.gerente===1?'':'s')+' · '+cont.vendedor+' vendedor'+(cont.vendedor===1?'':'es');
+  var linha=function(u){
+    var n=nivelDe(u), eu=(u.uid===U.uid);
+    var nivel=u.admin ? '<span class="st st-blue">Diretoria · admin</span>'
+      : '<select onchange="mudarNivel(\''+u.uid+'\',this)" style="min-width:150px">'
+        +['nenhum','vendedor','gerente'].map(function(k){ return '<option value="'+k+'"'+(k===n?' selected':'')+'>'+NIVEL_NOME[k]+'</option>'; }).join('')+'</select>';
+    return '<tr><td><b>'+esc(u.nome||'(sem nome)')+'</b>'+(eu?' <span class="mini">(você)</span>':'')+'<br><span class="mini">'+esc(u.email||u.uid)+'</span></td>'
+      +'<td>'+nivel+'</td><td class="r">'+(cart[u.uid]||'<span class="mini">0</span>')+'</td></tr>';
+  };
+  box.innerHTML='<table class="tb"><tr><th>Pessoa</th><th>Nível no Comercial</th><th class="r">Clientes na carteira</th></tr>'
+    +(ativos.length?ativos.map(linha).join(''):'<tr><td colspan="3" class="mini">Ninguém com esse nome.</td></tr>')+'</table>'
+    +(inativos.length?'<div class="sect">Contas ainda não liberadas ('+inativos.length+')</div>'
+      +'<p class="mini" style="margin-top:0">Entraram uma vez, mas a conta está com <b>ativo: false</b>. Liberar a conta vale para todos os apps, por isso fica fora daqui: libere no cadastro de usuários e depois defina o nível nesta tela.</p>'
+      +'<div class="mini">'+inativos.map(function(u){ return esc(u.nome||u.email||u.uid); }).join(' · ')+'</div>':'');
+}
+function mudarNivel(uid, sel){
+  var u=(usuariosLista||[]).filter(function(x){ return x.uid===uid; })[0]; if(!u) return;
+  var antes=nivelDe(u), novo=sel.value;
+  if(novo===antes) return;
+  var n=clientes.filter(function(c){ return c.donoUid===uid && c.situacao!=='inativo'; }).length;
+  if(novo==='nenhum' && n && !confirm((u.nome||u.email)+' tem '+n+' cliente'+(n>1?'s':'')+' na carteira. Sem acesso, eles continuam no nome dele até você passá-los para outro vendedor. Continuar?')){ sel.value=antes; return; }
+  var dados={ comercial:novo!=='nenhum', comercialGestor:novo==='gerente' };
+  sel.disabled=true;
+  updateDoc(doc(db,'usuarios',uid), dados).then(function(){
+    u.comercial=dados.comercial; u.gerente=dados.comercialGestor; sel.disabled=false;
+    toast((u.nome||u.email)+': '+NIVEL_NOME[novo]+'. Vale na próxima vez que a pessoa abrir o app.'); renderUsuarios();
+  }).catch(function(e){ sel.disabled=false; sel.value=antes; falha('mudar o nível')(e); });
+}
+function setUsuBusca(v){ usuBusca=v; renderUsuarios(); }
+Object.assign(window, { setUsuBusca:setUsuBusca });
 </script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
