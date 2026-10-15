@@ -483,10 +483,22 @@ details.mais[open]{padding-bottom:4px}
     <div class="page" id="page-importar">
       <div class="card" style="max-width:980px;margin-bottom:16px">
         <div class="sect">Direto do ERP</div>
-        <p class="mini" style="margin-top:0">O faturamento do ERP já diz qual vendedor atende cada cliente. Este botão monta a carteira
-          a partir dele (mês mais recente em que o cliente comprou). Na primeira vez você liga cada vendedor do ERP a uma pessoa do app;
+        <p class="mini" style="margin-top:0">O faturamento do ERP já diz qual representante atende cada cliente. Este botão monta a carteira
+          a partir dele (mês mais recente em que o cliente comprou). Na primeira vez você liga cada representante do ERP a uma pessoa do app;
           a ligação fica guardada e, das próximas vezes, é só conferir e gravar.</p>
-        <button class="btn" onclick="impDoErp(this)">⇣ Ler vendedores do ERP</button>
+        <div class="tools" style="margin:0">
+          <select id="imp-erp-campo">
+            <option value="rep" selected>Separar por representante</option>
+            <option value="vend">Separar pelo vendedor do ERP</option>
+          </select>
+          <select id="imp-erp-dias">
+            <option value="30" selected>Só quem comprou nos últimos 30 dias</option>
+            <option value="60">Só quem comprou nos últimos 60 dias</option>
+            <option value="90">Só quem comprou nos últimos 90 dias</option>
+            <option value="0">Todos os clientes do faturamento</option>
+          </select>
+          <button class="btn" onclick="impDoErp(this)">⇣ Ler do ERP</button>
+        </div>
       </div>
       <div class="card" style="max-width:980px">
         <div class="sect">Por planilha</div>
@@ -897,7 +909,7 @@ function render(){
   if(pagina==='carteira') sub=clientes.length+' cliente'+(clientes.length===1?'':'s')+(U.gestor?' em todas as carteiras':' na sua carteira');
   $('psub').textContent=sub;
   var av=Object.keys(erros).map(function(k){ return '<div class="alert a-err">⚠ '+esc(erros[k])+'</div>'; });
-  if(U.admin && !cfgExiste) av.push('<div class="alert a-info">ⓘ Ainda não há ninguém configurado para responder solicitações — por enquanto só a diretoria responde. Ajuste em Configurações.</div>');
+  if(U.admin && !cfgExiste) av.push('<div class="alert a-info">ⓘ Configurações ainda não salvas: por enquanto a diretoria e os gerentes respondem todos os tipos de solicitação. Ajuste em Configurações.</div>');
   $('avisos').innerHTML=av.join('');
   badge();
   if(pagina==='hoje') renderHoje();
@@ -1700,11 +1712,31 @@ function impGuardarMapa(){
 function impDoErp(el){
   if(!U.admin) return;
   if(!cmDocs.length){ toast(fatErp===false?'Sem acesso ao faturamento do ERP.':'O faturamento ainda está carregando. Tente em alguns segundos.', true); return; }
-  var ult={};
-  cmDocs.forEach(function(d){ Object.keys(d.clientes).forEach(function(k){ var c=d.clientes[k]||{}; if(c.vend) ult[k]={ nome:c.nome||k, vend:String(c.vend).trim() }; }); });
-  var linhas=Object.keys(ult).map(function(k){ return [ult[k].nome, ult[k].vend]; });
-  if(!linhas.length){ toast('O faturamento não trouxe o vendedor dos clientes.', true); return; }
-  IMP={ cab:['Cliente','Vendedor'], linhas:linhas, col:{ cli:0, vend:1, cid:-1 }, mapa:{}, usuarios:IMP.usuarios, plano:null, nomeArq:'ERP', fonte:'erp' };
+  /* rep = representante (coluna de representantes do ERP); vend = vendedor interno do pedido */
+  var campo=($('imp-erp-campo')&&$('imp-erp-campo').value)||'rep', rot=campo==='rep'?'representante':'vendedor';
+  var ult={}, todos={};
+  cmDocs.forEach(function(d){ Object.keys(d.clientes).forEach(function(k){ var c=d.clientes[k]||{}; todos[k]=1;
+    var v=String(c[campo]||'').trim(); if(v) ult[k]={ nome:c.nome||k, quem:v }; }); });
+  var comCampo=Object.keys(ult);
+  if(!comCampo.length){ toast('O faturamento não trouxe o '+rot+' dos clientes.', true); return; }
+  /* só clientes ativos: última compra (base do ERP, ligada pelo nome) dentro do período.
+     Nome que não está na base: vale ter comprado no mês atual, se o período cobre o mês. */
+  var dias=+(($('imp-erp-dias')&&$('imp-erp-dias').value)||30), limite=dias?somaDias(hoje(), -dias):'';
+  var uPorNome={};
+  Object.keys(erp).forEach(function(id){ var e=erp[id]; if(!e.u) return;
+    [e.n, e.nErp].forEach(function(n){ n=normEmp(n); if(n && (!uPorNome[n] || e.u>uPorNome[n])) uPorNome[n]=String(e.u).slice(0,10); }); });
+  var mesAtual=hoje().slice(0,7), docAtual=cmDocs.filter(function(d){ return d.mes===mesAtual; })[0], diaHoje=+hoje().slice(8,10);
+  var ativos=comCampo.filter(function(k){
+    if(!limite) return true;
+    var u=uPorNome[normEmp(ult[k].nome)];
+    if(u) return u>=limite;
+    var c=docAtual&&docAtual.clientes[k];
+    return !!(c && (c.fat||0)>0 && diaHoje<=dias);
+  });
+  var linhas=ativos.map(function(k){ return [ult[k].nome, ult[k].quem]; });
+  if(!linhas.length){ toast('Nenhum cliente com '+rot+' comprou nos últimos '+dias+' dias.', true); return; }
+  IMP={ cab:['Cliente', rot], linhas:linhas, col:{ cli:0, vend:1, cid:-1 }, mapa:{}, usuarios:IMP.usuarios, plano:null, nomeArq:'ERP', fonte:'erp',
+        rotulo:rot, semCampo:Object.keys(todos).length-comCampo.length, parados:comCampo.length-ativos.length, dias:dias };
   $('imp-p3').innerHTML=''; $('imp-p4').innerHTML='';
   var pare=ocupado(el,'Lendo…');
   impUsuarios().then(function(){ pare(); impPintarP2(); $('imp-passos').scrollIntoView({ behavior:'smooth', block:'start' }); })
@@ -1716,7 +1748,10 @@ function impSelCol(k, el){ IMP.col[k]=+el.value; IMP.plano=null; $('imp-p4').inn
 function impPintarP2(){
   $('imp-passos').style.display='';
   $('imp-fonte').innerHTML=IMP.fonte==='erp'
-    ? '<b>Fonte: ERP</b> · '+IMP.linhas.length+' clientes com vendedor no faturamento de '+cmDocs.map(function(d){ return nomeMes(d.mes); }).join(', ')
+    ? '<b>Fonte: ERP</b> · '+IMP.linhas.length+' clientes ativos com '+IMP.rotulo+(IMP.dias?' (compraram nos últimos '+IMP.dias+' dias)':' (todo o faturamento de '+cmDocs.map(function(d){ return nomeMes(d.mes); }).join(', ')+')')
+      +(IMP.parados?' · '+IMP.parados+' sem compra no período':'')
+      +(IMP.semCampo?' · '+IMP.semCampo+' sem '+IMP.rotulo:'')
+      +((IMP.parados||IMP.semCampo)?' — esses ficam como estão':'')
     : '<b>Fonte: planilha</b> '+esc(IMP.nomeArq)+' · '+IMP.linhas.length+' linhas';
   if(IMP.fonte==='erp'){ $('imp-p2').innerHTML=''; impPintarP3(); return; }
   var op=function(k, opc){ return '<select onchange="impSelCol(\''+k+'\',this)"><option value="-1">'+(opc?'— não tem —':'— escolha —')+'</option>'
@@ -1748,7 +1783,7 @@ function impPintarP3(){
   var opU=function(v){ return '<select onchange="impMapa(this)" data-v="'+esc(v)+'"><option value="">— não importar —</option>'
     +IMP.usuarios.map(function(u){ return '<option value="'+u.uid+'"'+(IMP.mapa[v]===u.uid?' selected':'')+'>'+esc(impNomeU(u))+(u.com?'':' (sem acesso ao Comercial)')+'</option>'; }).join('')+'</select>'; };
   box.innerHTML='<div class="passo"><b>'+(IMP.fonte==='erp'?'1':'3')+'</b> Quem é quem</div>'
-    +'<p class="mini" style="margin-top:0">Ligue cada vendedor '+(IMP.fonte==='erp'?'do ERP':'da planilha')+' a uma pessoa do app. A ligação fica guardada para a próxima vez. Quem não aparece na lista ainda não entrou no app nenhuma vez — peça para entrar uma vez e recarregue esta tela.</p>'
+    +'<p class="mini" style="margin-top:0">Ligue cada '+(IMP.fonte==='erp'?IMP.rotulo+' do ERP':'vendedor da planilha')+' a uma pessoa do app. A ligação fica guardada para a próxima vez. Quem não aparece na lista ainda não entrou no app nenhuma vez — peça para entrar uma vez e recarregue esta tela.</p>'
     +'<div class="tscroll" style="max-height:40vh"><table class="tb"><tr><th>'+(IMP.fonte==='erp'?'No ERP':'Na planilha')+'</th><th class="r">Clientes</th><th>No app</th></tr>'
     +vals.map(function(v){ return '<tr><td>'+esc(v)+'</td><td class="r">'+cont[v]+'</td><td>'+opU(v)+'</td></tr>'; }).join('')+'</table></div>'
     +'<label class="chk" style="margin-top:13px"><input type="checkbox" id="imp-semerp" checked> Cadastrar também os clientes que não forem achados no ERP (ficam "sem vínculo")</label>'
