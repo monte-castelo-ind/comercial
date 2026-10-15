@@ -2032,7 +2032,13 @@ function renderEquipe(){
     x.ctt++; if(w.tipo==='visita') x.vis++; if(w.clienteId && x.carteiraIds[w.clienteId]) x.cli[w.clienteId]=1;
     var d=distVisita(w); if(d!=null && d>LONGE_KM) x.longe++; });
   sols.forEach(function(s){ if(ABERTAS.includes(s.status)){ var x=v(s.donoUid, s.donoNome); if(x) x.abertas++; } });
-  var lista=Object.keys(V).map(function(k){ return V[k]; }).sort(function(a,b){ return b.cart-a.cart || String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
+  /* valor vendido por representante, direto do faturamento do ERP (todos os clientes
+     dele, mesmo os que não estão na carteira do app) */
+  var vd=vendasPorRep(), ms=fatMeses, mA=ms[ms.length-1], m1=ms[ms.length-2], m2=ms[ms.length-3];
+  if(vd) Object.keys(vd.por).forEach(function(uid){ var x=v(uid, vd.nomes[uid]); if(x) x.vendas=vd.por[uid]; });
+  var lista=Object.keys(V).map(function(k){ return V[k]; }).sort(function(a,b){
+    var fa=(a.vendas&&a.vendas[mA])||0, fb=(b.vendas&&b.vendas[mA])||0;
+    return fb-fa || b.cart-a.cart || String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
   var tot={ cart:0, ctt:0, vis:0, cob:0, sem:0, caiu:0, abertas:0 };
   lista.forEach(function(x){ tot.cart+=x.cart; tot.ctt+=x.ctt; tot.vis+=x.vis; tot.cob+=Object.keys(x.cli).length; tot.sem+=x.sem; tot.caiu+=x.caiu; tot.abertas+=x.abertas; });
   /* tempo até a primeira resposta, no período */
@@ -2045,18 +2051,25 @@ function renderEquipe(){
     var r=primeiraResposta(s); if(r){ var h=(Date.parse(r)-Date.parse(s.criadoEm))/3600000; if(h>=0){ pt.horas.push(h); todasH.push(h); } }
   });
   var media=function(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; };
+  var totA=0, tot1=0; lista.forEach(function(x){ if(x.vendas){ totA+=x.vendas[mA]||0; tot1+=x.vendas[m1]||0; } });
   $('eq-kpis').innerHTML=[
+    vd ? kpiEq('Vendido em '+nomeMes(mA), fmtRS0(totA), 'até hoje · '+nomeMes(m1)+': '+fmtRS0(tot1)+(vd.semRep?' · sem representante: '+fmtRS0(vd.semRep[mA]||0):''), '')
+       : kpiEq('Vendido', '—', fatErp===false?'sem acesso ao faturamento':'carregando o faturamento…', ''),
     kpiEq('Contatos no período', tot.ctt, tot.vis+' visita'+(tot.vis===1?'':'s')+' presencia'+(tot.vis===1?'l':'is')),
     kpiEq('Carteira contatada', tot.cart?Math.round(tot.cob/tot.cart*100)+'%':'—', tot.cob+' de '+tot.cart+' clientes'),
     kpiEq('Sem comprar', tot.sem, 'há mais de '+CFG.diasAlerta+' dias', tot.sem?'var(--red)':''),
     kpiEq('Comprou menos', tot.caiu, 'queda de '+Math.round(QUEDA*100)+'% ou mais', tot.caiu?'var(--red)':''),
     kpiEq('Resposta média', fmtHoras(media(todasH)), tot.abertas+' solicitaç'+(tot.abertas===1?'ão':'ões')+' em aberto', '')
   ].join('');
-  $('eq-tab').innerHTML=lista.length ? '<table class="tb eq-tab"><tr><th>Vendedor</th><th class="r">Carteira</th><th class="r">Contatos</th><th class="r">Visitas</th><th>Clientes contatados</th>'
+  $('eq-tab').innerHTML=lista.length ? '<table class="tb eq-tab"><tr><th>Vendedor</th>'
+    +(vd?'<th class="r">Vendido em '+nomeMes(mA)+'<br><span class="mini">até hoje</span></th><th class="r">Vendido em '+nomeMes(m1)+'</th><th class="r">'+nomeMes(m1)+' × '+nomeMes(m2)+'</th>':'')
+    +'<th class="r">Carteira</th><th class="r">Contatos</th><th class="r">Visitas</th><th>Clientes contatados</th>'
     +'<th class="r">Contato atrasado</th><th class="r">Sem comprar</th><th class="r">Comprou menos</th><th class="r">Visita longe</th><th class="r">Pedidos abertos</th></tr>'
     +lista.map(function(x){ var cob=Object.keys(x.cli).length, pc=x.cart?Math.round(cob/x.cart*100):0;
       var n=function(val, cor){ return '<td class="r">'+(val?'<b'+(cor?' style="color:'+cor+'"':'')+'>'+val+'</b>':'<span class="mini">0</span>')+'</td>'; };
-      return '<tr style="cursor:pointer" onclick="verVendedor(\''+x.uid+'\')"><td><b>'+esc(x.nome)+'</b>'+(String(x.uid).indexOf('erp:')===0?' <span class="mini">sem login</span>':'')+'</td><td class="r">'+x.cart+'</td>'+n(x.ctt)+n(x.vis)
+      return '<tr style="cursor:pointer" onclick="verVendedor(\''+x.uid+'\')"><td><b>'+esc(x.nome)+'</b>'+(String(x.uid).indexOf('erp:')===0?' <span class="mini">sem login</span>':'')+'</td>'
+        +(vd?colVendas(x.vendas, mA, m1, m2):'')
+        +'<td class="r">'+x.cart+'</td>'+n(x.ctt)+n(x.vis)
         +'<td><div style="display:flex;align-items:center;gap:8px"><div class="barra" style="flex:1"><i style="width:'+pc+'%"></i></div><span class="mini">'+cob+' · '+pc+'%</span></div></td>'
         +n(x.atras,'var(--red)')+n(x.sem,'var(--red)')+n(x.caiu,'var(--red)')+n(x.longe,'var(--amber)')+n(x.abertas,'var(--amber)')+'</tr>'; }).join('')
     +'</table>' : '<div class="empty">Nenhum vendedor com carteira ainda.</div>';
@@ -2064,6 +2077,30 @@ function renderEquipe(){
     +TIPO_IDS.map(function(tp){ var p=porTipo[tp]||{ n:0, abertas:0, horas:[], maisAntiga:'' };
       return '<tr><td>'+TIPOS[tp].ico+' '+TIPOS[tp].nome+'</td><td class="r">'+p.n+'</td><td class="r">'+fmtHoras(media(p.horas))+'</td><td class="r">'+(p.abertas?'<b style="color:var(--amber)">'+p.abertas+'</b>':'0')+'</td>'
         +'<td class="mini">'+(p.maisAntiga?fmtQuando(p.maisAntiga):'—')+'</td></tr>'; }).join('')+'</table>';
+}
+function fmtRS0(v){ return 'R$ '+Math.round(v||0).toLocaleString('pt-BR'); }
+/* representante do ERP → pessoa do app: a ligação guardada em "Separar carteira";
+   sem login, a carteira "no nome" usa o mesmo dono provisório (erp:NOME) */
+function uidDoRep(rep, porNomeDono){
+  var k=normEmp(rep), m=(CFG.vendMapa||{})[k];
+  if(m && m!=='#nome') return m;
+  if(!m && porNomeDono && porNomeDono[k]) return porNomeDono[k];      /* sem ligação guardada: dono da carteira com o mesmo nome */
+  return 'erp:'+k.replace(/ /g,'_');
+}
+function vendasPorRep(){
+  if(!cmDocs.length) return null;
+  var por={}, nomes={}, semRep={}, porNomeDono={};
+  clientes.forEach(function(c){ var n=normEmp(c.donoNome); if(n && c.donoUid && !porNomeDono[n]) porNomeDono[n]=c.donoUid; });
+  cmDocs.forEach(function(d){ Object.keys(d.clientes).forEach(function(k){ var c=d.clientes[k]||{}, f=c.fat||0, rep=String(c.rep||'').trim();
+    if(!rep){ semRep[d.mes]=(semRep[d.mes]||0)+f; return; }
+    var uid=uidDoRep(rep, porNomeDono); por[uid]=por[uid]||{}; por[uid][d.mes]=(por[uid][d.mes]||0)+f; if(!nomes[uid]) nomes[uid]=rep; }); });
+  return { por:por, nomes:nomes, semRep:Object.keys(semRep).length?semRep:null };
+}
+function colVendas(vv, mA, m1, m2){
+  vv=vv||{};
+  var a=vv[mA]||0, b=vv[m1]||0, c=vv[m2]||0, var_='<span class="mini">—</span>';
+  if(c>0){ var p=Math.round((b/c-1)*100); var_='<b style="color:'+(p<=-10?'var(--red)':(p>=10?'var(--green)':'var(--muted)'))+'">'+(p>0?'+':'')+p+'%</b>'; }
+  return '<td class="r"><b>'+(a?fmtRS0(a):'<span class="mini">—</span>')+'</b></td><td class="r">'+(b?fmtRS0(b):'<span class="mini">—</span>')+'</td><td class="r">'+var_+'</td>';
 }
 function kpiEq(rot, val, dica, cor){ return '<div class="card"><div class="klabel">'+rot+'</div><div class="kval"'+(cor?' style="color:'+cor+'"':'')+'>'+val+'</div><div class="khint">'+dica+'</div></div>'; }
 function verVendedor(uid){ filtroCart='todos'; nav('carteira'); var s=$('c-vend'); if(s){ s.value=uid; renderCarteira(); } }
