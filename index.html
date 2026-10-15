@@ -82,11 +82,12 @@ textarea{min-height:88px;resize:vertical;line-height:1.55}
 html[data-theme="light"] .side:hover:not(.pin){box-shadow:14px 0 40px rgba(20,20,40,.14)}
 .side .lbl{transition:opacity .12s}
 .side:not(.pin):not(:hover) .lbl{opacity:0}
-.side-logo{padding:0 30px 12px;cursor:pointer}
+.side-logo{padding:0 4px 12px;cursor:pointer}
+.side-logo .brand-logo-box{width:auto;margin:0 26px}       /* logo no centro, sem encostar no botão ⇤ */
 .side-logo .logo-mini{display:none;font-size:20px;text-align:center}
 .side:not(.pin):not(:hover) .side-logo .brand-logo-box,.side:not(.pin):not(:hover) .side-logo .brand-cap{display:none}
 .side:not(.pin):not(:hover) .side-logo .logo-mini{display:block}
-.brand-cap{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:6px;text-align:center}
+.brand-cap{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:8px;text-align:left;padding-left:4px}
 .pinbtn{position:absolute;top:20px;right:12px;width:30px;height:30px;padding:0;font-size:16px;border-radius:8px;
         background:none;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .pinbtn:hover{background:var(--card-2);color:var(--text)}
@@ -235,6 +236,7 @@ table.tb .r{text-align:right}
 .vinc{display:flex;align-items:center;gap:9px;background:var(--card-2);border:1px solid var(--border);
       border-radius:10px;padding:8px 11px;font-size:13px}
 .vinc b{flex:1;min-width:0}
+.vinc-sub small{display:block;font-size:11.5px;font-weight:400;color:var(--muted)}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{background:var(--card-2);border:1px solid var(--border);color:var(--muted);font:600 12.5px 'Archivo',sans-serif;
       padding:7px 13px;border-radius:20px;cursor:pointer}
@@ -697,8 +699,16 @@ function negar(msg){
 onAuthStateChanged(auth, async function(u){
   if(!u){ $('auth').style.display='flex'; $('app').style.display='none'; pararTudo(); return; }
   var d={};
-  try{ var s=await getDoc(doc(db,'usuarios',u.uid)); d=s.exists()?s.data():{}; }
+  var existe=true;
+  try{ var s=await getDoc(doc(db,'usuarios',u.uid)); existe=s.exists(); d=existe?s.data():{}; }
   catch(e){ console.error('usuarios:',e); }
+  /* primeiro login: cria o cadastro pendente (sem acesso), como no Manut. Comodato.
+     A regra só aceita ativo:false e papel leitura — ninguém se libera sozinho. */
+  if(!existe){
+    try{ await setDoc(doc(db,'usuarios',u.uid), { email:u.email||'', nome:u.email||'', role:'leitura', ativo:false, criadoEm:Date.now() }); }
+    catch(e){ console.error('cadastro pendente:', e); }
+    negar('Cadastro criado. Agora a diretoria precisa liberar o seu acesso — depois é só entrar de novo.'); return;
+  }
   if(d.ativo!==true){ negar('Sua conta ainda não foi liberada. Fale com a diretoria.'); return; }
   U.uid=u.uid; U.email=u.email||''; U.nome=d.nome||U.email.split('@')[0];
   U.admin=(d.role==='admin');
@@ -817,7 +827,7 @@ function lerErp(){
   getDocs(collection(db,'logClientesMapa')).then(function(r){
     var b={};
     r.docs.forEach(function(d){ var cl=(d.data()||{}).clientes||{}; Object.keys(cl).forEach(function(k){ b[k]=cl[k]; }); });
-    Object.keys(b).forEach(function(k){ var c=b[k]; c._busca=norm([c.n,c.nErp,c.c,c.r].join(' ')); });
+    Object.keys(b).forEach(function(k){ var c=b[k]; c._busca=norm([c.n,c.nErp,c.c,c.r,c.e].join(' ')); });
     erp=b; erpEstado='ok'; render();
   }).catch(function(e){ console.warn('logClientesMapa:', e); erpEstado='erro'; render(); });
 }
@@ -1098,15 +1108,22 @@ function salvarConfig(){
 var PK={};
 function pkMontar(id, o){ PK[id]={ sel:o.sel||null, comErp:o.comErp!==false, ph:o.ph||'Digite o nome ou a cidade…', onSel:o.onSel||null, res:[] }; pkPintar(id); }
 function pkSelDeCliente(c){ return c ? { clienteId:c.id, erpId:c.erpId||'', nome:c.nome, cidade:c.cidade||'', rota:c.rota||'', dono:c.donoNome||'' } : null; }
+/* endereço do ERP (rua e bairro, sem número) — diferencia lojas de mesmo nome */
+function endErpTxt(e){ return e && e.e ? String(e.e).trim() : ''; }
+function pkEnd(x){ var e=x.erpId?erp[x.erpId]:null; return [endErpTxt(e), x.cidade].filter(Boolean).join(' · '); }
 function pkDesc(x){
   var e=x.erpId?erp[x.erpId]:null;
-  return [x.cidade, x.rota?'rota '+x.rota:'', (e&&e.u)?'última compra '+fmtDia(e.u):'', (U.gestor&&x.dono)?'carteira de '+x.dono:''].filter(Boolean).join(' · ');
+  return [x.rota?'rota '+x.rota:'', (e&&e.u)?'última compra '+fmtDia(e.u):'', (U.gestor&&x.dono)?'carteira de '+x.dono:''].filter(Boolean).join(' · ');
+}
+function pkLinhas(x, extra){
+  var end=pkEnd(x), inf=[pkDesc(x), extra].filter(Boolean).join(' · ');
+  return (end?'<small>📍 '+esc(end)+'</small>':'')+(inf?'<small>'+esc(inf)+'</small>':'');
 }
 function pkPintar(id){
   var p=PK[id], box=$(id); if(!p||!box) return;
   if(p.sel){
-    box.innerHTML='<div class="vinc"><span>👤</span><b>'+esc(p.sel.nome)+'<br><span class="mini">'+esc(pkDesc(p.sel)||'')
-      +(p.sel.clienteId?'':' · fora da carteira')+'</span></b><button type="button" class="btn btn-sm btn-ghost" onclick="pkTrocar(\''+id+'\')">Trocar</button></div>';
+    box.innerHTML='<div class="vinc"><span>👤</span><b>'+esc(p.sel.nome)+'<span class="vinc-sub">'+pkLinhas(p.sel, p.sel.clienteId?'':'fora da carteira')
+      +'</span></b><button type="button" class="btn btn-sm btn-ghost" onclick="pkTrocar(\''+id+'\')">Trocar</button></div>';
     return;
   }
   box.innerHTML='<input type="search" id="'+id+'-q" placeholder="'+esc(p.ph)+'" oninput="pkBusca(\''+id+'\')" autocomplete="off"><div id="'+id+'-r"></div>';
@@ -1132,7 +1149,7 @@ function pkBusca(id){
   p.res=res;
   out.innerHTML=res.length ? '<div class="busca-res">'+res.map(function(x,i){
       return '<button type="button" onclick="pkEscolher(\''+id+'\','+i+')"><span class="orig'+(x.clienteId?' cart':'')+'">'+(x.clienteId?'carteira':'ERP')+'</span>'
-        +esc(x.nome)+'<small>'+esc(pkDesc(x)||'—')+'</small></button>'; }).join('')+'</div>'
+        +esc(x.nome)+pkLinhas(x)+'</button>'; }).join('')+'</div>'
     : '<div class="mini" style="margin-top:6px">'+(p.comErp&&erpEstado!=='ok'?'Lendo a base do ERP…':'Nenhum cliente com esse nome.')+'</div>';
 }
 function pkEscolher(id, i){ var p=PK[id]; p.sel=p.res[i]; pkPintar(id); if(p.onSel) p.onSel(p.sel); }
@@ -1172,6 +1189,7 @@ function verCliente(id){
   if(!c.erpId) corpo+='<div class="alert a-warn">'+(c.situacao==='prospect'?'Prospect: ainda não é cliente no ERP.':'Sem vínculo com o ERP — edite o cliente e procure o nome na base para ver a última compra.')+'</div>';
   else {
     corpo+='<div class="det"><div><span>Nome no ERP</span><b>'+esc((e&&(e.nErp||e.n))||c.erpNome||'—')+'</b></div>'
+      +(endErpTxt(e)?'<div><span>Endereço no ERP</span><b>'+esc(endErpTxt(e))+'</b></div>':'')
       +'<div><span>Última compra</span><b'+(emAlerta(c)?' style="color:var(--red)"':'')+'>'+(u?fmtDia(u)+' · '+d+' dia'+(d===1?'':'s'):(erpEstado==='ok'?'nenhuma registrada':'…'))+'</b></div>';
     var fc2=fatCliente(c), ms=mesesFat();
     if(fc2 && ms.length) ms.forEach(function(m, i){ corpo+='<div><span>'+(i===ms.length-1?nomeMes(m)+' (até hoje)':'Comprou em '+nomeMes(m))+'</span><b class="mono">'+(fc2[m]?fmtRS(fc2[m]):'—')+'</b></div>'; });
@@ -1289,7 +1307,7 @@ function fcPintarErp(){
   if(fc.erpId){
     var e=erp[fc.erpId];
     box.innerHTML='<div class="vinc"><span>🔗</span><b>'+esc((e&&(e.nErp||e.n))||fc.erpNome||fc.erpId)
-      +'<br><span class="mini">'+esc(e?[e.c, e.r?'rota '+e.r:'', e.u?'última compra '+fmtDia(e.u):''].filter(Boolean).join(' · '):'')+'</span></b>'
+      +'<span class="vinc-sub">'+(e?pkLinhas({ erpId:fc.erpId, cidade:e.c||'', rota:e.r||'' }):'')+'</span></b>'
       +'<button type="button" class="btn btn-sm btn-ghost" onclick="fcDesvincular()">Trocar</button></div>';
     return;
   }
@@ -1303,7 +1321,7 @@ function fcBuscaErp(){
   var ach=[];
   Object.keys(erp).some(function(k){ var t=erp[k]._busca; if(q.every(function(x){ return t.indexOf(x)>=0; })) ach.push(k); return ach.length>=8; });
   out.innerHTML=ach.length ? '<div class="busca-res">'+ach.map(function(k){ var e=erp[k];
-      return '<button type="button" onclick="fcVincular(\''+k+'\')">'+esc(e.n||e.nErp||k)+'<small>'+esc([e.c, e.r?'rota '+e.r:'', e.u?'última compra '+fmtDia(e.u):''].filter(Boolean).join(' · '))+'</small></button>'; }).join('')+'</div>'
+      return '<button type="button" onclick="fcVincular(\''+k+'\')">'+esc(e.n||e.nErp||k)+pkLinhas({ erpId:k, cidade:e.c||'', rota:e.r||'' })+'</button>'; }).join('')+'</div>'
     : '<div class="mini" style="margin-top:6px">Nada encontrado na base do ERP.</div>';
 }
 function fcVincular(k){
@@ -2124,14 +2142,21 @@ function renderUsuarios(){
     var nivel=u.admin ? '<span class="st st-blue">Diretoria · admin</span>'
       : '<select onchange="mudarNivel(\''+u.uid+'\',this)" style="min-width:150px">'
         +['nenhum','vendedor','gerente'].map(function(k){ return '<option value="'+k+'"'+(k===n?' selected':'')+'>'+NIVEL_NOME[k]+'</option>'; }).join('')+'</select>';
-    return '<tr><td><b>'+esc(u.nome||'(sem nome)')+'</b>'+(eu?' <span class="mini">(você)</span>':'')+'<br><span class="mini">'+esc(u.email||u.uid)+'</span></td>'
+    return '<tr><td><b>'+esc(u.nome||'(sem nome)')+'</b> <button class="pr-x" style="font-size:13px" title="Mudar o nome" onclick="mudarNome(\''+u.uid+'\')">✎</button>'
+      +(eu?' <span class="mini">(você)</span>':'')+'<br><span class="mini">'+esc(u.email||u.uid)+'</span></td>'
       +'<td>'+nivel+'</td><td class="r">'+(cart[u.uid]||'<span class="mini">0</span>')+'</td></tr>';
+  };
+  var linhaInativo=function(u){
+    return '<tr><td><b>'+esc(u.nome||'(sem nome)')+'</b> <button class="pr-x" style="font-size:13px" title="Mudar o nome" onclick="mudarNome(\''+u.uid+'\')">✎</button>'
+      +'<br><span class="mini">'+esc(u.email||u.uid)+'</span></td>'
+      +'<td><select onchange="liberarConta(\''+u.uid+'\',this)" style="min-width:170px"><option value="">Liberar como…</option>'
+      +'<option value="vendedor">Vendedor</option><option value="gerente">Gerente</option></select></td><td></td></tr>';
   };
   box.innerHTML='<table class="tb"><tr><th>Pessoa</th><th>Nível no Comercial</th><th class="r">Clientes na carteira</th></tr>'
     +(ativos.length?ativos.map(linha).join(''):'<tr><td colspan="3" class="mini">Ninguém com esse nome.</td></tr>')+'</table>'
-    +(inativos.length?'<div class="sect">Contas ainda não liberadas ('+inativos.length+')</div>'
-      +'<p class="mini" style="margin-top:0">Entraram uma vez, mas a conta está com <b>ativo: false</b>. Liberar a conta vale para todos os apps, por isso fica fora daqui: libere no cadastro de usuários e depois defina o nível nesta tela.</p>'
-      +'<div class="mini">'+inativos.map(function(u){ return esc(u.nome||u.email||u.uid); }).join(' · ')+'</div>':'');
+    +(inativos.length?'<div class="sect" style="margin:18px 8px 6px">Esperando liberação ('+inativos.length+')</div>'
+      +'<p class="mini" style="margin:0 8px 8px">Entraram uma vez e o cadastro nasceu bloqueado. Liberar aqui ativa a conta e dá o nível no Comercial. Atenção: conta ativa também enxerga o que hoje é aberto a qualquer conta ativa (Manut. Comodato em leitura e o app Campo, que ainda está com as regras temporárias).</p>'
+      +'<table class="tb">'+inativos.map(linhaInativo).join('')+'</table>':'');
 }
 function mudarNivel(uid, sel){
   var u=(usuariosLista||[]).filter(function(x){ return x.uid===uid; })[0]; if(!u) return;
@@ -2146,8 +2171,26 @@ function mudarNivel(uid, sel){
     toast((u.nome||u.email)+': '+NIVEL_NOME[novo]+'. Vale na próxima vez que a pessoa abrir o app.'); renderUsuarios();
   }).catch(function(e){ sel.disabled=false; sel.value=antes; falha('mudar o nível')(e); });
 }
+function liberarConta(uid, sel){
+  var u=(usuariosLista||[]).filter(function(x){ return x.uid===uid; })[0]; if(!u || !sel.value) return;
+  var nivel=sel.value;
+  if(!confirm('Liberar '+(u.nome||u.email)+' como '+NIVEL_NOME[nivel]+' no Comercial?')){ sel.value=''; return; }
+  var dados={ ativo:true, comercial:true, comercialGestor:nivel==='gerente' };
+  sel.disabled=true;
+  updateDoc(doc(db,'usuarios',uid), dados).then(function(){
+    u.ativo=true; u.comercial=true; u.gerente=dados.comercialGestor;
+    toast((u.nome||u.email)+' liberado como '+NIVEL_NOME[nivel]+'. Basta entrar de novo no app.'); renderUsuarios();
+  }).catch(function(e){ sel.disabled=false; sel.value=''; falha('liberar a conta')(e); });
+}
+function mudarNome(uid){
+  var u=(usuariosLista||[]).filter(function(x){ return x.uid===uid; })[0]; if(!u) return;
+  var n=(prompt('Nome que aparece no app (carteira, equipe, solicitações):', (u.nome&&u.nome!==u.email)?u.nome:'')||'').trim();
+  if(!n || n===u.nome) return;
+  updateDoc(doc(db,'usuarios',uid), { nome:n }).then(function(){ u.nome=n; toast('Nome salvo. Os clientes já cadastrados mantêm o nome antigo até a próxima alteração.'); renderUsuarios(); })
+    .catch(falha('mudar o nome'));
+}
 function setUsuBusca(v){ usuBusca=v; renderUsuarios(); }
-Object.assign(window, { setUsuBusca:setUsuBusca });
+Object.assign(window, { setUsuBusca:setUsuBusca, liberarConta:liberarConta, mudarNome:mudarNome });
 </script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
