@@ -164,6 +164,17 @@ h1{margin:0;font-size:21px;font-weight:700;letter-spacing:-.4px}
     border-radius:14px;padding:12px 15px;margin-bottom:9px;cursor:pointer;position:relative}
 .it:hover{border-color:var(--muted)}
 .it-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.promos{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(260px,340px);gap:12px;overflow-x:auto;margin-bottom:20px;padding-bottom:4px}
+.promo{background:linear-gradient(135deg,var(--prim-suave),var(--card) 70%);border:1px solid var(--primary);border-radius:16px;cursor:pointer;overflow:hidden;display:flex;flex-direction:column}
+.promo img{width:100%;height:120px;object-fit:cover;display:block}
+.promo-c{padding:12px 15px 14px}
+.promo-t{font-size:16px;font-weight:800;letter-spacing:-.2px}
+.promo-p{font-size:20px;font-weight:800;color:var(--primary);margin-top:2px}
+.promo-x{font-size:12.5px;color:var(--muted);margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.promo-v{font-size:11px;font-weight:600;color:var(--muted);margin-top:8px;text-transform:uppercase;letter-spacing:.4px}
+.it-fat{flex:0 0 auto;text-align:right;font-weight:700;font-size:15px;white-space:nowrap;line-height:1.2}
+.it-fat small{display:block;font-size:10.5px;font-weight:500;color:var(--muted)}
+.it-fat.zero{color:var(--muted);font-weight:500}
 .it-tit{font-size:15px;font-weight:700;letter-spacing:-.2px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .it-meta{font-size:12px;color:var(--muted);margin-top:2px}
 .it-txt{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.5;white-space:pre-wrap;
@@ -405,6 +416,7 @@ details.mais[open]{padding-bottom:4px}
         <button onclick="abrirSolic()"><span>✉</span>Pedir algo</button>
         <button onclick="abrirCliente()"><span>＋</span>Novo cliente</button>
       </div>
+      <div id="h-promos"></div>
       <div class="kpis" id="kpis"></div>
       <div class="cols">
         <div><div class="sect">Agenda de contatos</div><div id="h-agenda"></div></div>
@@ -418,6 +430,13 @@ details.mais[open]{padding-bottom:4px}
       <div class="tools">
         <input type="search" id="c-busca" placeholder="Buscar cliente, cidade, rota…" oninput="renderCarteira()">
         <select id="c-vend" onchange="renderCarteira()" class="gestor-only" style="display:none"></select>
+        <select id="c-per" onchange="setPerFat(this.value)" title="Período do faturamento"></select>
+        <input type="month" id="c-mes" style="display:none;width:auto" onchange="carregarMesExtra(this.value)">
+        <select id="c-ord" onchange="renderCarteira()">
+          <option value="nome">Ordem: nome</option>
+          <option value="fatd">Ordem: maior faturamento</option>
+          <option value="fata">Ordem: menor faturamento</option>
+        </select>
         <button class="btn btn-sm btn-novo" onclick="abrirCliente()">+ Novo cliente</button>
       </div>
       <div class="chips" id="c-filtros" style="margin-bottom:14px"></div>
@@ -591,6 +610,8 @@ var fatErp=null, fatMeses=[];     /* gestor: nome normalizado -> {mes: fat}; mes
 var cmDocs=[];                    /* gestor: comercialClienteMes lidos (para puxar o vendedor do ERP) */
 var fatVend=null;                 /* vendedor: comVendResumo/{uid} — o valor comprado pelos clientes dele */
 var resumoMeta=null, clientesOk=false;
+var prodErp={};                   /* gestor: nome normalizado -> { mes: { produto:[valor, qtd] } } (2 últimos meses) */
+var promos=[];                    /* promoções (comPromocoes) */
 var pagina='hoje', filtroCart='todos', segSol='minhas';
 var subs=[], subsResp=[];
 var erros={};
@@ -743,7 +764,7 @@ onAuthStateChanged(auth, async function(u){
 });
 
 function pararTudo(){ subs.forEach(function(f){ try{ f(); }catch(e){} }); subs=[]; pararResp();
-  clientes=[]; visitas=[]; concorrentes=[]; solFontes={}; sols=[]; erp={}; erpEstado='nao'; fatErp=null; cmDocs=[]; fatVend=null; resumoMeta=null; clientesOk=false; erros={}; }
+  clientes=[]; visitas=[]; concorrentes=[]; solFontes={}; sols=[]; erp={}; erpEstado='nao'; fatErp=null; cmDocs=[]; prodErp={}; promos=[]; fatVend=null; resumoMeta=null; clientesOk=false; erros={}; }
 function pararResp(){ subsResp.forEach(function(f){ try{ f(); }catch(e){} }); subsResp=[];
   Object.keys(solFontes).forEach(function(k){ if(k.indexOf('resp_')===0) delete solFontes[k]; }); }
 
@@ -794,6 +815,11 @@ function ouvir(){
         .filter(function(c){ return c.ativo!==false; })
         .sort(function(a,b){ return String(a.nome).localeCompare(String(b.nome),'pt-BR'); }); },
       function(e){ console.warn('comConcorrentes:', e); }));
+    /* promoções: poucas e curtas; o gestor vê também as encerradas (para reativar) */
+    subs.push(onSnapshot(U.gestor ? query(collection(db,'comPromocoes'), orderBy('criadoEm','desc'), limit(60))
+                                  : query(collection(db,'comPromocoes'), where('ativa','==',true)),
+      function(s){ promos=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); render(); },
+      function(e){ console.warn('comPromocoes:', e); }));
     var cs=collection(db,'comSolicitacoes');
     subs.push(onSnapshot(query(cs, where('donoUid','==',U.uid)),
       function(s){ delete erros.solicitacoes; solFontes.minhas=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); juntarSols(); },
@@ -848,11 +874,16 @@ function lerErp(){
 function lerFaturamento(){
   fatMeses=mesesAtras(4).reverse();
   Promise.all(fatMeses.map(function(m){ return getDoc(doc(db,'comercialClienteMes',m)); })).then(function(rs){
-    var idx={}; cmDocs=[];
+    var idx={}; cmDocs=[]; prodErp={};
+    var ult2=fatMeses.slice(-2);
     rs.forEach(function(s, i){
       if(!s.exists()) return;
       var cs=(s.data()||{}).clientes||{};
       cmDocs.push({ mes:fatMeses[i], clientes:cs });
+      if(ult2.indexOf(fatMeses[i])>=0) Object.keys(cs).forEach(function(k){ var c=cs[k]||{}, n=normEmp(c.nome||k), pr=c.prod||{}; if(!n) return;
+        var alvo=((prodErp[n]=prodErp[n]||{})[fatMeses[i]]=prodErp[n][fatMeses[i]]||{});
+        Object.keys(pr).forEach(function(p){ var a=pr[p], v=Array.isArray(a)?(a[0]||0):(a||0), q=Array.isArray(a)?(a[1]||0):0;
+          var o=alvo[p]=alvo[p]||[0,0]; o[0]+=v; o[1]+=q; }); });
       Object.keys(cs).forEach(function(k){ var c=cs[k]||{}; var n=normEmp(c.nome||k); if(!n) return;
         idx[n]=idx[n]||{}; idx[n][fatMeses[i]]=(idx[n][fatMeses[i]]||0)+(c.fat||0); });
     });
@@ -945,8 +976,10 @@ function cartaoCliente(c){
   if(emAlerta(c) || contatoAtrasado(c) || qd) borda=' b-red'; else if(contatoHoje(c)) borda=' b-amber';
   else if(c.situacao==='prospect') borda=' b-blue';
   var meta=[c.cidade, c.rota?'rota '+c.rota:'', (U.gestor&&c.donoNome)?'carteira de '+c.donoNome:''].filter(Boolean).join(' · ');
+  var vf=(c.situacao==='prospect')?null:valorPeriodo(c), pf=perAtual();
+  var fatHtml=(vf==null||!pf)?'':'<div class="it-fat'+(vf?'':' zero')+'">'+(vf?fmtRS0(vf):'R$ 0')+'<small>'+esc(pf.curto)+'</small></div>';
   return '<div class="it'+borda+(c.situacao==='inativo'?' b-muted':'')+'" onclick="verCliente(\''+c.id+'\')">'
-    +'<div class="it-top"><div class="it-tit">'+esc(c.nome||'(sem nome)')+'</div></div>'
+    +'<div class="it-top" style="align-items:flex-start"><div class="it-tit">'+esc(c.nome||'(sem nome)')+'</div>'+fatHtml+'</div>'
     +(meta?'<div class="it-meta">'+esc(meta)+'</div>':'')
     +'<div class="it-tags">'+tags.join('')+'</div></div>';
 }
@@ -989,6 +1022,7 @@ function renderHoje(){
   else k.push(kpi('Minhas solicitações', minhasAb, 'em aberto', "segSol='minhas';nav('solic')", ''));
   $('kpis').innerHTML=k.join('');
 
+  renderPromos();
   $('h-agenda').innerHTML=agenda.length ? agenda.slice(0,30).map(cartaoCliente).join('')
     : '<div class="empty">Nenhum contato marcado para os próximos 7 dias.</div>';
   $('h-alerta-tit').textContent='Sem comprar há mais de '+CFG.diasAlerta+' dias';
@@ -1029,11 +1063,75 @@ function renderCarteira(){
     if(filtroCart==='semerp' && (c.erpId || c.situacao==='prospect')) return false;
     if(q.length){ var t=norm([c.nome,c.cidade,c.rota,c.contato,c.fornecedor,c.donoNome].join(' ')); if(!q.every(function(x){ return t.indexOf(x)>=0; })) return false; }
     return true;
-  }).sort(function(a,b){ return String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'); });
+  });
+  /* faturamento do período: no cartão, no total e na ordem */
+  pintarPerFat();
+  var ord=$('c-ord').value, pf=perAtual(), val={}, tot=0, temVal=false;
+  l.forEach(function(c){ var v=(c.situacao==='prospect')?null:valorPeriodo(c); val[c.id]=v; if(v!=null){ temVal=true; tot+=v; } });
+  l.sort(function(a,b){
+    if(ord!=='nome' && pf){ var x=val[a.id]||0, y=val[b.id]||0; if(x!==y) return ord==='fatd' ? y-x : x-y; }
+    return String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'); });
+  $('psub').textContent=l.length+' cliente'+(l.length===1?'':'s')+(l.length!==clientes.length?' de '+clientes.length:'')
+    +(U.gestor&&!$('c-vend').value?' em todas as carteiras':'')+(temVal&&pf?' · '+fmtRS0(tot)+' faturados em '+pf.longo:'');
   $('c-lista').innerHTML=l.length ? l.slice(0,400).map(cartaoCliente).join('')+(l.length>400?'<div class="empty">Mostrando 400 de '+l.length+'. Use a busca.</div>':'')
     : '<div class="empty">'+(clientes.length?'Nenhum cliente neste filtro.':'Sua carteira está vazia. Toque em <b>+ Novo cliente</b> para começar.')+'</div>';
 }
 function setFiltroCart(f){ filtroCart=f; renderCarteira(); }
+
+/* ---- período do faturamento na carteira (o ERP fecha por mês) ---- */
+var perFat='', fatExtra={}, mesExtraLendo='';
+function perOpcoes(){
+  var ms=mesesFat(), o=[];
+  if(!ms.length) return o;
+  for(var i=ms.length-1;i>=0;i--){ var m=ms[i], at=(i===ms.length-1);
+    o.push({ v:m, txt:'Faturamento de '+nomeMes(m)+(at?' (até hoje)':''), curto:nomeMes(m)+(at?' até hoje':''), longo:nomeMes(m)+(at?' até hoje':''), meses:[m] }); }
+  if(ms.length>=4){ var f3=ms.slice(0,3);
+    o.push({ v:'u3', txt:'Faturamento dos 3 meses fechados', curto:nomeMes(f3[0])+'–'+nomeMes(f3[2]), longo:nomeMes(f3[0])+' a '+nomeMes(f3[2]), meses:f3 }); }
+  Object.keys(fatExtra).sort().reverse().forEach(function(m){ if(ms.indexOf(m)<0) o.push({ v:m, txt:'Faturamento de '+nomeMes(m), curto:nomeMes(m), longo:nomeMes(m), meses:[m], extra:true }); });
+  if(U.gestor) o.push({ v:'outro', txt:'Outro mês…' });
+  return o;
+}
+function perAtual(){
+  var o=perOpcoes(); if(!o.length) return null;
+  var p=o.filter(function(x){ return x.v===perFat && x.v!=='outro'; })[0];
+  return p || o[0];
+}
+function pintarPerFat(){
+  var sel=$('c-per'); if(!sel) return;
+  var o=perOpcoes(), p=perAtual();
+  sel.style.display=o.length?'':'none';
+  var html=o.map(function(x){ return '<option value="'+x.v+'">'+esc(x.txt)+'</option>'; }).join('');
+  if(sel.dataset.h!==html){ sel.innerHTML=html; sel.dataset.h=html; }
+  if(p && sel.value!==p.v && perFat!=='outro') sel.value=p.v;
+}
+function setPerFat(v){
+  if(v==='outro'){ perFat='outro'; var m=$('c-mes'); m.style.display=''; m.max=hoje().slice(0,7); try{ m.showPicker&&m.showPicker(); }catch(e){} return; }
+  perFat=v; $('c-mes').style.display='none'; renderCarteira();
+}
+/* gestor: busca um mês fora dos 4 carregados, só quando pedido */
+function carregarMesExtra(ym){
+  if(!ym || !U.gestor) return;
+  if(fatExtra[ym] || fatMeses.indexOf(ym)>=0){ perFat=ym; $('c-mes').style.display='none'; renderCarteira(); return; }
+  if(mesExtraLendo) return; mesExtraLendo=ym;
+  getDoc(doc(db,'comercialClienteMes',ym)).then(function(s){
+    mesExtraLendo='';
+    if(!s.exists()){ toast('Não há faturamento de '+nomeMes(ym)+' no robô.', true); return; }
+    var ix={}, cs=(s.data()||{}).clientes||{};
+    Object.keys(cs).forEach(function(k){ var c=cs[k]||{}, n=normEmp(c.nome||k); if(n) ix[n]=(ix[n]||0)+(c.fat||0); });
+    fatExtra[ym]=ix; perFat=ym; $('c-mes').style.display='none'; renderCarteira();
+  }).catch(function(e){ mesExtraLendo=''; falha('ler o faturamento de '+nomeMes(ym))(e); });
+}
+function valorPeriodo(c){
+  var p=perAtual(); if(!p) return null;
+  if(p.extra){
+    var ix=fatExtra[p.v]; if(!ix) return null;
+    var e=erpDe(c), ns=[c.nome, c.erpNome, e&&e.n, e&&e.nErp].filter(Boolean).map(normEmp);
+    for(var i=0;i<ns.length;i++) if(ix[ns[i]]!=null) return ix[ns[i]];
+    return 0;
+  }
+  var f=fatCliente(c); if(!f) return c.erpId?0:null;
+  return p.meses.reduce(function(t,m){ return t+(f[m]||0); }, 0);
+}
 
 /* ---- VISITAS ---- */
 function visitasFiltradas(){
@@ -1118,7 +1216,7 @@ function salvarConfig(){
    a visita e a solicitação guardam o nome e a ligação com o ERP.
    ===================================================================== */
 var PK={};
-function pkMontar(id, o){ PK[id]={ sel:o.sel||null, comErp:o.comErp!==false, ph:o.ph||'Digite o nome ou a cidade…', onSel:o.onSel||null, res:[] }; pkPintar(id); }
+function pkMontar(id, o){ PK[id]={ sel:o.sel||null, comErp:o.comErp!==false, novo:!!o.novo, ph:o.ph||'Digite o nome ou a cidade…', onSel:o.onSel||null, res:[] }; pkPintar(id); }
 function pkSelDeCliente(c){ return c ? { clienteId:c.id, erpId:c.erpId||'', nome:c.nome, cidade:c.cidade||'', rota:c.rota||'', dono:c.donoNome||'' } : null; }
 /* endereço do ERP (rua e bairro, sem número) — diferencia lojas de mesmo nome */
 function endErpTxt(e){ return e && e.e ? String(e.e).trim() : ''; }
@@ -1134,7 +1232,7 @@ function pkLinhas(x, extra){
 function pkPintar(id){
   var p=PK[id], box=$(id); if(!p||!box) return;
   if(p.sel){
-    box.innerHTML='<div class="vinc"><span>👤</span><b>'+esc(p.sel.nome)+'<span class="vinc-sub">'+pkLinhas(p.sel, p.sel.clienteId?'':'fora da carteira')
+    box.innerHTML='<div class="vinc"><span>'+(p.sel.novo?'✚':'👤')+'</span><b>'+esc(p.sel.nome)+'<span class="vinc-sub">'+(p.sel.novo?'<small>Cliente novo — ainda não está no ERP</small>':pkLinhas(p.sel, p.sel.clienteId?'':'fora da carteira'))
       +'</span></b><button type="button" class="btn btn-sm btn-ghost" onclick="pkTrocar(\''+id+'\')">Trocar</button></div>';
     return;
   }
@@ -1158,8 +1256,12 @@ function pkBusca(id){
       return n>=8;
     });
   }
+  /* cliente que não está na carteira nem no ERP: entra como novo */
+  var txt=$(id+'-q').value.trim();
+  if(p.novo && txt.length>=3) res.push({ clienteId:'', erpId:'', nome:txt.toUpperCase(), novo:true });
   p.res=res;
   out.innerHTML=res.length ? '<div class="busca-res">'+res.map(function(x,i){
+      if(x.novo) return '<button type="button" onclick="pkEscolher(\''+id+'\','+i+')"><span class="orig" style="color:var(--primary)">novo</span>✚ Cliente novo: <b>'+esc(x.nome)+'</b><small>Não achou na lista? Cadastre como cliente novo.</small></button>';
       return '<button type="button" onclick="pkEscolher(\''+id+'\','+i+')"><span class="orig'+(x.clienteId?' cart':'')+'">'+(x.clienteId?'carteira':'ERP')+'</span>'
         +esc(x.nome)+pkLinhas(x)+'</button>'; }).join('')+'</div>'
     : '<div class="mini" style="margin-top:6px">'+(p.comErp&&erpEstado!=='ok'?'Lendo a base do ERP…':'Nenhum cliente com esse nome.')+'</div>';
@@ -1211,6 +1313,7 @@ function verCliente(id){
     var qd=queda(c);
     if(qd) corpo+='<div class="alert a-err">↓ Comprou '+qd.pct+'% menos em '+nomeMes(qd.mes)+' ('+fmtRS(qd.ult)+') do que no mês anterior ('+fmtRS(qd.ant)+').</div>';
   }
+  corpo+=comprasRecentesHtml(c);
   corpo+='<div class="det-sec">Contato</div><div class="det">'
     +'<div><span>Situação</span><b>'+({cliente:'Cliente',prospect:'Prospect',inativo:'Inativo'}[c.situacao]||'Cliente')+'</b></div>'
     +'<div><span>Cidade · rota</span><b>'+esc([c.cidade, c.rota?'rota '+c.rota:''].filter(Boolean).join(' · ')||'—')+'</b></div>'
@@ -1421,12 +1524,21 @@ function abrirVisita(clienteId){
       +'<div class="fld"><label>Lembrete do próximo contato</label><input type="text" id="fv-proxobs" placeholder="opcional"></div>');
   abrirModal({ titulo:'Registrar contato', corpo:corpo, wide:true,
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Salvar contato', fn:salvarVisita }] });
-  pkMontar('fv-cli', { sel:pkSelDeCliente(c), ph:'Nome do cliente (carteira ou ERP)…', onSel:fvSelCli });
+  pkMontar('fv-cli', { sel:pkSelDeCliente(c), ph:'Nome do cliente (carteira, ERP ou novo)…', onSel:fvSelCli, novo:true });
   fvSelCli(pkSelDeCliente(c));
   fvPintarFotos(); proxPintar('fv-prox'); fvGeo();
 }
 function fvSelCli(sel){
   var box=$('fv-add'); if(!box) return;
+  /* cliente novo: o mínimo para achar de novo; a ficha completa de cadastro vem depois */
+  if(sel && sel.novo){
+    box.innerHTML='<div class="grid2" style="margin-top:10px"><div class="fld"><label>Cidade *</label><input type="text" id="fv-n-cid"></div>'
+      +'<div class="fld"><label>Telefone / WhatsApp *</label><input type="tel" id="fv-n-tel"></div>'
+      +'<div class="fld"><label>Pessoa de contato</label><input type="text" id="fv-n-ctt"></div>'
+      +'<div class="fld"><label>Endereço</label><input type="text" id="fv-n-end" placeholder="rua, número, bairro"></div></div>'
+      +'<div class="mini">Entra na sua carteira como <b>prospect</b>.</div>';
+    return;
+  }
   box.innerHTML=(sel && !sel.clienteId)
     ? '<label class="chk" style="margin:9px 0 0"><input type="checkbox" id="fv-addcart"> Colocar este cliente na minha carteira</label>' : '';
   var c=sel&&sel.clienteId?clientePorId(sel.clienteId):null;
@@ -1489,7 +1601,17 @@ function salvarVisita(el){
   var cid=c?c.id:'';
   /* cliente do ERP que entra na carteira junto com a visita */
   var add=$('fv-addcart');
-  if(!c && add && add.checked){
+  if(sel.novo){
+    var nCid=$('fv-n-cid').value.trim(), nTel=$('fv-n-tel').value.trim();
+    if(!nCid || !nTel){ toast('Cliente novo: informe cidade e telefone.', true); return; }
+    var nref=doc(collection(db,'comClientes'));
+    b.set(nref, { nome:sel.nome, situacao:'prospect', erpId:'', erpNome:'', cidade:nCid, rota:'', contato:$('fv-n-ctt').value.trim(), telefone:nTel,
+      endereco:$('fv-n-end').value.trim(), fornecedor:'', totalMensal:null, precos:[], obs:'',
+      proxContato:prox, proxObs:proxObs, ultimoContato:data, origem:'novo no registro de contato',
+      donoUid:U.uid, donoNome:U.nome, donoEmail:U.email, criadoEm:agora, atualizadoEm:agora, atualizadoPor:U.email });
+    cid=nref.id; sel.cidade=nCid;
+  }
+  else if(!c && add && add.checked){
     var e=erp[sel.erpId]||{}, cref=doc(collection(db,'comClientes'));
     b.set(cref, { nome:sel.nome, situacao:'cliente', erpId:sel.erpId||'', erpNome:e.nErp||e.n||'',
       cidade:sel.cidade||'', rota:sel.rota||'', contato:'', telefone:'', fornecedor:'', totalMensal:null, precos:[], obs:'',
@@ -1742,6 +1864,13 @@ function impDoErp(el){
   impUsuarios().then(function(){ pare(); impPintarP2(); $('imp-passos').scrollIntoView({ behavior:'smooth', block:'start' }); })
     .catch(function(e){ pare(); falha('ler a lista de usuários')(e); });
 }
+/* troca o vínculo só entre cadastros de MESMO nome e só se o novo comprou mais recentemente */
+function melhorVinculo(atualId, novoId){
+  if(!novoId || atualId===novoId) return false;
+  if(!atualId) return true;
+  var a=erp[atualId], b=erp[novoId]; if(!a || !b) return !a && !!b;
+  return normEmp(a.n||a.nErp)===normEmp(b.n||b.nErp) && String(b.u||'')>String(a.u||'');
+}
 /* nome de empresa sem o tipo societário: "PADARIA CENTRAL LTDA" = "Padaria Central" */
 function normEmp(s){ return norm(s).replace(/\b(LTDA|ME|EPP|EIRELI|MEI|S A|SA|CIA)\b/g,' ').replace(/\s+/g,' ').trim(); }
 function impSelCol(k, el){ IMP.col[k]=+el.value; IMP.plano=null; $('imp-p4').innerHTML=''; impPintarP3(); }
@@ -1807,13 +1936,16 @@ function impConferir(){
     var it={ linha:i+1, nome:nome, vend:vend, cid:cid, erpId:'', obs:'' };
     var ids=idxErp[normEmp(nome)]||[];
     if(ids.length>1 && cid){ var f=ids.filter(function(k){ return norm(erp[k].c)===norm(cid); }); if(f.length) ids=f; }
-    if(ids.length){ it.erpId=ids[0]; if(ids.length>1) it.obs='nome repetido no ERP — usado o primeiro'; }
+    if(ids.length>1) ids=ids.slice().sort(function(a,b){ return String(erp[b].u||'').localeCompare(String(erp[a].u||'')); });
+    if(ids.length){ it.erpId=ids[0]; if(ids.length>1) it.obs='nome repetido no ERP — ligado ao de compra mais recente'; }
     var u=uPor[IMP.mapa[vend]||''];
     /* carteira só com o nome (sem login): dono provisório "erp:NOME", trocado quando a pessoa ganhar login */
     if(!u && IMP.mapa[vend]==='#nome' && vend) u={ uid:'erp:'+normEmp(vend).replace(/ /g,'_'), nome:vend, email:'', semLogin:true };
     var atual=(it.erpId&&porErp[it.erpId]) || porNome[normEmp(nome)] || null;
     if(!u) it.acao='ignorar', it.obs=(IMP.fonte==='erp'?IMP.rotulo:'vendedor')+' marcado para não importar';
-    else if(atual){ it.cliId=atual.id; it.acao=(atual.donoUid===u.uid)?'igual':'transferir'; it.de=atual.donoNome||''; }
+    else if(atual){ it.cliId=atual.id; it.acao=(atual.donoUid===u.uid)?'igual':'transferir'; it.de=atual.donoNome||'';
+      /* vínculo velho: ligado a um cadastro do ERP de mesmo nome que parou de comprar */
+      if(it.erpId && melhorVinculo(atual.erpId, it.erpId)){ it.novoErp=true; if(it.acao==='igual') it.acao='vincular'; it.obs='vínculo com o ERP corrigido (cadastro de compra mais recente)'; } }
     else if(it.erpId || semErp) it.acao='novo';
     else it.acao='ignorar', it.obs='não achado no ERP';
     if(!it.erpId && it.acao==='novo' && !it.obs) it.obs='não achado no ERP';
@@ -1825,11 +1957,12 @@ function impConferir(){
   IMP.plano=itens;
   var n=function(a){ return itens.filter(function(x){ return x.acao===a; }).length; };
   var semV=itens.filter(function(x){ return x.acao==='novo' && !x.erpId; }).length;
-  var ROT={ novo:['Novo','green'], transferir:['Muda de carteira','amber'], igual:['Já está certo','muted'], ignorar:['Fica de fora','red'] };
+  var ROT={ novo:['Novo','green'], transferir:['Muda de carteira','amber'], vincular:['Vínculo corrigido','blue'], igual:['Já está certo','muted'], ignorar:['Fica de fora','red'] };
   $('imp-p4').innerHTML='<div class="passo"><b>'+(IMP.fonte==='erp'?'2':'4')+'</b> Conferir</div>'
     +'<div class="resumo-imp">'
     +'<div class="card"><div class="klabel">Novos na carteira</div><div class="kval">'+n('novo')+'</div></div>'
     +'<div class="card"><div class="klabel">Mudam de carteira</div><div class="kval">'+n('transferir')+'</div></div>'
+    +(n('vincular')?'<div class="card"><div class="klabel">Vínculo com o ERP corrigido</div><div class="kval">'+n('vincular')+'</div></div>':'')
     +'<div class="card"><div class="klabel">Já estão certos</div><div class="kval">'+n('igual')+'</div></div>'
     +'<div class="card"><div class="klabel">Ficam de fora</div><div class="kval" style="color:var(--red)">'+n('ignorar')+'</div></div></div>'
     +(semV?'<div class="alert a-warn">⚠ '+semV+' cliente'+(semV>1?'s':'')+' entram sem vínculo com o ERP (nome diferente). Dá para ligar depois, editando cada um.</div>':'')
@@ -1839,11 +1972,11 @@ function impConferir(){
         +'<td><span class="st st-'+r[1]+'">'+r[0]+'</span>'+(x.acao==='transferir'&&x.de?' <span class="mini">de '+esc(x.de)+'</span>':'')+'</td><td class="mini">'+esc(x.obs)+'</td></tr>'; }).join('')
     +'</table></div>'+(itens.length>600?'<div class="mini">Mostrando 600 de '+itens.length+' linhas.</div>':'')
     +'<div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
-    +'<button class="btn" id="imp-go" onclick="impGravar(this)"'+((n('novo')+n('transferir'))?'':' disabled')+'>Gravar '+(n('novo')+n('transferir'))+' alteraç'+((n('novo')+n('transferir'))===1?'ão':'ões')+'</button>'
+    +'<button class="btn" id="imp-go" onclick="impGravar(this)"'+((n('novo')+n('transferir')+n('vincular'))?'':' disabled')+'>Gravar '+(n('novo')+n('transferir')+n('vincular'))+' alteraç'+((n('novo')+n('transferir')+n('vincular'))===1?'ão':'ões')+'</button>'
     +'<span class="mini" id="imp-prog"></span></div>';
 }
 function impGravar(el){
-  var ops=(IMP.plano||[]).filter(function(x){ return x.acao==='novo' || x.acao==='transferir'; });
+  var ops=(IMP.plano||[]).filter(function(x){ return x.acao==='novo' || x.acao==='transferir' || x.acao==='vincular'; });
   if(!ops.length) return;
   if(!confirm('Gravar '+ops.length+' alterações na carteira?')) return;
   el.disabled=true;
@@ -1855,9 +1988,9 @@ function impGravar(el){
     var b=writeBatch(db);
     lotes[k].forEach(function(x){
       var u=x.u, dono={ donoUid:u.uid, donoNome:impNomeU(u), donoEmail:u.email||'', atualizadoEm:agora, atualizadoPor:U.email };
-      if(x.acao==='transferir'){
-        var c=clientePorId(x.cliId)||{}, up=Object.assign({}, dono);
-        if(x.erpId && !c.erpId){ var e0=erp[x.erpId]||{}; up.erpId=x.erpId; up.erpNome=e0.nErp||e0.n||''; }
+      if(x.acao==='transferir' || x.acao==='vincular'){
+        var c=clientePorId(x.cliId)||{}, up=x.acao==='transferir'?Object.assign({}, dono):{ atualizadoEm:agora, atualizadoPor:U.email };
+        if(x.erpId && (!c.erpId || x.novoErp)){ var e0=erp[x.erpId]||{}; up.erpId=x.erpId; up.erpNome=e0.nErp||e0.n||''; }
         b.update(doc(db,'comClientes',x.cliId), up);
       } else {
         var e=x.erpId?(erp[x.erpId]||{}):{};
@@ -1887,7 +2020,7 @@ Object.assign(window, {
   abrirVisita:abrirVisita, fvTipo:fvTipo, fvGeo:fvGeo, fvTirarFoto:fvTirarFoto, fvFoto:fvFoto, verVisita:verVisita,
   abrirSolic:abrirSolic, fsTipo:fsTipo, verSolic:verSolic,
   impArquivo:impArquivo, impSelCol:impSelCol, impMapa:impMapa, impConferir:impConferir, impGravar:impGravar,
-  impDoErp:impDoErp, setModoVis:setModoVis, mudarNivel:mudarNivel, renderUsuarios:renderUsuarios, renderEquipe:renderEquipe, gerarResumo:gerarResumo,
+  impDoErp:impDoErp, setModoVis:setModoVis, setPerFat:setPerFat, carregarMesExtra:carregarMesExtra, mudarNivel:mudarNivel, renderUsuarios:renderUsuarios, renderEquipe:renderEquipe, gerarResumo:gerarResumo,
   abrirOS:abrirOS, verVisita:verVisita
 });
 /* filtroCart e segSol são trocados direto pelos cartões do "Hoje" */
@@ -1919,17 +2052,23 @@ function queda(c){
 var resumoRodando=false;
 function autoResumo(){
   if(!U.gestor || !fatErp || !clientesOk || resumoMeta===null || resumoMeta.erro || resumoRodando) return;
-  var t=Date.parse(resumoMeta.atualizadoEm||''); if(t && Date.now()-t < 12*3600*1000) return;
+  var t=Date.parse(resumoMeta.atualizadoEm||''); if(t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===2) return;
   gerarResumo(false);
 }
 function gerarResumo(manual, el){
   if(!U.gestor) return;
   if(!fatErp){ if(manual) toast(fatErp===false?'Sem acesso ao faturamento do ERP.':'O faturamento ainda está carregando.', true); return; }
   resumoRodando=true;
-  var por={};
+  var por={}, prodPor={}, ult2=fatMeses.slice(-2);
   clientes.forEach(function(c){
     if(!c.donoUid) return;
-    por[c.donoUid]=por[c.donoUid]||{};
+    por[c.donoUid]=por[c.donoUid]||{}; prodPor[c.donoUid]=prodPor[c.donoUid]||{};
+    /* produtos dos 2 últimos meses (até 15 por mês, os de maior valor) */
+    var pr=prodDe(c);
+    if(pr){ var o={}; ult2.forEach(function(m){ var x=pr[m]||{};
+      var top=Object.keys(x).sort(function(a,b){ return (x[b][0]||0)-(x[a][0]||0); }).slice(0,15);
+      if(top.length){ o[m]={}; top.forEach(function(p){ o[m][p]=[Math.round((x[p][0]||0)*100)/100, x[p][1]||0]; }); } });
+      if(Object.keys(o).length) prodPor[c.donoUid][c.id]=o; }
     var f=fatDe(c); if(!f) return;
     var a=fatMeses.map(function(m){ return Math.round((f[m]||0)*100)/100; });
     if(a.some(function(x){ return x; })) por[c.donoUid][c.id]=a;
@@ -1937,8 +2076,8 @@ function gerarResumo(manual, el){
   var uids=Object.keys(por);
   ((resumoMeta&&resumoMeta.uids)||[]).forEach(function(u){ if(uids.indexOf(u)<0){ uids.push(u); por[u]={}; } });   /* carteira que esvaziou */
   var agora=agoraISO(), b=writeBatch(db);
-  uids.forEach(function(u){ b.set(doc(db,'comVendResumo',u), { meses:fatMeses, cli:por[u], atualizadoEm:agora, por:U.email }); });
-  b.set(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses });
+  uids.forEach(function(u){ b.set(doc(db,'comVendResumo',u), { meses:fatMeses, cli:por[u], prod:prodPor[u]||{}, atualizadoEm:agora, por:U.email, versao:2 }); });
+  b.set(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:2 });
   var pare=el?ocupado(el,'Atualizando…'):function(){};
   b.commit().then(function(){ resumoRodando=false; pare(); if(manual) toast('Valores atualizados para '+uids.length+' vendedor'+(uids.length===1?'':'es')+'.'); })
     .catch(function(e){ resumoRodando=false; pare(); if(manual) falha('atualizar os valores dos vendedores')(e); else console.warn('resumo:', e); });
@@ -2267,6 +2406,125 @@ function mudarNome(uid){
 }
 function setUsuBusca(v){ usuBusca=v; renderUsuarios(); }
 Object.assign(window, { setUsuBusca:setUsuBusca, liberarConta:liberarConta, mudarNome:mudarNome });
+
+/* =====================================================================
+   COMPRAS RECENTES — produto, quantidade e valor dos 2 últimos meses
+   (o robô fecha por mês e grava os principais produtos de cada cliente)
+   ===================================================================== */
+function prodDe(c){
+  var e=erpDe(c), ns=[c.nome, c.erpNome, e&&e.n, e&&e.nErp].filter(Boolean).map(normEmp);
+  for(var i=0;i<ns.length;i++) if(prodErp[ns[i]]) return prodErp[ns[i]];
+  return null;
+}
+function comprasRecentesHtml(c){
+  var ms=mesesFat().slice(-2); if(ms.length<2 || c.situacao==='prospect') return '';
+  var pr=U.gestor ? prodDe(c) : (fatVend && fatVend.prod && fatVend.prod[c.id]);
+  var tit='<div class="det-sec">Compras recentes <span class="mini" style="text-transform:none;letter-spacing:0">'+nomeMes(ms[0])+' e '+nomeMes(ms[1])+' até hoje · principais produtos</span></div>';
+  if(!pr) return c.erpId ? tit+'<div class="mini" style="margin-bottom:13px">'+((U.gestor&&!fatErp)||(!U.gestor&&!fatVend)?'Carregando…':'Sem compras nesses dois meses.')+'</div>' : '';
+  var nomes={}; ms.forEach(function(m){ Object.keys(pr[m]||{}).forEach(function(p){ nomes[p]=1; }); });
+  var l=Object.keys(nomes).map(function(p){ var a=(pr[ms[0]]||{})[p]||[0,0], b=(pr[ms[1]]||{})[p]||[0,0]; return { p:p, a:a, b:b, t:(a[0]||0)+(b[0]||0) }; })
+    .sort(function(x,y){ return y.t-x.t; });
+  if(!l.length) return tit+'<div class="mini" style="margin-bottom:13px">Sem compras nesses dois meses.</div>';
+  var q=function(n){ return n ? Math.round(n).toLocaleString('pt-BR') : '<span class="mini">—</span>'; };
+  var v=function(n){ return n ? fmtRS0(n) : '<span class="mini">—</span>'; };
+  var tA=0, tB=0; l.forEach(function(x){ tA+=x.a[0]||0; tB+=x.b[0]||0; });
+  return tit+'<div class="tscroll" style="max-height:300px;margin-bottom:13px"><table class="tb"><tr><th>Produto</th>'
+    +'<th class="r">'+nomeMes(ms[0])+' qtd</th><th class="r">'+nomeMes(ms[0])+' valor</th><th class="r">'+nomeMes(ms[1])+' qtd</th><th class="r">'+nomeMes(ms[1])+' valor</th></tr>'
+    +l.map(function(x){ return '<tr><td>'+esc(x.p)+'</td><td class="r">'+q(x.a[1])+'</td><td class="r">'+v(x.a[0])+'</td><td class="r">'+q(x.b[1])+'</td><td class="r">'+v(x.b[0])+'</td></tr>'; }).join('')
+    +'<tr><td><b>Total</b></td><td></td><td class="r"><b>'+fmtRS0(tA)+'</b></td><td></td><td class="r"><b>'+fmtRS0(tB)+'</b></td></tr></table></div>';
+}
+
+/* =====================================================================
+   PROMOÇÕES — card no início do app para todo o comercial.
+   Diretoria e gerentes criam, editam e encerram.
+   ===================================================================== */
+function promoSituacao(p){
+  if(p.ativa===false) return 'encerrada';
+  var h=hoje();
+  if(p.de && p.de>h) return 'agendada';
+  if(p.ate && p.ate<h) return 'vencida';
+  return 'ativa';
+}
+function renderPromos(){
+  var box=$('h-promos'); if(!box) return;
+  var at=promos.filter(function(p){ return promoSituacao(p)==='ativa'; })
+    .sort(function(a,b){ return String(a.ate||'9999').localeCompare(String(b.ate||'9999')); });
+  if(!at.length && !U.gestor){ box.innerHTML=''; return; }
+  box.innerHTML='<div class="sect" style="display:flex;align-items:center;gap:10px">🔥 Promoções ativas'
+    +(U.gestor?'<span style="flex:1"></span><button class="btn btn-sm btn-ghost" onclick="gerenciarPromos()">Gerenciar</button><button class="btn btn-sm" onclick="abrirPromo()">+ Nova promoção</button>':'')+'</div>'
+    +(at.length?'<div class="promos">'+at.map(function(p){
+        return '<div class="promo" onclick="verPromo(\''+p.id+'\')">'
+          +(p.img?'<img src="'+p.img+'" alt="">':'')
+          +'<div class="promo-c"><div class="promo-t">'+esc(p.titulo)+'</div>'
+          +(p.preco?'<div class="promo-p">'+esc(p.preco)+'</div>':'')
+          +(p.texto?'<div class="promo-x">'+esc(p.texto)+'</div>':'')
+          +'<div class="promo-v">'+(p.ate?'até '+fmtDia(p.ate)+' · '+quandoRelativo(p.ate):'sem data para acabar')+'</div></div></div>'; }).join('')+'</div>'
+      :'<div class="mini" style="margin-bottom:16px">Nenhuma promoção ativa. Crie uma e ela aparece aqui para todo o comercial.</div>');
+}
+function verPromo(id){
+  var p=promos.filter(function(x){ return x.id===id; })[0]; if(!p) return;
+  var corpo=(p.img?'<img src="'+p.img+'" style="width:100%;border-radius:12px;margin-bottom:12px;cursor:zoom-in" onclick="zoom(this.src)">':'')
+    +(p.preco?'<div style="font-size:24px;font-weight:800;color:var(--primary);margin-bottom:8px">'+esc(p.preco)+'</div>':'')
+    +(p.texto?'<div class="det-txt">'+esc(p.texto)+'</div>':'')
+    +'<div class="mini">'+(p.de?'De '+fmtDia(p.de)+' ':'')+(p.ate?'até '+fmtDia(p.ate):'sem data para acabar')+' · publicada por '+esc(p.criadoNome||p.criadoPor||'—')+'</div>';
+  abrirModal({ titulo:esc(p.titulo), corpo:corpo, botoes:U.gestor?[
+    { txt:'Encerrar', cls:'btn-ghost', fn:function(el){ encerrarPromo(p.id, el); } },
+    { txt:'✎ Editar', fn:function(){ abrirPromo(p.id); } }]:[] });
+}
+var fp=null;
+function abrirPromo(id){
+  if(!U.gestor) return;
+  var p=id?promos.filter(function(x){ return x.id===id; })[0]:null;
+  fp={ id:id||null, img:p?p.img||'':'' };
+  var corpo='<div class="fld"><label>Título *</label><input type="text" id="fp-tit" maxlength="80" value="'+esc(p?p.titulo:'')+'" placeholder="ex.: Feira do pastel"></div>'
+    +'<div class="fld"><label>Preço / condição</label><input type="text" id="fp-preco" maxlength="60" value="'+esc(p?p.preco||'':'')+'" placeholder="ex.: R$ 4,50 a unidade"></div>'
+    +'<div class="fld"><label>Detalhes</label><textarea id="fp-txt" placeholder="Produtos, quantidade mínima, para quais clientes…">'+esc(p?p.texto||'':'')+'</textarea></div>'
+    +'<div class="grid2"><div class="fld"><label>Começa em</label><input type="date" id="fp-de" value="'+esc(p?p.de||'':hoje())+'"></div>'
+    +'<div class="fld"><label>Termina em</label><input type="date" id="fp-ate" value="'+esc(p?p.ate||'':somaDias(hoje(),7))+'"></div></div>'
+    +'<div class="fld"><label>Imagem (opcional)</label><div class="fotos" id="fp-img"></div>'
+    +'<input type="file" id="fp-file" accept="image/*" style="display:none" onchange="fpFoto(this)"></div>';
+  abrirModal({ titulo:p?'Editar promoção':'Nova promoção', corpo:corpo,
+    botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:p?'Salvar':'Publicar', fn:salvarPromo }] });
+  fpPintarImg();
+}
+function fpPintarImg(){
+  var box=$('fp-img'); if(!box) return;
+  box.innerHTML=fp.img ? '<div class="foto-prev"><img src="'+fp.img+'" onclick="zoom(this.src)"><button type="button" onclick="fpTirar()">×</button></div>'
+    : '<div class="foto-add" onclick="$(\'fp-file\').click()">🖼<small>Imagem</small></div>';
+}
+function fpTirar(){ fp.img=''; fpPintarImg(); }
+function fpFoto(inp){ var f=inp.files&&inp.files[0]; inp.value=''; if(!f) return;
+  reduzir(f).then(function(d){ fp.img=d; fpPintarImg(); }).catch(function(){ toast('Não foi possível ler a imagem.', true); }); }
+function salvarPromo(el){
+  var tit=$('fp-tit').value.trim();
+  if(!tit){ toast('Dê um título para a promoção.', true); $('fp-tit').focus(); return; }
+  var de=$('fp-de').value||'', ate=$('fp-ate').value||'';
+  if(de && ate && ate<de){ toast('A data final é antes da inicial.', true); return; }
+  var agora=agoraISO();
+  var d={ titulo:tit, preco:$('fp-preco').value.trim(), texto:$('fp-txt').value.trim(), de:de, ate:ate, img:fp.img||'', ativa:true,
+          atualizadoEm:agora, atualizadoPor:U.email };
+  var pare=ocupado(el,'Publicando…'), pr;
+  if(fp.id) pr=updateDoc(doc(db,'comPromocoes',fp.id), d);
+  else { d.criadoEm=agora; d.criadoPor=U.email; d.criadoNome=U.nome; pr=setDoc(doc(collection(db,'comPromocoes')), d); }
+  pr.then(function(){ toast(fp.id?'Promoção atualizada.':'Promoção publicada para todo o comercial.'); fecharModal(); })
+    .catch(function(e){ pare(); falha('salvar a promoção')(e); });
+}
+function encerrarPromo(id, el){
+  if(!confirm('Encerrar esta promoção? Ela some do início do app.')) return;
+  var pare=ocupado(el,'Encerrando…');
+  updateDoc(doc(db,'comPromocoes',id), { ativa:false, atualizadoEm:agoraISO(), atualizadoPor:U.email })
+    .then(function(){ toast('Promoção encerrada.'); fecharModal(); })
+    .catch(function(e){ pare(); falha('encerrar a promoção')(e); });
+}
+function gerenciarPromos(){
+  var ROT={ ativa:['Ativa','green'], agendada:['Agendada','blue'], vencida:['Vencida','muted'], encerrada:['Encerrada','muted'] };
+  var corpo=promos.length ? promos.map(function(p){ var s=ROT[promoSituacao(p)];
+      return '<div class="it" onclick="abrirPromo(\''+p.id+'\')"><div class="it-top"><div class="it-tit">'+esc(p.titulo)+'</div><span class="st st-'+s[1]+'">'+s[0]+'</span></div>'
+        +'<div class="it-meta">'+(p.de?fmtDia(p.de):'—')+' a '+(p.ate?fmtDia(p.ate):'—')+(p.preco?' · '+esc(p.preco):'')+'</div></div>'; }).join('')
+    : '<div class="empty">Nenhuma promoção ainda.</div>';
+  abrirModal({ titulo:'Promoções', sub:'Toque para editar ou republicar', corpo:corpo, botoes:[{ txt:'+ Nova promoção', fn:function(){ abrirPromo(); } }] });
+}
+Object.assign(window, { verPromo:verPromo, abrirPromo:abrirPromo, gerenciarPromos:gerenciarPromos, fpFoto:fpFoto, fpTirar:fpTirar });
 </script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
