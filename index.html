@@ -573,6 +573,7 @@ details.mais[open]{padding-bottom:4px}
         <div class="seg so-cel" id="prod-seg"></div>
         <input type="search" placeholder="Buscar produto, peso, código de barras…" oninput="setFichaBusca(this.value)">
         <select id="prod-linha" onchange="renderProdutos()"></select>
+        <button class="btn btn-sm btn-ghost" id="cat-ocultos" style="display:none" onclick="alternarOcultos()"></button>
         <button class="btn btn-sm" id="cat-share" onclick="compartilharCatalogo(this)">⤴ Compartilhar o catálogo</button>
         <label class="btn btn-sm" id="prod-imp" style="display:none;cursor:pointer">⇪ Importar fichas (.docx)
           <input type="file" accept=".docx" multiple style="display:none" onchange="importarFichas(this)"></label>
@@ -619,7 +620,7 @@ import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
          setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, onSnapshot, doc, getDoc, getDocs, setDoc, updateDoc,
-         query, where, orderBy, limit, writeBatch, serverTimestamp }
+         query, where, orderBy, limit, writeBatch, serverTimestamp, deleteDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const cfg={ apiKey:"AIzaSyCH_t074MvkJn-qVMvCtLfEMaQHf_e_d7M",
@@ -818,6 +819,7 @@ function aplicarCfg(c){
   CFG.vendMapa=(c&&c.vendMapa)||{};
   CFG.gerenteNao=(c&&c.gerenteNao)||[];
   CFG.carteiraSync=(c&&c.carteiraSync)||null;
+  CFG.catOcultos=(c&&c.catOcultos)||[];
   var em=String(U.email||'').toLowerCase();
   meusTipos=TIPO_IDS.filter(function(t){
     if(U.admin) return true;
@@ -2823,9 +2825,10 @@ function renderProdutos(){
   $('prod-imp').style.display=(U.admin && abaProd==='fichas')?'':'none';
   $('prod-linha').style.display=abaProd==='catalogo'?'':'none';
   $('cat-share').style.display=abaProd==='catalogo'?'':'none';
+  if(abaProd!=='catalogo') $('cat-ocultos').style.display='none';
   $('ptit').textContent=abaProd==='catalogo'?'Catálogo':'Fichas técnicas';
   document.querySelectorAll('#sub-prod .navsub').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-a')===abaProd); });
-  var nCat=catalogo?catalogo.produtos.length:0;
+  var nCat=catalogo?catalogo.produtos.filter(function(p){ return !produtoOculto(p); }).length:0;
   $('prod-seg').innerHTML=[['catalogo','Catálogo',nCat],['fichas','Fichas técnicas',fichas.length]].map(function(x){
     return '<button class="'+(abaProd===x[0]?'on':'')+'" onclick="setAbaProd(\''+x[0]+'\')">'+x[1]+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</button>'; }).join('');
   if(abaProd==='catalogo'){ renderCatalogo(); return; }
@@ -2876,7 +2879,8 @@ function verFicha(id){
     if((f[s[0]]||[]).length) corpo+='<div class="det-sec">'+s[1]+'</div><div class="det">'+f[s[0]].map(function(x){ return '<div><span>'+esc(x.k)+'</span><b>'+esc(x.v)+'</b></div>'; }).join('')+'</div>'; });
   /* a ficha sai só em PDF fechado: sem "copiar texto" */
   abrirModal({ titulo:esc(f.nome), sub:'Ficha técnica', wide:true, corpo:corpo,
-    botoes:[{ txt:(ehCelular()&&navigator.share)?'⤴ Compartilhar PDF':'⇣ Baixar PDF', fn:function(el){ compartilharFicha(f, el); } }] });
+    botoes:(U.admin?[{ txt:'🗑 Excluir ficha', cls:'btn-ghost', fn:function(el){ excluirFicha(f, el); } }]:[])
+      .concat([{ txt:(ehCelular()&&navigator.share)?'⤴ Compartilhar PDF':'⇣ Baixar PDF', fn:function(el){ compartilharFicha(f, el); } }]) });
   pdfFichaPronto[f.id]=null; carregarJsPDF().then(function(){ return gerarPdfFicha(f); }).then(function(b){ pdfFichaPronto[f.id]=b; }).catch(function(){});   /* já deixa pronto */
 }
 function copiarFicha(f){
@@ -3142,19 +3146,22 @@ function renderCatalogo(){
   var op='<option value="">Todas as linhas</option>'+linhas.map(function(l){ return '<option>'+esc(l)+'</option>'; }).join('');
   if(sel.dataset.h!==op){ var v=sel.value; sel.innerHTML=op; sel.dataset.h=op; sel.value=v; }
   var lf=sel.value, q=norm(fichaBusca).split(' ').filter(Boolean);
-  var l=ps.filter(function(p){ if(lf && p.linha!==lf) return false;
+  var ocultos=ps.filter(produtoOculto).length;
+  $('cat-ocultos').style.display=(U.admin && ocultos)?'':'none';
+  $('cat-ocultos').textContent=verOcultos?'Esconder os removidos':'Removidos ('+ocultos+')';
+  var l=ps.filter(function(p){ if(lf && p.linha!==lf) return false; if(produtoOculto(p) && !(U.admin && verOcultos)) return false;
     var t=norm([p.nome,p.linha,p.sub,p.pesoUn].join(' ')); return q.every(function(x){ return t.indexOf(x)>=0; }); });
-  $('psub').textContent=ps.length+' produtos no catálogo'+(catalogo.versao?' · catálogo de '+catalogo.versao:'');
+  $('psub').textContent=(ps.length-ocultos)+' produtos no catálogo'+(catalogo.versao?' · catálogo de '+catalogo.versao:'');
   if(!l.length){ box.innerHTML='<div class="empty">Nenhum produto com esse nome.</div>'; return; }
   var html='', lin=null, sub=null;
   l.forEach(function(p){
     if(p.linha!==lin){ if(lin!==null) html+='</div>'; lin=p.linha; sub=null;
-      html+='<div class="cat-sec">'+esc(p.linha)+'<small>'+ps.filter(function(x){ return x.linha===lin; }).length+' produtos</small></div><div class="prod-grade">'; }
+      html+='<div class="cat-sec">'+esc(p.linha)+'<small>'+ps.filter(function(x){ return x.linha===lin && !produtoOculto(x); }).length+' produtos</small></div><div class="prod-grade">'; }
     if((p.sub||'')!==(sub||'')){ sub=p.sub||''; if(sub) html+='</div><div class="cat-sub">'+esc(sub)+'</div><div class="prod-grade">'; }
-    var f=fichaDoProduto(p);
-    html+='<div class="prod" onclick="verProduto('+p.ordem+')"><img src="'+p.img+'" alt="" loading="lazy">'
+    var f=fichaDoProduto(p), oc=produtoOculto(p);
+    html+='<div class="prod'+(oc?' b-muted':'')+'" onclick="verProduto('+p.ordem+')"><img src="'+p.img+'" alt="" loading="lazy">'
       +'<div class="prod-c"><b>'+esc(p.nome)+'</b><span>'+esc([p.pesoUn, p.qtd?p.qtd.replace(/\.$/,'')+' por pacote':''].filter(Boolean).join(' · '))+'</span>'
-      +(f?'<div><span class="tem-ficha">ficha técnica</span></div>':'')+'</div></div>';
+      +(f?'<div><span class="tem-ficha">ficha técnica</span></div>':'')+(oc?'<div><span class="tag t-red" style="margin-top:6px;display:inline-block">removido</span></div>':'')+'</div></div>';
   });
   box.innerHTML=html+'</div>';
 }
@@ -3170,9 +3177,38 @@ function verProduto(ordem){
   var bts=[{ txt:'Copiar', cls:'btn-ghost', fn:function(){ (navigator.clipboard?navigator.clipboard.writeText(textoProduto(p)):Promise.reject()).then(function(){ toast('Copiado.'); }).catch(function(){ toast('Não foi possível copiar.', true); }); } }];
   if(navigator.share) bts.push({ txt:'Compartilhar', cls:'btn-ghost', fn:function(){ navigator.share({ title:p.nome, text:textoProduto(p) }).catch(function(){}); } });
   if(f) bts.push({ txt:'Ver ficha técnica', fn:function(){ verFicha(f.id); } });
+  if(U.admin) bts.unshift(produtoOculto(p) ? { txt:'↺ Voltar ao catálogo', cls:'btn-ghost', fn:function(el){ ocultarProduto(p, false, el); } }
+                                          : { txt:'🗑 Remover do catálogo', cls:'btn-ghost', fn:function(el){ ocultarProduto(p, true, el); } });
   abrirModal({ titulo:esc(p.nome), sub:esc(p.linha), corpo:corpo, botoes:bts });
 }
-Object.assign(window, { setAbaProd:setAbaProd, verProduto:verProduto, renderProdutos:renderProdutos, navProd:navProd, compartilharCatalogo:compartilharCatalogo });
+
+/* ---- excluir (só a diretoria) ----
+   Ficha técnica: o documento é apagado do banco.
+   Produto do catálogo: o catálogo vem do PDF oficial (arquivo fixo), então
+   "remover" guarda o produto numa lista de removidos (comConfig/app) e ele some
+   para todos; dá para trazer de volta. O PDF para compartilhar não muda. */
+var verOcultos=false;
+function chaveCat(p){ return norm(p.nome)+'|'+norm(p.pesoUn||''); }
+function produtoOculto(p){ return (CFG.catOcultos||[]).indexOf(chaveCat(p))>=0; }
+function alternarOcultos(){ verOcultos=!verOcultos; renderProdutos(); }
+function ocultarProduto(p, ocultar, el){
+  if(!U.admin) return;
+  if(ocultar && !confirm('Remover "'+p.nome+'" do catálogo do app? Ele some para todos (dá para trazer de volta).')) return;
+  var k=chaveCat(p), lista=(CFG.catOcultos||[]).filter(function(x){ return x!==k; });
+  if(ocultar) lista.push(k);
+  var pare=ocupado(el, ocultar?'Removendo…':'Voltando…');
+  setDoc(doc(db,'comConfig','app'), { catOcultos:lista }, { merge:true })
+    .then(function(){ CFG.catOcultos=lista; toast(ocultar?'Removido do catálogo.':'Voltou para o catálogo.'); fecharModal(); renderProdutos(); })
+    .catch(function(e){ pare(); falha(ocultar?'remover do catálogo':'voltar ao catálogo')(e); });
+}
+function excluirFicha(f, el){
+  if(!U.admin) return;
+  if(!confirm('Excluir a ficha técnica de "'+f.nome+'"? Não dá para desfazer — para ter de novo, é importar o Word outra vez.')) return;
+  var pare=ocupado(el,'Excluindo…');
+  deleteDoc(doc(db,'comFichas',f.id)).then(function(){ toast('Ficha excluída.'); fecharModal(); })
+    .catch(function(e){ pare(); falha('excluir a ficha')(e); });
+}
+Object.assign(window, { setAbaProd:setAbaProd, verProduto:verProduto, renderProdutos:renderProdutos, navProd:navProd, compartilharCatalogo:compartilharCatalogo, alternarOcultos:alternarOcultos });
 
 /* =====================================================================
    FICHA TÉCNICA EM PDF — é assim que ela sai do app: arquivo fechado,
@@ -3239,12 +3275,13 @@ function gerarPdfFicha(f){
     y+=2;
 
     /* alergênicos e alertas */
-    if(f.alergenicos){ var al=d.splitTextToSize('ALÉRGICOS: '+f.alergenicos, W-2*M-8); var ah=al.length*4.6+6; precisa(ah);
+    /* o texto vai exatamente como está na ficha (sem acrescentar "ALÉRGICOS:" se já tiver) */
+    if(f.alergenicos){ var al=d.splitTextToSize((/^AL[ÉE]RGIC/i.test(f.alergenicos)?'':'ALÉRGICOS: ')+f.alergenicos, W-2*M-8); var ah=al.length*4.6+6; precisa(ah);
       d.setFillColor(255,244,222); d.roundedRect(M, y, W-2*M, ah, 2, 2, 'F');
       d.setFont('helvetica','bold'); d.setFontSize(9.5); d.setTextColor(122,74,0); al.forEach(function(l,i){ d.text(l, M+4, y+5+i*4.6); }); y+=ah+4; }
     if((f.alertas||[]).length){ var x=M; precisa(9);
       d.setFont('helvetica','bold'); d.setFontSize(8.5);
-      f.alertas.forEach(function(a){ var t=String(a).replace(/^[-–\s]+/,'').toUpperCase(), tw=d.getTextWidth(t)+8;
+      f.alertas.forEach(function(a){ var t=String(a).replace(/^[-–\s]+/,''), tw=d.getTextWidth(t)+8;
         if(x+tw>W-M){ x=M; y+=8; precisa(9); }
         d.setFillColor(253,234,236); d.setDrawColor(224,87,79); d.roundedRect(x, y, tw, 6.2, 3, 3, 'FD');
         d.setTextColor(176,40,40); d.text(t, x+4, y+4.3); x+=tw+3; });
