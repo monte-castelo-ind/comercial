@@ -3027,7 +3027,7 @@ function reduzirDataURL(src, max){
 var fichasNovas=[];
 function importarFichas(inp){
   var arqs=Array.prototype.slice.call(inp.files||[]); inp.value=''; if(!arqs.length) return;
-  toast('Lendo '+arqs.length+' arquivo'+(arqs.length>1?'s':'')+'…');
+  toast('Lendo '+arqs.length+' arquivo'+(arqs.length>1?'s':'')+'…'); carregarCatalogo();
   carregarMammoth().then(function(){
     return Promise.all(arqs.map(function(a){
       return a.arrayBuffer().then(function(buf){ return mammoth.convertToHtml({ arrayBuffer:buf }); })
@@ -3038,21 +3038,36 @@ function importarFichas(inp){
     fichasNovas=lista;
     var ok=lista.filter(function(f){ return !f.erro && f.nome; });
     var corpo='<table class="tb"><tr><th>Arquivo</th><th>Produto</th><th>EAN</th><th>Peso</th><th>Tabela</th><th>Foto</th></tr>'
-      +lista.map(function(f){ if(f.erro || !f.nome) return '<tr><td class="mini">'+esc(f.arquivo)+'</td><td colspan="5" style="color:var(--red)">Não deu para ler'+(f.erro?': '+esc(f.erro):'')+'</td></tr>';
+      +lista.map(function(f,i){ if(f.erro || !f.nome) return '<tr><td class="mini">'+esc(f.arquivo)+'</td><td colspan="5" style="color:var(--red)">Não deu para ler'+(f.erro?': '+esc(f.erro):'')+'</td></tr>';
         var sim='<span style="color:var(--green)">✓</span>', nao='<span style="color:var(--amber)">falta</span>';
-        return '<tr><td class="mini">'+esc(f.arquivo)+'</td><td><b>'+esc(f.nome)+'</b></td><td class="mono">'+(f.ean?esc(f.ean):nao)+'</td><td>'+(f.peso?esc(f.peso):nao)+'</td>'
+        return '<tr><td class="mini">'+esc(f.arquivo)+'</td><td><input type="text" value="'+esc(f.nome)+'" list="imp-cat-nomes" oninput="impFichaNome('+i+',this)" aria-label="Produto" style="font-weight:700;min-width:190px;padding:7px 10px"></td><td class="mono">'+(f.ean?esc(f.ean):nao)+'</td><td>'+(f.peso?esc(f.peso):nao)+'</td>'
           +'<td>'+(f.nutri&&f.nutri.linhas.length?sim+' '+f.nutri.linhas.length+' linhas':nao)+'</td><td>'+(f.img?sim:nao)+'</td></tr>'; }).join('')+'</table>'
-      +'<p class="mini">Produto que já existe (mesmo código de barras ou mesmo nome) é atualizado; os demais entram novos.</p>';
+      +impCatNomes()
+      +'<p class="mini">Se o nome do produto veio errado, corrija na própria linha antes de gravar. Produto que já existe (mesmo código de barras ou mesmo nome) é atualizado; os demais entram novos.</p>';
     abrirModal({ titulo:'Importar fichas técnicas', sub:ok.length+' de '+lista.length+' prontas', wide:true, corpo:'<div class="tscroll">'+corpo+'</div>',
       botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Gravar '+ok.length+' ficha'+(ok.length===1?'':'s'), fn:gravarFichas }] });
   }).catch(falha('ler os arquivos'));
+}
+/* nome do produto editável na tela de importação: a leitura do Word às vezes
+   pega só parte do título ("PÃO BRIOCHE" em vez de "PÃO BRIOCHE BOLA").
+   Os nomes do catálogo aparecem como sugestão, para a foto casar depois. */
+function impCatNomes(){
+  var ps=(catalogo&&catalogo.produtos)||[], vis={};
+  return '<datalist id="imp-cat-nomes">'+ps.map(function(p){ var n=String(p.nome||'').trim(); if(!n||vis[n]) return ''; vis[n]=1;
+    return '<option value="'+esc(n)+'">'; }).join('')+'</datalist>';
+}
+function impFichaNome(i, el){
+  var f=fichasNovas[i]; if(!f) return;
+  f.nome=String(el.value||'').replace(/\s+/g,' ').trim();
+  el.style.borderColor=f.nome?'':'var(--red)';
+  el.title=f.nome?'':'Sem nome, esta ficha não é gravada';
 }
 function idFicha(f){
   if(f.ean) return 'ean_'+f.ean;
   return 'n_'+norm(f.nome).replace(/ /g,'_').slice(0,80);
 }
 function gravarFichas(el){
-  var ok=fichasNovas.filter(function(f){ return !f.erro && f.nome; }); if(!ok.length) return;
+  var ok=fichasNovas.filter(function(f){ return !f.erro && f.nome; }); if(!ok.length){ toast('Preencha o nome do produto para gravar.'); return; }
   var pare=ocupado(el,'Gravando…'), agora=agoraISO();
   /* uma por vez: cada ficha com foto pode chegar perto do limite de um documento */
   var feitas=0;
@@ -3069,7 +3084,7 @@ function gravarFichas(el){
     .then(function(){ toast(feitas+' ficha'+(feitas===1?'':'s')+' gravada'+(feitas===1?'':'s')+'.'); fecharModal(); })
     .catch(function(e){ pare(); falha('gravar as fichas ('+feitas+' gravadas)')(e); });
 }
-Object.assign(window, { editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas });
+Object.assign(window, { editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome });
 
 /* =====================================================================
    CATÁLOGO — vem do PDF oficial, convertido em catalogo.json (mesmo
