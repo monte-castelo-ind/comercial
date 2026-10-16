@@ -118,7 +118,7 @@ html[data-theme="light"] .side:hover:not(.pin){box-shadow:14px 0 40px rgba(20,20
 .uname{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .urole{font-size:10.5px;color:var(--muted)}
 .side:not(.pin):not(:hover) .side-foot .btn{display:none}
-main{margin-left:64px;padding:22px 28px 60px;max-width:1260px;transition:margin-left .16s}
+main{margin-left:64px;padding:22px clamp(20px,2.2vw,44px) 60px;transition:margin-left .16s}   /* ocupa a largura toda do monitor */
 .side.pin ~ main{margin-left:225px}
 
 /* ---- topo ---- */
@@ -550,7 +550,7 @@ details.mais[open]{padding-bottom:4px}
 
     <!-- IMPORTAR CARTEIRA (admin) -->
     <div class="page" id="page-importar">
-      <div class="card" style="max-width:980px">
+      <div class="card">
         <p class="mini" style="margin-top:0">Quem define o representante de cada cliente é o <b>ERP</b>; o app só lê, para não existir
           uma segunda informação. Entram os clientes <b>ativos</b> (compraram nos últimos 30 dias). A sincronização é <b>automática</b>:
           quando a diretoria abre o app, no máximo a cada 12 horas, a carteira volta a espelhar o ERP.</p>
@@ -559,7 +559,7 @@ details.mais[open]{padding-bottom:4px}
           e pode conferir o que mudaria antes de gravar.</p>
         <button class="btn" onclick="impDoErp(this)">⇣ Conferir agora</button>
       </div>
-      <div class="card" id="imp-passos" style="display:none;max-width:980px;margin-top:16px">
+      <div class="card" id="imp-passos" style="display:none;margin-top:16px">
         <div id="imp-fonte" class="mini"></div>
         <div id="imp-p2"></div>
         <div id="imp-p3"></div>
@@ -582,7 +582,7 @@ details.mais[open]{padding-bottom:4px}
 
     <!-- USUÁRIOS E NÍVEIS (admin) -->
     <div class="page" id="page-usuarios">
-      <div class="card" style="max-width:860px;margin-bottom:16px">
+      <div class="card" style="margin-bottom:16px">
         <div class="grid2" style="gap:12px">
           <div><b>Diretoria (admin)</b><div class="mini">Tudo: vê e altera todas as carteiras, passa cliente de um vendedor para outro, separa a carteira, responde todas as solicitações, define níveis e configura o app.</div></div>
           <div><b>Gerente</b><div class="mini">Vê todas as carteiras, a Equipe, as visitas e o valor comprado de todos. Responde solicitações (os tipos ligados em Configurações). Não altera cliente de outro vendedor.</div></div>
@@ -590,7 +590,7 @@ details.mais[open]{padding-bottom:4px}
         </div>
       </div>
       <div class="tools"><input type="search" placeholder="Buscar pessoa…" oninput="setUsuBusca(this.value)"><span class="mini" id="usu-cont"></span></div>
-      <div class="card" style="max-width:860px;padding:6px 8px" id="usu-lista"></div>
+      <div class="card" style="padding:6px 8px" id="usu-lista"></div>
     </div>
 
     <!-- CONFIGURAÇÕES (admin) -->
