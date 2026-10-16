@@ -2843,7 +2843,7 @@ function verFicha(id){
   if(f.ingredientes) corpo+='<div class="det-sec">Ingredientes</div><div class="det-txt">'+esc(f.ingredientes)+'</div>';
   if((n.linhas||[]).length) corpo+='<div class="det-sec">Informação nutricional</div><div class="tscroll" style="max-height:none;margin-bottom:13px"><table class="tb"><tr>'
     +(n.cab||['','100g','Porção','%VD*']).map(function(h,i){ return '<th'+(i?' class="r"':'')+'>'+esc(h)+'</th>'; }).join('')+'</tr>'
-    +n.linhas.map(function(r){ return '<tr>'+r.map(function(c,i){ return '<td'+(i?' class="r"':'')+'>'+esc(c)+'</td>'; }).join('')+'</tr>'; }).join('')
+    +n.linhas.map(function(r){ r=Array.isArray(r)?r:(r.c||[]); return '<tr>'+r.map(function(c,i){ return '<td'+(i?' class="r"':'')+'>'+esc(c)+'</td>'; }).join('')+'</tr>'; }).join('')
     +'</table></div>'+(n.nota?'<div class="mini" style="margin:-6px 0 13px">'+esc(n.nota)+'</div>':'');
   if((f.conservacao||[]).length) corpo+='<div class="det-sec">Conservação</div><div class="det-txt">'+esc(f.conservacao.join('\n'))+'</div>';
   if((f.preparo||[]).length) corpo+='<div class="det-sec">Modo de preparo</div><div class="det-txt">'
@@ -2963,7 +2963,10 @@ function gravarFichas(el){
   var feitas=0;
   ok.reduce(function(p, f){ return p.then(function(){
     var d={ nome:f.nome, ean:f.ean||'', peso:f.peso||'', ingredientes:f.ingredientes||'', alergenicos:f.alergenicos||'',
-            alertas:f.alertas||[], conservacao:f.conservacao||[], preparo:f.preparo||[], nutri:f.nutri||null, img:f.img||'',
+            alertas:f.alertas||[], conservacao:f.conservacao||[], preparo:f.preparo||[], img:f.img||'',
+            /* o Firestore não aceita lista dentro de lista: cada linha da tabela vira { c:[...] } */
+            nutri:f.nutri ? { porcoes:f.nutri.porcoes||'', cab:f.nutri.cab||null, nota:f.nutri.nota||'',
+                              linhas:(f.nutri.linhas||[]).map(function(r){ return { c:r }; }) } : null,
             arquivo:f.arquivo||'', atualizadoEm:agora, atualizadoPor:U.email };
     return setDoc(doc(db,'comFichas', idFicha(f)), d).then(function(){ feitas++; });
   }); }, Promise.resolve())
