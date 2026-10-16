@@ -2856,8 +2856,12 @@ function verFicha(id){
   var n=f.nutri||{}, corpo='';
   var foto=fotoFicha(f);
   if(foto) corpo+='<img src="'+foto+'" class="ficha-img" onclick="zoom(this.src)">';
-  corpo+='<div class="det"><div><span>Peso</span><b>'+esc(f.peso||'—')+'</b></div><div><span>Código de barras</span><b class="mono">'+esc(f.ean||'—')+'</b></div>'
-    +(n.porcoes?'<div><span>Porções</span><b>'+esc(n.porcoes)+'</b></div>':'')+'</div>';
+  corpo+='<div class="det"><div><span>'+(f.pesoUn?'Peso do pacote':'Peso')+'</span><b>'+esc(f.peso||'—')+'</b></div>'
+    +(f.pesoUn?'<div><span>Peso unitário</span><b>'+esc(f.pesoUn)+'</b></div>':'')
+    +'<div><span>Código de barras</span><b class="mono">'+esc(f.ean||'—')+'</b></div>'
+    +(f.validade?'<div><span>Validade</span><b>'+esc(f.validade)+'</b></div>':'')
+    +(n.porcoes?'<div><span>Porções</span><b>'+esc(n.porcoes)+'</b></div>':'')
+    +(f.registro?'<div style="grid-column:1/-1"><span>Registro</span><b>'+esc(f.registro)+'</b></div>':'')+'</div>';
   if(f.alergenicos) corpo+='<div class="alert a-warn">⚠ '+esc(f.alergenicos)+'</div>';
   if((f.alertas||[]).length) corpo+='<div class="chips" style="margin-bottom:13px">'+f.alertas.map(function(a){ return '<span class="tag t-red" style="font-size:12.5px">'+esc(a.replace(/^[-–\s]+/,''))+'</span>'; }).join('')+'</div>';
   if(f.ingredientes) corpo+='<div class="det-sec">Ingredientes</div><div class="det-txt">'+esc(f.ingredientes)+'</div>';
@@ -2868,6 +2872,8 @@ function verFicha(id){
   if((f.conservacao||[]).length) corpo+='<div class="det-sec">Conservação</div><div class="det-txt">'+esc(f.conservacao.join('\n'))+'</div>';
   if((f.preparo||[]).length) corpo+='<div class="det-sec">Modo de preparo</div><div class="det-txt">'
     +f.preparo.map(function(x){ return x.charAt(0)==='§'?'<b>'+esc(x.slice(1))+'</b>':esc(x); }).join('\n')+'</div>';
+  [['sensoriais','Características sensoriais'],['micro','Características microbiológicas']].forEach(function(s){
+    if((f[s[0]]||[]).length) corpo+='<div class="det-sec">'+s[1]+'</div><div class="det">'+f[s[0]].map(function(x){ return '<div><span>'+esc(x.k)+'</span><b>'+esc(x.v)+'</b></div>'; }).join('')+'</div>'; });
   /* a ficha sai só em PDF fechado: sem "copiar texto" */
   abrirModal({ titulo:esc(f.nome), sub:'Ficha técnica', wide:true, corpo:corpo,
     botoes:[{ txt:(ehCelular()&&navigator.share)?'⤴ Compartilhar PDF':'⇣ Baixar PDF', fn:function(el){ compartilharFicha(f, el); } }] });
@@ -2891,8 +2897,71 @@ function carregarMammoth(){
 var FICHA_ROTULOS=[['nome','NOME DO PRODUTO'],['ingredientes','INGREDIENTES'],['imagem','IMAGEM DO PRODUTO'],['peso','PESO'],['nutri','INFORMACOES NUTRICIONAIS'],
   ['ean','CODIGO DE BARRAS'],['alergenicos','INFORMACAO SOBRE GLUTEN'],['alertas','INFORMACAO SOBRE TEOR'],['conservacao','MODO DE CONSERVACAO'],
   ['preparo','MODO DE PREPARO'],['_fim','LOGO DA MONTE CASTELO'],['_fim','INFORMACOES DE CONTATO'],['_fim','EXISTE UM CANAL'],['_fim','CNPJ'],['_fim','TIPO DE IMPRESSAO']];
+/* Formato "FT" (ficha do food service): uma tabela de duas colunas, rótulo à
+   esquerda e valor à direita, com a tabela nutricional e as características
+   sensoriais em tabelas dentro dela. */
+var FT_ROTULOS=[['pesoLiq','PESO LIQUIDO'],['pesoUn','PESO UNITARIO'],['ean','CODIGO DE BARRAS'],['registro','REGISTRO'],['ingredientes','INGREDIENTES'],
+  ['alergenicos','ALERGENICOS'],['alertas','INFORMACAO FRONTAL'],['nutri','TABELA NUTRICIONAL'],['validade','VALIDADE'],['temperatura','TEMPERATURA'],
+  ['conservacao','MODO DE CONSERVACAO'],['preparo','MODO DE PREPARO'],['sensoriais','SENSORIA'],['micro','MICROBIOLOG']];
+function tabelaParaNutri(tb){
+  var rows=Array.prototype.map.call(tb.querySelectorAll('tr'), function(tr){ return Array.prototype.map.call(tr.children, function(td){
+    return Array.prototype.map.call(td.querySelectorAll('p'), function(p){ return p.textContent.trim(); }).filter(Boolean).join(' · ') || td.textContent.trim(); }); });
+  var nt={ porcoes:'', cab:null, linhas:[], nota:'' };
+  rows.forEach(function(r){
+    var t=r.join(' ').trim(); if(!t) return;
+    if(/INFORMA/.test(norm(t)) && r.filter(Boolean).length===1) return;
+    if(/^PORC/.test(norm(r[0]))){ nt.porcoes=r[0]; return; }
+    if(!r[0] && r.length>=3){ nt.cab=['']; for(var i=1;i<r.length;i++) nt.cab.push(r[i].replace(/\*+$/,'*')); return; }
+    if(/^\*/.test(r[0])){ nt.nota=r[0]; return; }
+    if(r.length>=3) nt.linhas.push(r.map(function(x){ return x||''; }));
+  });
+  return nt;
+}
+function paragrafosDe(td){
+  var ps=Array.prototype.map.call(td.querySelectorAll(':scope > p'), function(p){
+    var t=p.textContent.replace(/\s+/g,' ').trim(), st=p.querySelector('strong');
+    return (st && st.textContent.replace(/\s+/g,' ').trim()===t ? '§' : '')+t; }).filter(function(t){ return t && t!=='§'; });
+  return ps;
+}
+function chaveValor(tb){ return Array.prototype.map.call(tb.rows, function(tr){ var c=tr.cells; return c.length>=2 ? { k:c[0].textContent.trim(), v:c[1].textContent.replace(/\s+/g,' ').trim() } : null; }).filter(function(x){ return x && (x.k||x.v); }); }
+function parseFichaFT(tab){
+  var f={ nome:'', ingredientes:'', peso:'', pesoUn:'', ean:'', registro:'', validade:'', temperatura:'', alergenicos:'', alertas:[], conservacao:[], preparo:[], nutri:null, img:'', sensoriais:[], micro:[] };
+  var secao=null;
+  Array.prototype.forEach.call(tab.rows, function(tr){
+    var c=tr.cells; if(!c.length) return;
+    var interna=tr.querySelector('table');
+    if(c.length===1){
+      var t=c[0].textContent.replace(/\s+/g,' ').trim(), nt=norm(t);
+      if(interna && !c[0].querySelector(':scope > p')){ if(secao) f[secao]=chaveValor(interna); return; }
+      if(!f.nome && t && !interna){ f.nome=t; return; }
+      secao=null; FT_ROTULOS.some(function(r){ if(nt.indexOf(r[1])>=0 && (r[0]==='sensoriais'||r[0]==='micro')){ secao=r[0]; return true; } return false; });
+      if(secao && interna) f[secao]=chaveValor(interna);
+      return;
+    }
+    var rot=norm(c[0].textContent), cel=c[1], campo=null;
+    FT_ROTULOS.some(function(r){ if(rot.indexOf(r[1])>=0){ campo=r[0]; return true; } return false; });
+    if(!campo) return;
+    var txt=cel.textContent.replace(/\s+/g,' ').trim();
+    if(campo==='nutri'){ var tb=cel.querySelector('table'); if(tb) f.nutri=tabelaParaNutri(tb); return; }
+    if(campo==='sensoriais' || campo==='micro'){ var tb2=cel.querySelector('table'); if(tb2) f[campo]=chaveValor(tb2); return; }
+    if(campo==='pesoLiq'){ f.peso=txt; return; }
+    if(campo==='alergenicos'){ f.alergenicos=paragrafosDe(cel).map(function(x){ return x.replace(/^§/,''); }).join(' '); return; }
+    if(campo==='alertas'){ f.alertas=paragrafosDe(cel).map(function(x){ return x.replace(/^§/,''); }); return; }
+    if(campo==='conservacao' || campo==='preparo'){ f[campo]=paragrafosDe(cel); if(campo==='conservacao') f.conservacao=f.conservacao.map(function(x){ return x.replace(/^§/,''); }); return; }
+    f[campo]=txt;
+  });
+  if(f.temperatura) f.conservacao.unshift(f.temperatura);
+  f.ean=(f.ean.match(/\d{8,14}/)||[f.ean])[0];
+  var im=tab.querySelector('img'); if(im) f.img=im.getAttribute('src')||'';
+  return f;
+}
 function parseFicha(html){
   var raiz=new DOMParser().parseFromString('<div>'+html+'</div>','text/html').body.firstChild;
+  /* qual dos dois modelos de ficha: o da embalagem (campos em parágrafos) ou o "FT" (tudo numa tabela) */
+  var tab=raiz.querySelector(':scope > table');
+  if(tab){ var rot=0; Array.prototype.forEach.call(tab.rows, function(tr){ if(tr.cells.length===2){ var n=norm(tr.cells[0].textContent);
+      if(FT_ROTULOS.some(function(r){ return n.indexOf(r[1])>=0; })) rot++; } });
+    if(rot>=3) return parseFichaFT(tab); }
   var f={ nome:'', ingredientes:'', peso:'', ean:'', alergenicos:'', alertas:[], conservacao:[], preparo:[], nutri:null, img:'' };
   var h1=raiz.querySelector('h1'); var titulo=h1?h1.textContent.trim():'';
   var im=raiz.querySelector('img'); if(im) f.img=im.getAttribute('src')||'';
@@ -2986,6 +3055,7 @@ function gravarFichas(el){
   ok.reduce(function(p, f){ return p.then(function(){
     var d={ nome:f.nome, ean:f.ean||'', peso:f.peso||'', ingredientes:f.ingredientes||'', alergenicos:f.alergenicos||'',
             alertas:f.alertas||[], conservacao:f.conservacao||[], preparo:f.preparo||[], img:f.img||'',
+            pesoUn:f.pesoUn||'', registro:f.registro||'', validade:f.validade||'', sensoriais:f.sensoriais||[], micro:f.micro||[],
             /* o Firestore não aceita lista dentro de lista: cada linha da tabela vira { c:[...] } */
             nutri:f.nutri ? { porcoes:f.nutri.porcoes||'', cab:f.nutri.cab||null, nota:f.nutri.nota||'',
                               linhas:(f.nutri.linhas||[]).map(function(r){ return { c:r }; }) } : null,
@@ -3007,7 +3077,21 @@ var PARADAS={ DE:1, DA:1, DO:1, COM:1, C:1, E:1, EM:1, A:1, O:1 };
 /* nome comparável: sem "de/com/e…" e sem o peso da embalagem ("400G", "1KG"), em qualquer ordem */
 function chaveProduto(n){ return normEmp(n).split(' ').filter(function(w){ return w && !PARADAS[w] && !/^\d+([.,]\d+)?(G|GR|KG|ML|L)$/.test(w); }).sort().join(' '); }
 /* foto da ficha técnica: a do catálogo, para todo o app usar a mesma; sem par no catálogo, a do Word */
-function produtoDaFicha(f){ if(!catalogo || !f) return null; var k=chaveProduto(f.nome); return (catalogo.produtos||[]).filter(function(p){ return chaveProduto(p.nome)===k; })[0] || null; }
+function produtoDaFicha(f){
+  if(!catalogo || !f) return null;
+  var ps=catalogo.produtos||[], k=chaveProduto(f.nome);
+  var exato=ps.filter(function(p){ return chaveProduto(p.nome)===k; })[0]; if(exato) return exato;
+  /* sem par exato: o nome do catálogo inteiro dentro do nome da ficha ("PÃO BRIOCHE 500G" → "BRIOCHE");
+     entre vários, o mais completo e, empatando, o de mesmo peso unitário */
+  var fk=k.split(' ').filter(function(w){ return !/^\d{3,}$/.test(w); }), fs={}; fk.forEach(function(w){ fs[w]=1; });
+  var cand=ps.map(function(p){ var t=chaveProduto(p.nome).split(' '); return { p:p, t:t, ok:t.length && t.every(function(w){ return fs[w]; }) }; })
+    .filter(function(x){ return x.ok; });
+  if(!cand.length) return null;
+  var max=Math.max.apply(null, cand.map(function(x){ return x.t.length; }));
+  cand=cand.filter(function(x){ return x.t.length===max; });
+  if(cand.length>1){ var pu=norm(f.pesoUn||f.peso||''); var porPeso=cand.filter(function(x){ return pu && pu.indexOf(norm(x.p.pesoUn))===0; }); if(porPeso.length===1) return porPeso[0].p; return null; }
+  return cand[0].p;
+}
 function fotoFicha(f){ var p=produtoDaFicha(f); return (p && p.img) || f.img || ''; }
 function carregarCatalogo(){
   if(catalogo || catLendo) return;
@@ -3143,7 +3227,7 @@ function gerarPdfFicha(f){
     d.setFont('helvetica','bold'); d.setFontSize(18); d.setTextColor.apply(d, TINTA);
     d.splitTextToSize(f.nome, txw).forEach(function(l){ d.text(l, M, y); y+=7.5; });
     y+=1; d.setFontSize(10);
-    [['Peso', f.peso], ['Código de barras (EAN)', f.ean], ['Porções', (f.nutri&&f.nutri.porcoes)||'']].forEach(function(r){
+    [[f.pesoUn?'Peso do pacote':'Peso', f.peso], ['Peso unitário', f.pesoUn], ['Código de barras (EAN)', f.ean], ['Validade', f.validade], ['Porções', (f.nutri&&f.nutri.porcoes)||'']].forEach(function(r){
       if(!r[1]) return;
       d.setFont('helvetica','normal'); d.setTextColor.apply(d, CINZA); d.setFontSize(8); d.text(r[0].toUpperCase(), M, y); y+=4.5;
       d.setFont('helvetica','bold'); d.setTextColor.apply(d, TINTA); d.setFontSize(10.5);
@@ -3186,6 +3270,14 @@ function gerarPdfFicha(f){
     if((f.conservacao||[]).length){ titulo('Conservação'); f.conservacao.forEach(function(t){ paragrafo(t); }); }
     if((f.preparo||[]).length){ titulo('Modo de preparo');
       f.preparo.forEach(function(t){ if(t.charAt(0)==='§'){ precisa(16); y+=1; paragrafo(t.slice(1), { negrito:true, tam:9.5 }); } else paragrafo(t, { tam:9.5 }); }); }
+    [['sensoriais','Características sensoriais'],['micro','Características microbiológicas']].forEach(function(s){
+      if(!(f[s[0]]||[]).length) return;
+      titulo(s[1]);
+      d.autoTable({ startY:y, margin:{ left:M, right:M }, body:f[s[0]].map(function(x){ return [x.k, x.v]; }), theme:'grid',
+        styles:{ font:'helvetica', fontSize:8.8, cellPadding:1.4, textColor:TINTA, lineColor:[226,226,231], lineWidth:0.2 },
+        columnStyles:{ 0:{ fontStyle:'bold', cellWidth:42 } } });
+      y=d.lastAutoTable.finalY+4; });
+    if(f.registro){ titulo('Registro'); paragrafo(f.registro, { tam:9 }); }
     rodape();
     return d.output('blob');
   });
