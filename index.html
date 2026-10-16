@@ -105,6 +105,13 @@ html[data-theme="light"] .side:hover:not(.pin){box-shadow:14px 0 40px rgba(20,20
      line-height:18px;border-radius:9px;padding:0 5px;text-align:center}
 .cnt[hidden]{display:none}
 .side:not(.pin):not(:hover) .cnt{position:absolute;top:3px;right:5px;min-width:15px;height:15px;line-height:15px;font-size:9.5px;padding:0 3px}
+.subnav{display:none;flex-direction:column;gap:2px;margin:2px 0 6px 23px;padding-left:10px;border-left:1px solid var(--border)}
+.subnav.on{display:flex}
+.navsub{background:none;border:none;color:var(--muted);font:500 13px 'Archivo',sans-serif;text-align:left;padding:7px 10px;border-radius:8px;cursor:pointer}
+.navsub:hover{background:var(--card-2);color:var(--text)}
+.navsub.on{color:var(--text);font-weight:700;background:var(--prim-suave)}
+.side:not(.pin):not(:hover) .subnav{display:none!important}
+.so-cel{display:none!important}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--border)}
 .uline{display:flex;align-items:center;gap:9px;padding:6px}
 .uav{width:29px;height:29px;flex:0 0 29px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
@@ -332,7 +339,8 @@ details.mais[open]{padding-bottom:4px}
   .side{top:auto;bottom:0;left:0;right:0;width:auto!important;height:auto;flex-direction:row;overflow:visible;gap:2px;
         justify-content:space-around;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))!important;
         border-right:none;border-top:1px solid var(--border);box-shadow:none!important;z-index:800}
-  .side-logo,.side-sec,.side-foot,.pinbtn,.navbtn.so-desk{display:none!important}
+  .side-logo,.side-sec,.side-foot,.pinbtn,.navbtn.so-desk,.subnav{display:none!important}
+  .so-cel{display:inline-flex!important}
   .side .lbl{opacity:1!important}
   .navbtn{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:2px;min-height:52px;
           padding:4px 2px!important;font-size:11px;border-radius:12px}
@@ -409,7 +417,11 @@ details.mais[open]{padding-bottom:4px}
     <button class="navbtn on com-only" data-p="hoje" onclick="nav('hoje')"><span class="side-ico">◷</span><span class="lbl lab-d">Hoje</span><span class="lab-m">Hoje</span></button>
     <button class="navbtn com-only" data-p="carteira" onclick="nav('carteira')"><span class="side-ico">▤</span><span class="lbl lab-d">Carteira</span><span class="lab-m">Carteira</span></button>
     <button class="navbtn com-only" data-p="visitas" onclick="nav('visitas')"><span class="side-ico">⌖</span><span class="lbl lab-d">Visitas e contatos</span><span class="lab-m">Visitas</span></button>
-    <button class="navbtn com-only" data-p="produtos" onclick="nav('produtos')"><span class="side-ico">▦</span><span class="lbl lab-d">Produtos</span><span class="lab-m">Produtos</span></button>
+    <button class="navbtn com-only" data-p="produtos" onclick="navProd()"><span class="side-ico">▦</span><span class="lbl lab-d">Produtos</span><span class="lab-m">Produtos</span></button>
+    <div class="subnav" id="sub-prod">
+      <button class="navsub" data-a="catalogo" onclick="navProd('catalogo')"><span class="lbl">Catálogo</span></button>
+      <button class="navsub" data-a="fichas" onclick="navProd('fichas')"><span class="lbl">Fichas técnicas</span></button>
+    </div>
     <button class="navbtn gestor-only so-desk" data-p="equipe" onclick="nav('equipe')" style="display:none"><span class="side-ico">◫</span><span class="lbl lab-d">Equipe</span><span class="lab-m">Equipe</span></button>
     <div class="side-sec lbl">Pedidos</div>
     <button class="navbtn" data-p="solic" onclick="nav('solic')"><span class="side-ico">✉</span><span class="lbl lab-d">Solicitações</span><span class="lab-m">Pedidos</span><span class="cnt" id="cntSol" hidden>0</span></button>
@@ -558,9 +570,10 @@ details.mais[open]{padding-bottom:4px}
     <!-- PRODUTOS E FICHAS TÉCNICAS -->
     <div class="page" id="page-produtos">
       <div class="tools">
-        <div class="seg" id="prod-seg"></div>
+        <div class="seg so-cel" id="prod-seg"></div>
         <input type="search" placeholder="Buscar produto, peso, código de barras…" oninput="setFichaBusca(this.value)">
         <select id="prod-linha" onchange="renderProdutos()"></select>
+        <button class="btn btn-sm" id="cat-share" onclick="compartilharCatalogo(this)">⤴ Compartilhar o catálogo</button>
         <label class="btn btn-sm" id="prod-imp" style="display:none;cursor:pointer">⇪ Importar fichas (.docx)
           <input type="file" accept=".docx" multiple style="display:none" onchange="importarFichas(this)"></label>
       </div>
@@ -951,11 +964,12 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   importar:['Carteira pelo ERP','A carteira segue o representante cadastrado no ERP'],
   equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
   usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'],
-  produtos:['Produtos','Fichas técnicas para consultar e mandar ao cliente'] };
+  produtos:['Produtos','Catálogo e fichas técnicas'] };
 var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };
 function nav(p){
   pagina=p;
   document.querySelectorAll('.navbtn').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-p')===p); });
+  var sp=$('sub-prod'); if(sp) sp.classList.toggle('on', p==='produtos');
   document.querySelectorAll('.page').forEach(function(x){ x.classList.toggle('on', x.id==='page-'+p); });
   $('ptit').textContent=TITULOS[p][0];
   var a=ACAO[p];
@@ -2808,6 +2822,9 @@ function renderProdutos(){
   var box=$('prod-lista'); if(!box) return;
   $('prod-imp').style.display=(U.admin && abaProd==='fichas')?'':'none';
   $('prod-linha').style.display=abaProd==='catalogo'?'':'none';
+  $('cat-share').style.display=abaProd==='catalogo'?'':'none';
+  $('ptit').textContent=abaProd==='catalogo'?'Catálogo':'Fichas técnicas';
+  document.querySelectorAll('#sub-prod .navsub').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-a')===abaProd); });
   var nCat=catalogo?catalogo.produtos.length:0;
   $('prod-seg').innerHTML=[['catalogo','Catálogo',nCat],['fichas','Fichas técnicas',fichas.length]].map(function(x){
     return '<button class="'+(abaProd===x[0]?'on':'')+'" onclick="setAbaProd(\''+x[0]+'\')">'+x[1]+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</button>'; }).join('');
@@ -2995,6 +3012,35 @@ function fichaDoProduto(p){
   return fichas.filter(function(f){ return chaveProduto(f.nome)===k; })[0] || null;
 }
 function setAbaProd(a){ abaProd=a; renderProdutos(); }
+function navProd(a){ abaProd=a||abaProd||'catalogo'; if(pagina!=='produtos') nav('produtos'); else renderProdutos(); }
+
+/* ---- compartilhar o catálogo em PDF: no celular abre o "Compartilhar" do
+   aparelho (WhatsApp, e-mail…); no computador baixa o arquivo ---- */
+var CAT_PDF='Catalogo-Monte-Castelo.pdf', CAT_NOME='Catálogo Monte Castelo.pdf', catPdf=null;
+function ehCelular(){ return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(pointer:coarse)').matches); }
+function baixarCatalogo(){
+  var a=document.createElement('a'); a.href=CAT_PDF; a.download=CAT_NOME; document.body.appendChild(a); a.click(); a.remove();
+  toast('Baixando o catálogo…');
+}
+function enviarCatalogo(el){
+  var f=new File([catPdf], CAT_NOME, { type:'application/pdf' });
+  if(!(navigator.canShare && navigator.canShare({ files:[f] }))){ baixarCatalogo(); return Promise.resolve(); }
+  return navigator.share({ files:[f], title:'Catálogo Monte Castelo', text:'Catálogo de produtos da Monte Castelo' })
+    .then(function(){ if(el) el.textContent='⤴ Compartilhar o catálogo'; })
+    .catch(function(e){
+      if(e && e.name==='AbortError') return;                  /* a pessoa fechou a janela de compartilhar */
+      /* demorou para baixar e o aparelho pede um toque novo antes de abrir o compartilhar */
+      if(el) el.textContent='⤴ Toque para enviar'; toast('Catálogo pronto. Toque de novo para enviar.');
+    });
+}
+function compartilharCatalogo(el){
+  if(!ehCelular() || !navigator.share){ baixarCatalogo(); return; }
+  if(catPdf){ enviarCatalogo(el); return; }
+  var t=el.textContent; el.disabled=true; el.textContent='Preparando o catálogo…';
+  fetch(CAT_PDF).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.blob(); })
+    .then(function(b){ catPdf=b; el.disabled=false; el.textContent=t; return enviarCatalogo(el); })
+    .catch(function(e){ el.disabled=false; el.textContent=t; toast('Não foi possível pegar o catálogo ('+(e.message||e)+'). Confira se o PDF está no repositório do app.', true); });
+}
 function renderCatalogo(){
   var box=$('prod-lista');
   if(!catalogo){ carregarCatalogo(); box.innerHTML=catErro?'<div class="alert a-err">Não foi possível carregar o catálogo ('+esc(catErro)+'). Confira se o arquivo catalogo.json está no repositório do app.</div>':'<div class="empty">Carregando o catálogo…</div>'; return; }
@@ -3033,7 +3079,7 @@ function verProduto(ordem){
   if(f) bts.push({ txt:'Ver ficha técnica', fn:function(){ verFicha(f.id); } });
   abrirModal({ titulo:esc(p.nome), sub:esc(p.linha), corpo:corpo, botoes:bts });
 }
-Object.assign(window, { setAbaProd:setAbaProd, verProduto:verProduto, renderProdutos:renderProdutos });
+Object.assign(window, { setAbaProd:setAbaProd, verProduto:verProduto, renderProdutos:renderProdutos, navProd:navProd, compartilharCatalogo:compartilharCatalogo });
 </script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
