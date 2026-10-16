@@ -185,6 +185,15 @@ h1{margin:0;font-size:21px;font-weight:700;letter-spacing:-.4px}
 .prod-c{padding:10px 12px 12px}
 .prod-c b{display:block;font-size:14px;line-height:1.3}
 .prod-c span{font-size:12px;color:var(--muted)}
+.cat-sec{font-size:17px;font-weight:800;margin:26px 0 10px;display:flex;align-items:baseline;gap:10px}
+.cat-sec:first-child{margin-top:4px}
+.cat-sec small{font-size:12.5px;font-weight:600;color:var(--muted)}
+.cat-sub{font-size:13px;font-weight:700;color:var(--primary);margin:16px 0 8px}
+.prod .tem-ficha{display:inline-block;margin-top:6px;font-size:10.5px;font-weight:700;color:var(--green);border:1px solid rgba(63,191,134,.4);border-radius:20px;padding:1px 8px}
+.cat-specs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.cat-specs div{background:var(--card-2);border-radius:12px;padding:10px 12px}
+.cat-specs span{display:block;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.cat-specs b{font-size:18px}
 .ficha-img{width:100%;max-height:300px;object-fit:contain;background:#fff;border-radius:12px;margin-bottom:12px;cursor:zoom-in}
 .promos{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(260px,340px);gap:12px;overflow-x:auto;margin-bottom:20px;padding-bottom:4px}
 .promo{background:linear-gradient(135deg,var(--prim-suave),var(--card) 70%);border:1px solid var(--primary);border-radius:16px;cursor:pointer;overflow:hidden;display:flex;flex-direction:column}
@@ -363,6 +372,9 @@ details.mais[open]{padding-bottom:4px}
   .tipo-sol{padding:12px;font-size:14px}
   .pr-row .pr-v{flex-basis:90px} .pr-row .pr-u{flex-basis:62px}
   .foto-add,.fotos img{width:96px;height:96px}
+  .prod-grade{grid-template-columns:1fr 1fr;gap:8px}
+  .prod-c{padding:8px 10px 10px} .prod-c b{font-size:12.5px} .prod-c span{font-size:11px}
+  .cat-specs b{font-size:16px}
   #mc-voltar-hub{bottom:calc(78px + env(safe-area-inset-bottom,0px))!important}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -546,7 +558,9 @@ details.mais[open]{padding-bottom:4px}
     <!-- PRODUTOS E FICHAS TÉCNICAS -->
     <div class="page" id="page-produtos">
       <div class="tools">
-        <input type="search" placeholder="Buscar produto, código de barras, ingrediente…" oninput="setFichaBusca(this.value)">
+        <div class="seg" id="prod-seg"></div>
+        <input type="search" placeholder="Buscar produto, peso, código de barras…" oninput="setFichaBusca(this.value)">
+        <select id="prod-linha" onchange="renderProdutos()"></select>
         <label class="btn btn-sm" id="prod-imp" style="display:none;cursor:pointer">⇪ Importar fichas (.docx)
           <input type="file" accept=".docx" multiple style="display:none" onchange="importarFichas(this)"></label>
       </div>
@@ -2792,7 +2806,12 @@ function ouvirFichas(){
 }
 function renderProdutos(){
   var box=$('prod-lista'); if(!box) return;
-  $('prod-imp').style.display=U.admin?'':'none';
+  $('prod-imp').style.display=(U.admin && abaProd==='fichas')?'':'none';
+  $('prod-linha').style.display=abaProd==='catalogo'?'':'none';
+  var nCat=catalogo?catalogo.produtos.length:0;
+  $('prod-seg').innerHTML=[['catalogo','Catálogo',nCat],['fichas','Fichas técnicas',fichas.length]].map(function(x){
+    return '<button class="'+(abaProd===x[0]?'on':'')+'" onclick="setAbaProd(\''+x[0]+'\')">'+x[1]+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</button>'; }).join('');
+  if(abaProd==='catalogo'){ renderCatalogo(); return; }
   if(!fichasLidas){ box.innerHTML='<div class="empty">Carregando…</div>'; return; }
   var q=norm(fichaBusca).split(' ').filter(Boolean);
   var l=fichas.filter(function(f){ var t=norm([f.nome,f.ean,f.peso,f.ingredientes].join(' ')); return q.every(function(x){ return t.indexOf(x)>=0; }); });
@@ -2952,6 +2971,66 @@ function gravarFichas(el){
     .catch(function(e){ pare(); falha('gravar as fichas ('+feitas+' gravadas)')(e); });
 }
 Object.assign(window, { editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas });
+
+/* =====================================================================
+   CATÁLOGO — vem do PDF oficial, convertido em catalogo.json (mesmo
+   repositório do app). Arquivo estático: o navegador guarda em cache e
+   não custa leitura no Firebase. Atualizar = gerar um catalogo.json novo.
+   ===================================================================== */
+var catalogo=null, catLendo=false, catErro='', abaProd='catalogo';
+var PARADAS={ DE:1, DA:1, DO:1, COM:1, C:1, E:1, EM:1, A:1, O:1 };
+function chaveProduto(n){ return normEmp(n).split(' ').filter(function(w){ return w && !PARADAS[w]; }).sort().join(' '); }
+function carregarCatalogo(){
+  if(catalogo || catLendo) return;
+  catLendo=true;
+  fetch('catalogo.json', { cache:'no-cache' }).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(j){ catalogo=j; catLendo=false; if(pagina==='produtos') renderProdutos(); })
+    .catch(function(e){ catLendo=false; catErro=e.message||String(e); if(pagina==='produtos') renderProdutos(); });
+}
+function fichaDoProduto(p){
+  var k=chaveProduto(p.nome);
+  return fichas.filter(function(f){ return chaveProduto(f.nome)===k; })[0] || null;
+}
+function setAbaProd(a){ abaProd=a; renderProdutos(); }
+function renderCatalogo(){
+  var box=$('prod-lista');
+  if(!catalogo){ carregarCatalogo(); box.innerHTML=catErro?'<div class="alert a-err">Não foi possível carregar o catálogo ('+esc(catErro)+'). Confira se o arquivo catalogo.json está no repositório do app.</div>':'<div class="empty">Carregando o catálogo…</div>'; return; }
+  var ps=catalogo.produtos||[];
+  var sel=$('prod-linha'), linhas=[]; ps.forEach(function(p){ if(linhas.indexOf(p.linha)<0) linhas.push(p.linha); });
+  var op='<option value="">Todas as linhas</option>'+linhas.map(function(l){ return '<option>'+esc(l)+'</option>'; }).join('');
+  if(sel.dataset.h!==op){ var v=sel.value; sel.innerHTML=op; sel.dataset.h=op; sel.value=v; }
+  var lf=sel.value, q=norm(fichaBusca).split(' ').filter(Boolean);
+  var l=ps.filter(function(p){ if(lf && p.linha!==lf) return false;
+    var t=norm([p.nome,p.linha,p.sub,p.pesoUn].join(' ')); return q.every(function(x){ return t.indexOf(x)>=0; }); });
+  $('psub').textContent=ps.length+' produtos no catálogo'+(catalogo.versao?' · catálogo de '+catalogo.versao:'');
+  if(!l.length){ box.innerHTML='<div class="empty">Nenhum produto com esse nome.</div>'; return; }
+  var html='', lin=null, sub=null;
+  l.forEach(function(p){
+    if(p.linha!==lin){ if(lin!==null) html+='</div>'; lin=p.linha; sub=null;
+      html+='<div class="cat-sec">'+esc(p.linha)+'<small>'+ps.filter(function(x){ return x.linha===lin; }).length+' produtos</small></div><div class="prod-grade">'; }
+    if((p.sub||'')!==(sub||'')){ sub=p.sub||''; if(sub) html+='</div><div class="cat-sub">'+esc(sub)+'</div><div class="prod-grade">'; }
+    var f=fichaDoProduto(p);
+    html+='<div class="prod" onclick="verProduto('+p.ordem+')"><img src="'+p.img+'" alt="" loading="lazy">'
+      +'<div class="prod-c"><b>'+esc(p.nome)+'</b><span>'+esc([p.pesoUn, p.qtd?p.qtd.replace(/\.$/,'')+' por pacote':''].filter(Boolean).join(' · '))+'</span>'
+      +(f?'<div><span class="tem-ficha">ficha técnica</span></div>':'')+'</div></div>';
+  });
+  box.innerHTML=html+'</div>';
+}
+function textoProduto(p){
+  return p.nome+'\nPeso unitário: '+p.pesoUn+'\nPacote: '+p.pesoPct+' ('+p.qtd.replace(/\.$/,'')+')\nMonte Castelo · '+p.linha;
+}
+function verProduto(ordem){
+  var p=(catalogo&&catalogo.produtos||[]).filter(function(x){ return x.ordem===ordem; })[0]; if(!p) return;
+  var f=fichaDoProduto(p);
+  var corpo='<img src="'+p.img+'" class="ficha-img" onclick="zoom(this.src)">'
+    +'<div class="cat-specs"><div><span>Peso unitário</span><b>'+esc(p.pesoUn||'—')+'</b></div><div><span>Pacote</span><b>'+esc(p.pesoPct||'—')+'</b></div><div><span>Unidades</span><b>'+esc((p.qtd||'—').replace(/un\.?$/,''))+'</b></div></div>'
+    +'<div class="mini">'+esc(p.linha+(p.sub?' · '+p.sub:''))+'</div>';
+  var bts=[{ txt:'Copiar', cls:'btn-ghost', fn:function(){ (navigator.clipboard?navigator.clipboard.writeText(textoProduto(p)):Promise.reject()).then(function(){ toast('Copiado.'); }).catch(function(){ toast('Não foi possível copiar.', true); }); } }];
+  if(navigator.share) bts.push({ txt:'Compartilhar', cls:'btn-ghost', fn:function(){ navigator.share({ title:p.nome, text:textoProduto(p) }).catch(function(){}); } });
+  if(f) bts.push({ txt:'Ver ficha técnica', fn:function(){ verFicha(f.id); } });
+  abrirModal({ titulo:esc(p.nome), sub:esc(p.linha), corpo:corpo, botoes:bts });
+}
+Object.assign(window, { setAbaProd:setAbaProd, verProduto:verProduto, renderProdutos:renderProdutos });
 </script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
