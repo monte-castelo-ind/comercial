@@ -269,6 +269,28 @@ table.tb th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.4px;t
 table.tb td{padding:6px 7px;border-bottom:1px solid var(--border)}
 table.tb .r{text-align:right}
 .tscroll{overflow:auto;max-height:52vh;border:1px solid var(--border);border-radius:12px}
+/* Carteira em tabela (computador); no celular continua em cartões */
+.ct-wrap{max-height:calc(100vh - 330px);min-height:260px;background:var(--card)}
+table.ct{font-size:13.5px}
+table.ct th{padding:10px 12px;z-index:1}
+table.ct td{padding:10px 12px;vertical-align:top}
+table.ct tbody tr{cursor:pointer}
+table.ct tbody tr:hover td{background:var(--card-2)}
+table.ct tr.b-red td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+table.ct tr.b-amber td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
+table.ct tr.b-blue td:first-child{box-shadow:inset 3px 0 0 var(--blue)}
+table.ct tr.b-muted td{opacity:.6}
+.ct-nome{font-weight:700}
+.ct-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.ct-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.ct-tags .tag{font-size:10.5px;padding:1px 7px}
+table.ct .ct-val{text-align:right;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.ct .ct-val.zero{color:var(--muted);font-weight:500}
+table.ct th.ct-val small{display:block;font-size:9.5px;font-weight:600;text-transform:none;letter-spacing:0}
+table.ct .ct-uc{white-space:nowrap}
+.ct-red{color:var(--red)} .ct-amber{color:var(--amber)} .ct-mut{color:var(--muted)}
+.kpis .kpi.fixo{cursor:default}
+.kpis .kpi.fixo:hover{border-color:var(--border)}
 .pr-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
 .pr-row input{padding:8px 10px;font-size:13px}
 .pr-row .pr-p{flex:1 1 auto} .pr-row .pr-v{flex:0 0 110px} .pr-row .pr-u{flex:0 0 80px}
@@ -475,6 +497,7 @@ details.mais[open]{padding-bottom:4px}
 
     <!-- CARTEIRA -->
     <div class="page" id="page-carteira">
+      <div class="kpis" id="c-kpis"></div>
       <div class="tools">
         <input type="search" id="c-busca" placeholder="Buscar cliente, cidade, rota…" oninput="renderCarteira()">
         <select id="c-vend" onchange="renderCarteira()" class="gestor-only" style="display:none"></select>
@@ -696,7 +719,11 @@ function fmtDiaCurto(ymd){ if(!ymd) return '—'; var p=String(ymd).slice(0,10).
 function fmtQuando(iso){ if(!iso) return '—'; var d=new Date(iso); if(isNaN(d)) return '—';
   return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes()); }
 function fmtRS(v){ v=Number(v); if(!isFinite(v)) return '—'; return 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function numBR(s){ s=String(s==null?'':s).replace(/[^\d,.-]/g,''); if(s.indexOf(',')>=0) s=s.replace(/\./g,'').replace(',','.'); var n=parseFloat(s); return isFinite(n)?n:null; }
+/* número digitado no jeito brasileiro: "3.500" = três mil e quinhentos, "14,90" e "14.90" = 14,9 */
+function numBR(s){ s=String(s==null?'':s).replace(/[^\d,.-]/g,'');
+  if(s.indexOf(',')>=0) s=s.replace(/\./g,'').replace(',','.');
+  else if(/^-?\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+  var n=parseFloat(s); return isFinite(n)?n:null; }
 function mesesAtras(n){ var out=[], d=new Date(); d.setDate(1); for(var i=0;i<n;i++){ out.push(d.getFullYear()+'-'+pad(d.getMonth()+1)); d.setMonth(d.getMonth()-1); } return out; }
 var MES_NOME=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 function nomeMes(ym){ var p=ym.split('-'); return MES_NOME[+p[1]-1]+'/'+p[0].slice(2); }
@@ -1127,10 +1154,60 @@ function renderCarteira(){
   l.sort(function(a,b){
     if(ord!=='nome' && pf){ var x=val[a.id]||0, y=val[b.id]||0; if(x!==y) return ord==='fatd' ? y-x : x-y; }
     return String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'); });
-  $('psub').textContent=l.length+' cliente'+(l.length===1?'':'s')+(l.length!==clientes.length?' de '+clientes.length:'')
-    +(U.gestor&&!$('c-vend').value?' em todas as carteiras':'')+(temVal&&pf?' · '+fmtRS0(tot)+' faturados em '+pf.longo:'');
-  $('c-lista').innerHTML=l.length ? l.slice(0,400).map(cartaoCliente).join('')+(l.length>400?'<div class="empty">Mostrando 400 de '+l.length+'. Use a busca.</div>':'')
-    : '<div class="empty">'+(clientes.length?'Nenhum cliente neste filtro.':'Sua carteira está vazia. Ela vem do ERP (clientes em que você é o representante). Cliente novo entra por <b>Registrar contato</b>.')+'</div>';
+  var deQuem=U.gestor ? (vend ? 'carteira de '+(($('c-vend').selectedOptions[0]||{}).textContent||'') : 'todas as carteiras') : 'sua carteira';
+  $('psub').textContent=l.length+' cliente'+(l.length===1?'':'s')+(l.length!==clientes.length?' de '+clientes.length:'')+' · '+deQuem;
+  /* cartões: faturamento e número de clientes do que está na tela */
+  var compraram=l.filter(function(c){ return (val[c.id]||0)>0; }).length;
+  $('c-kpis').innerHTML=
+      '<div class="card kpi fixo"><div class="klabel">Faturamento</div><div class="kval">'+(temVal&&pf?fmtRS0(tot):'—')+'</div>'
+      +'<div class="khint">'+(pf?esc(pf.longo):'aguardando o resumo de vendas')+(temVal&&pf?' · '+compraram+' cliente'+(compraram===1?'':'s')+' compraram':'')+'</div></div>'
+    +'<div class="card kpi fixo"><div class="klabel">Clientes</div><div class="kval">'+l.length.toLocaleString('pt-BR')+'</div>'
+      +'<div class="khint">'+esc(l.length!==clientes.length?'de '+clientes.length+' · '+deQuem:deQuem)+'</div></div>';
+  _ctModo=ctCelular()?'cel':'pc';
+  var vazio='<div class="empty">'+(clientes.length?'Nenhum cliente neste filtro.':'Sua carteira está vazia. Ela vem do ERP (clientes em que você é o representante). Cliente novo entra por <b>Registrar contato</b>.')+'</div>';
+  var mais=l.length>400?'<div class="empty">Mostrando 400 de '+l.length+'. Use a busca.</div>':'';
+  if(!l.length){ $('c-lista').innerHTML=vazio; return; }
+  if(_ctModo==='cel'){ $('c-lista').innerHTML=l.slice(0,400).map(cartaoCliente).join('')+mais; return; }
+  var colVend=!!U.gestor;
+  $('c-lista').innerHTML='<div class="tscroll ct-wrap"><table class="tb ct"><thead><tr>'
+      +'<th>Cliente</th><th>Rota</th>'+(colVend?'<th>Vendedor</th>':'')+'<th>Última compra</th>'
+      +'<th class="ct-val">Valor'+(pf?'<small>'+esc(pf.curto)+'</small>':'')+'</th></tr></thead><tbody>'
+      +l.slice(0,400).map(function(c){ return linhaCliente(c, val[c.id], colVend); }).join('')
+      +'</tbody></table></div>'+mais;
+}
+/* Carteira em tabela: uma linha por cliente, clique abre a ficha. No celular
+   (até 600px) continua em cartões, que cabem na tela. */
+var _ctModo='';
+function ctCelular(){ try{ return window.matchMedia('(max-width:600px)').matches; }catch(e){ return false; } }
+window.addEventListener('resize', function(){
+  var m=ctCelular()?'cel':'pc';
+  if(_ctModo && m!==_ctModo && $('c-lista')) renderCarteira();
+});
+function linhaCliente(c, vf, colVend){
+  var u=ultimaCompra(c), d=diasSemComprar(c), qd=queda(c), tags=[], borda='';
+  if(c.situacao==='prospect') tags.push('<span class="tag t-blue">Prospect · '+funilNome(funilDe(c))+'</span>');
+  if(c.situacao==='inativo') tags.push('<span class="tag">Inativo</span>');
+  if(qd) tags.push('<span class="tag t-red">↓ '+qd.pct+'% em '+nomeMes(qd.mes)+'</span>');
+  if(c.proxContato){
+    var cls=contatoAtrasado(c)?' t-red':(contatoHoje(c)?' t-amber':'');
+    tags.push('<span class="tag'+cls+'">Contato '+quandoRelativo(c.proxContato)+'</span>');
+  }
+  if(emAlerta(c) || contatoAtrasado(c) || qd) borda='b-red'; else if(contatoHoje(c)) borda='b-amber';
+  else if(c.situacao==='prospect') borda='b-blue';
+  if(c.situacao==='inativo') borda+=' b-muted';
+  var uc;
+  if(c.erpId && u) uc='<span class="'+(emAlerta(c)?'ct-red':'')+'">'+fmtDiaCurto(u)+'</span><div class="ct-sub">'+d+' dia'+(d===1?'':'s')+'</div>';
+  else if(c.erpId && erpEstado==='ok') uc='<span class="ct-red">Sem compra</span>';
+  else if(c.situacao==='prospect') uc='<span class="ct-mut">—</span>';
+  else if(!c.erpId) uc='<span class="ct-amber">Sem vínculo ERP</span>';
+  else uc='<span class="ct-mut">…</span>';
+  var valHtml=(vf==null)?'<td class="ct-val zero">—</td>':'<td class="ct-val'+(vf?'':' zero')+'">'+(vf?fmtRS0(vf):'R$ 0')+'</td>';
+  return '<tr class="'+borda+'" onclick="verCliente(\''+c.id+'\')">'
+    +'<td><div class="ct-nome">'+esc(c.nome||'(sem nome)')+'</div>'+(c.cidade?'<div class="ct-sub">'+esc(c.cidade)+'</div>':'')
+      +(tags.length?'<div class="ct-tags">'+tags.join('')+'</div>':'')+'</td>'
+    +'<td>'+(c.rota?esc(c.rota):'<span class="ct-mut">—</span>')+'</td>'
+    +(colVend?'<td>'+(c.donoNome?esc(c.donoNome):'<span class="ct-mut">—</span>')+'</td>':'')
+    +'<td class="ct-uc">'+uc+'</td>'+valHtml+'</tr>';
 }
 function setFiltroCart(f){ filtroCart=f; renderCarteira(); }
 
@@ -1369,7 +1446,7 @@ function verCliente(id){
     var qd=queda(c);
     if(qd) corpo+='<div class="alert a-err">↓ Comprou '+qd.pct+'% menos em '+nomeMes(qd.mes)+' ('+fmtRS(qd.ult)+') do que no mês anterior ('+fmtRS(qd.ant)+').</div>';
   }
-  corpo+=funilFichaHtml(c)+oportunidadesHtml(c)+comprasRecentesHtml(c);
+  corpo+=funilFichaHtml(c)+fichaCadHtml(c)+oportunidadesHtml(c)+comprasRecentesHtml(c);
   corpo+='<div class="det-sec">Contato</div><div class="det">'
     +'<div><span>Situação</span><b>'+({cliente:'Cliente',prospect:'Prospect',inativo:'Inativo'}[c.situacao]||'Cliente')+'</b></div>'
     +'<div><span>Cidade · rota</span><b>'+esc([c.cidade, c.rota?'rota '+c.rota:''].filter(Boolean).join(' · ')||'—')+'</b></div>'
@@ -1447,6 +1524,13 @@ function abrirCliente(id){
       +'<div class="fld"><label>Total mensal estimado (R$)</label><input type="text" inputmode="decimal" id="fc-tot" value="'+(c&&c.totalMensal?String(c.totalMensal).replace('.',','):'')+'"></div></div>'
       +'<label>Preços que paga hoje</label><div id="fc-precos"></div>'
       +'<button type="button" class="btn btn-sm btn-ghost" onclick="fcAddPreco()" style="margin-bottom:13px">+ produto</button>'
+      +'<div class="det-sec" style="margin-top:4px">Ficha de cadastro</div>'
+      +'<div class="grid2"><div class="fld"><label>Razão social</label><input type="text" id="fc-razao" value="'+esc(c?c.razao||'':'')+'"></div>'
+      +'<div class="fld"><label>CNPJ (ou CPF)</label><input type="text" inputmode="numeric" id="fc-cnpj" value="'+esc(c&&c.cnpj?fmtDocBR(c.cnpj):'')+'" onblur="docFormatar(this)"></div></div>'
+      +'<div class="fld"><label>Endereço</label><input type="text" id="fc-end" value="'+esc(c?c.endereco||'':'')+'"></div>'
+      +'<div class="grid2"><div class="fld"><label>Compra mensal (kg)</label><input type="text" inputmode="decimal" id="fc-kg" value="'+(c&&c.kgMensal?String(c.kgMensal).replace('.',','):'')+'"></div></div>'
+      +'<div class="fld"><label>Linha de produtos</label>'+linhasChips('fc-lin', (c&&c.linhas)||[])+'</div>'
+      +'<div class="fld"><label>Quantas vezes quer ser atendido</label>'+freqChips('fc-freq', (c&&c.frequencia)||'')+'</div>'
       +'<div class="fld"><label>Lembrete do próximo contato</label><input type="text" id="fc-proxobs" value="'+esc(c?c.proxObs||'':'')+'" placeholder="ex.: levar amostra do pão de forma"></div>'
       +'<div class="fld"><label>Observações</label><textarea id="fc-obs">'+esc(c?c.obs||'':'')+'</textarea></div>');
   abrirModal({ titulo:c?'Editar cliente':'Novo cliente', wide:true, corpo:corpo,
@@ -1518,6 +1602,8 @@ function salvarCliente(el){
   fcLerPrecos();
   var nome=$('fc-nome').value.trim();
   if(!nome){ toast('Informe o nome do cliente.', true); $('fc-nome').focus(); return; }
+  var cnpjDig=$('fc-cnpj').value.replace(/\D/g,'');
+  if(cnpjDig && !docOk(cnpjDig)){ toast('CNPJ (ou CPF) inválido — confira os números.', true); $('fc-cnpj').focus(); return; }
   var sitB=document.querySelector('#fc-sit .chip.on');
   var forn=$('fc-forn').value; if(forn==='__novo') forn='';
   var d={
@@ -1528,6 +1614,8 @@ function salvarCliente(el){
     fornecedor:forn, totalMensal:numBR($('fc-tot').value),
     precos:fc.precos.filter(function(p){ return p.p; }),
     obs:$('fc-obs').value.trim(),
+    razao:$('fc-razao').value.trim(), cnpj:$('fc-cnpj').value.replace(/\D/g,''), endereco:$('fc-end').value.trim(),
+    kgMensal:numBR($('fc-kg').value), linhas:lerChips('fc-lin'), frequencia:(lerChips('fc-freq')[0]||''),
     proxContato:$('fc-prox').value||'', proxObs:$('fc-proxobs').value.trim(),
     atualizadoEm:agoraISO(), atualizadoPor:U.email
   };
@@ -1557,6 +1645,7 @@ var fv=null;
 function abrirVisita(clienteId){
   if(!U.comercial) return;
   fv={ fotos:[], lat:null, lng:null, prec:null };
+  carregarCatalogo();
   var c=clienteId?clientePorId(clienteId):null;
   var corpo=''
     +'<div class="fld"><label>Cliente *</label><div id="fv-cli"></div><div id="fv-add"></div></div>'
@@ -1579,24 +1668,31 @@ function abrirVisita(clienteId){
 }
 function fvSelCli(sel){
   var box=$('fv-add'); if(!box) return;
-  /* cliente novo: o mínimo para achar de novo; a ficha completa de cadastro vem depois */
+  /* cliente novo: FICHA DE CADASTRO completa, toda obrigatória (é o que o
+     gerente confere e o Jeferson usa para cadastrar no ERP) */
   if(sel && sel.novo){
-    /* os mesmos dados do cadastro de cliente; o essencial à vista, o resto em "Mais detalhes" */
     fc={ id:null, erpId:'', erpNome:'', precos:[{p:'',v:null,u:''}] };
-    var opF='<option value="">— não sabe / não informado —</option>'+concorrentes.map(function(x){ return '<option>'+esc(x.nome)+'</option>'; }).join('')
+    var opF='<option value="">— escolha —</option>'+concorrentes.map(function(x){ return '<option>'+esc(x.nome)+'</option>'; }).join('')
       +'<option value="__novo">+ Cadastrar outro fornecedor…</option>';
-    box.innerHTML='<div class="grid2" style="margin-top:10px">'
-      +'<div class="fld"><label>Telefone / WhatsApp *</label><input type="tel" id="fv-n-tel"></div>'
+    box.innerHTML='<div class="ficha-cad"><div class="det-sec" style="margin-top:12px">Ficha de cadastro</div>'
+      +'<div class="grid2">'
+      +'<div class="fld"><label>Razão social *</label><input type="text" id="fv-n-razao"></div>'
+      +'<div class="fld"><label>CNPJ (ou CPF) *</label><input type="text" inputmode="numeric" id="fv-n-cnpj" placeholder="00.000.000/0000-00" onblur="docFormatar(this)"></div></div>'
+      +'<div class="fld"><label>Endereço *</label><input type="text" id="fv-n-end" placeholder="rua, número, bairro"></div>'
+      +'<div class="grid2">'
       +'<div class="fld"><label>Cidade *</label><input type="text" id="fv-n-cid"></div>'
+      +'<div class="fld"><label>Telefone / WhatsApp *</label><input type="tel" id="fv-n-tel"></div>'
       +'<div class="fld"><label>Pessoa de contato</label><input type="text" id="fv-n-ctt"></div>'
-      +'<div class="fld"><label>Hoje compra de</label><select id="fv-n-forn" onchange="fcForn(this)">'+opF+'</select></div></div>'
-      +maisDetalhes('Mais detalhes do cliente (endereço, preços que paga, observações)',
-         '<div class="grid2"><div class="fld"><label>Endereço</label><input type="text" id="fv-n-end" placeholder="rua, número, bairro"></div>'
-        +'<div class="fld"><label>Total mensal estimado (R$)</label><input type="text" inputmode="decimal" id="fv-n-tot"></div></div>'
-        +'<label>Preços que paga hoje</label><div id="fc-precos"></div>'
-        +'<button type="button" class="btn btn-sm btn-ghost" onclick="fcAddPreco()" style="margin-bottom:13px">+ produto</button>'
-        +'<div class="fld"><label>Observações sobre o cliente</label><textarea id="fv-n-obs" style="min-height:62px"></textarea></div>')
-      +'<div class="mini">Entra na sua carteira como <b>prospect</b>. Quando virar cliente no ERP, passa a seguir o representante de lá.</div>';
+      +'<div class="fld"><label>Fornecedor atual *</label><select id="fv-n-forn" onchange="fcForn(this)">'+opF+'</select></div></div>'
+      +'<label>Preço atual * <span class="mini">— produto, valor e unidade; pelo menos um</span></label><div id="fc-precos"></div>'
+      +'<button type="button" class="btn btn-sm btn-ghost" onclick="fcAddPreco()" style="margin-bottom:13px">+ produto</button>'
+      +'<div class="grid2">'
+      +'<div class="fld"><label>Compra mensal (R$) *</label><input type="text" inputmode="decimal" id="fv-n-tot" placeholder="ex.: 3.500"></div>'
+      +'<div class="fld"><label>Compra mensal (kg) *</label><input type="text" inputmode="decimal" id="fv-n-kg" placeholder="ex.: 400"></div></div>'
+      +'<div class="fld"><label>Linha de produtos * <span class="mini">— toque em todas que interessam</span></label>'+linhasChips('fv-n-lin', [])+'</div>'
+      +'<div class="fld"><label>Quantas vezes quer ser atendido *</label>'+freqChips('fv-n-freq', '')+'</div>'
+      +maisDetalhes('Observações sobre o cliente', '<div class="fld"><textarea id="fv-n-obs" style="min-height:62px"></textarea></div>')
+      +'<div class="mini">Entra na sua carteira como <b>prospect</b>. Quando virar cliente no ERP, passa a seguir o representante de lá.</div></div>';
     fcPintarPrecos();
     return;
   }
@@ -1648,6 +1744,95 @@ function fvFoto(inp){
   var f=inp.files&&inp.files[0]; inp.value=''; if(!f) return;
   reduzir(f).then(function(d){ fv.fotos.push(d); fvPintarFotos(); }).catch(function(){ toast('Não foi possível ler a foto.', true); });
 }
+/* ---- ficha de cadastro do cliente novo ---- */
+var LINHAS_PADRAO=['Pães Tradicionais','Pães Especiais e Variedades','Pães Integrais','Pães e Massas Doces','Pães de Queijo',
+  'Folhados','Massas Folhadas e Croissants','Fritos','Pastéis','Empanadas'];
+/* linhas do catálogo (catalogo.json); sem catálogo carregado, a lista padrão */
+function linhasProduto(){
+  var s={}, o=[];
+  ((catalogo&&catalogo.produtos)||[]).forEach(function(p){ if(p.linha && !s[p.linha]){ s[p.linha]=1; o.push(p.linha); } });
+  LINHAS_PADRAO.forEach(function(l){ if(!s[l]){ s[l]=1; o.push(l); } });
+  return o;
+}
+var FREQS=['1x por semana','2x por semana','3x por semana','1x a cada 15 dias','1x por mês'];
+function linhasChips(id, sel){
+  sel=sel||[];
+  var todas=linhasProduto(); sel.forEach(function(l){ if(todas.indexOf(l)<0) todas.push(l); });
+  return '<div class="chips" id="'+id+'">'+todas.map(function(l){
+    return '<button type="button" class="chip'+(sel.indexOf(l)>=0?' on':'')+'" data-v="'+esc(l)+'" onclick="chipToggle(this)">'+esc(l)+'</button>'; }).join('')+'</div>';
+}
+function freqChips(id, atual){
+  var outra=!!atual && FREQS.indexOf(atual)<0;
+  return '<div class="chips" id="'+id+'">'+FREQS.map(function(f){
+      return '<button type="button" class="chip'+(atual===f?' on':'')+'" data-v="'+f+'" onclick="chipUnico(this)">'+f+'</button>'; }).join('')
+    +'<button type="button" class="chip'+(outra?' on':'')+'" data-v="'+(outra?esc(atual):'')+'" onclick="chipOutra(this)">'+(outra?'Outra: '+esc(atual):'Outra…')+'</button></div>';
+}
+function chipToggle(b){ b.classList.toggle('on'); }
+function chipUnico(b){ b.parentNode.querySelectorAll('.chip').forEach(function(x){ x.classList.toggle('on', x===b); }); }
+function chipOutra(b){
+  var t=(prompt('Quantas vezes quer ser atendido? (ex.: 1x a cada 10 dias)', b.getAttribute('data-v')||'')||'').trim();
+  if(!t) return;
+  b.setAttribute('data-v', t); b.textContent='Outra: '+t; chipUnico(b);
+}
+function lerChips(id){ return [].map.call(document.querySelectorAll('#'+id+' .chip.on'), function(b){ return b.getAttribute('data-v')||''; }).filter(Boolean); }
+/* CNPJ ou CPF com os dígitos verificadores conferidos (mesma regra do Peças) */
+function cnpjOk(c){
+  if(/^(\d)\1+$/.test(c)) return false;
+  function dv(n){ var p=n===12?[5,4,3,2,9,8,7,6,5,4,3,2]:[6,5,4,3,2,9,8,7,6,5,4,3,2], t=0;
+    for(var i=0;i<n;i++) t+=(+c[i])*p[i]; var r=t%11; return r<2?0:11-r; }
+  return dv(12)===+c[12] && dv(13)===+c[13];
+}
+function cpfOk(c){
+  if(/^(\d)\1+$/.test(c)) return false;
+  function dv(n){ var t=0; for(var i=0;i<n;i++) t+=(+c[i])*(n+1-i); var r=(t*10)%11; return r===10?0:r; }
+  return dv(9)===+c[9] && dv(10)===+c[10];
+}
+function docOk(d){ d=String(d||'').replace(/\D/g,''); return d.length===14 ? cnpjOk(d) : (d.length===11 ? cpfOk(d) : false); }
+function fmtDocBR(d){
+  d=String(d||'').replace(/\D/g,'');
+  if(d.length===14) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5');
+  if(d.length===11) return d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/,'$1.$2.$3-$4');
+  return d;
+}
+function docFormatar(inp){ var d=inp.value.replace(/\D/g,''); if(d.length===14||d.length===11) inp.value=fmtDocBR(d); }
+/* lê a ficha do cliente novo; avisa o primeiro campo que falta e devolve null */
+function lerFichaNovo(){
+  fcLerPrecos();
+  function falta(id, msg){ toast(msg, true); var el=$(id); if(el){ el.focus && el.focus(); el.scrollIntoView && el.scrollIntoView({block:'center'}); } return null; }
+  var f={
+    razao:$('fv-n-razao').value.trim(), cnpj:$('fv-n-cnpj').value.replace(/\D/g,''),
+    endereco:$('fv-n-end').value.trim(), cidade:$('fv-n-cid').value.trim(), telefone:$('fv-n-tel').value.trim(),
+    fornecedor:$('fv-n-forn').value, totalMensal:numBR($('fv-n-tot').value), kgMensal:numBR($('fv-n-kg').value),
+    linhas:lerChips('fv-n-lin'), frequencia:(lerChips('fv-n-freq')[0]||''),
+    precos:fc.precos.filter(function(p){ return p.p; })
+  };
+  if(f.fornecedor==='__novo') f.fornecedor='';
+  if(!f.razao) return falta('fv-n-razao','Ficha: informe a razão social.');
+  if(!f.cnpj) return falta('fv-n-cnpj','Ficha: informe o CNPJ.');
+  if(!docOk(f.cnpj)) return falta('fv-n-cnpj','Ficha: CNPJ (ou CPF) inválido — confira os números.');
+  if(!f.endereco) return falta('fv-n-end','Ficha: informe o endereço.');
+  if(!f.cidade) return falta('fv-n-cid','Ficha: informe a cidade.');
+  if(!f.telefone) return falta('fv-n-tel','Ficha: informe o telefone ou WhatsApp.');
+  if(!f.fornecedor) return falta('fv-n-forn','Ficha: escolha o fornecedor atual.');
+  if(!f.precos.length || f.precos.some(function(p){ return p.v==null || !(p.v>0); }))
+    return falta('fc-precos','Ficha: informe o preço atual (produto e valor) de pelo menos um produto.');
+  if(!(f.totalMensal>0)) return falta('fv-n-tot','Ficha: informe a compra mensal em R$.');
+  if(!(f.kgMensal>0)) return falta('fv-n-kg','Ficha: informe a compra mensal em kg.');
+  if(!f.linhas.length) return falta('fv-n-lin','Ficha: marque pelo menos uma linha de produtos.');
+  if(!f.frequencia) return falta('fv-n-freq','Ficha: escolha quantas vezes quer ser atendido.');
+  return f;
+}
+Object.assign(window, { chipToggle:chipToggle, chipUnico:chipUnico, chipOutra:chipOutra, docFormatar:docFormatar });
+function fichaCadHtml(c){
+  if(!(c.razao || c.cnpj || c.kgMensal || (c.linhas&&c.linhas.length) || c.frequencia || c.endereco)) return '';
+  return '<div class="det-sec">Ficha de cadastro</div><div class="det">'
+    +'<div><span>Razão social</span><b>'+esc(c.razao||'—')+'</b></div>'
+    +'<div><span>CNPJ / CPF</span><b class="mono">'+esc(c.cnpj?fmtDocBR(c.cnpj):'—')+'</b></div>'
+    +'<div style="grid-column:1/-1"><span>Endereço</span><b>'+esc(c.endereco||'—')+'</b></div>'
+    +'<div><span>Compra mensal</span><b class="mono">'+[c.totalMensal?fmtRS(c.totalMensal):'', c.kgMensal?String(c.kgMensal).replace('.',',')+' kg':''].filter(Boolean).join(' · ')+(c.totalMensal||c.kgMensal?'':'—')+'</b></div>'
+    +'<div><span>Atendimento</span><b>'+esc(c.frequencia||'—')+'</b></div>'
+    +'<div style="grid-column:1/-1"><span>Linhas de produtos</span><b>'+esc((c.linhas||[]).join(', ')||'—')+'</b></div></div>';
+}
 function salvarVisita(el){
   var sel=PK['fv-cli']&&PK['fv-cli'].sel;
   if(!sel){ toast('Escolha o cliente.', true); return; }
@@ -1663,14 +1848,13 @@ function salvarVisita(el){
   /* cliente do ERP que entra na carteira junto com a visita */
   var add=$('fv-addcart');
   if(sel.novo){
-    var nCid=$('fv-n-cid').value.trim(), nTel=$('fv-n-tel').value.trim();
-    if(!nTel || !nCid){ toast('Cliente novo: informe telefone e cidade.', true); return; }
-    fcLerPrecos();
-    var forn=$('fv-n-forn').value; if(forn==='__novo') forn='';
+    var fic=lerFichaNovo(); if(!fic) return;
+    var nCid=fic.cidade, nTel=fic.telefone;
     var nref=doc(collection(db,'comClientes'));
     b.set(nref, { nome:sel.nome, situacao:'prospect', erpId:'', erpNome:'', cidade:nCid, rota:'', contato:$('fv-n-ctt').value.trim(), telefone:nTel,
-      endereco:$('fv-n-end').value.trim(), fornecedor:forn, totalMensal:numBR($('fv-n-tot').value),
-      precos:fc.precos.filter(function(p){ return p.p; }), obs:$('fv-n-obs').value.trim(),
+      razao:fic.razao, cnpj:fic.cnpj, endereco:fic.endereco, fornecedor:fic.fornecedor,
+      totalMensal:fic.totalMensal, kgMensal:fic.kgMensal, linhas:fic.linhas, frequencia:fic.frequencia,
+      precos:fic.precos, obs:$('fv-n-obs').value.trim(),
       proxContato:prox, proxObs:proxObs, ultimoContato:data, origem:'novo no registro de contato',
       funil:funilPeloResultado($('fv-res').value), prospectDesde:data,
       donoUid:U.uid, donoNome:U.nome, donoEmail:U.email, criadoEm:agora, atualizadoEm:agora, atualizadoPor:U.email });
