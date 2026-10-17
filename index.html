@@ -1369,7 +1369,16 @@ function pkPintar(id){
       +'</span></b><button type="button" class="btn btn-sm btn-ghost" onclick="pkTrocar(\''+id+'\')">Trocar</button></div>';
     return;
   }
-  box.innerHTML='<input type="search" id="'+id+'-q" placeholder="'+esc(p.ph)+'" oninput="pkBusca(\''+id+'\')" autocomplete="off"><div id="'+id+'-r"></div>';
+  box.innerHTML='<input type="search" id="'+id+'-q" placeholder="'+esc(p.ph)+'" oninput="pkBusca(\''+id+'\')" autocomplete="off"><div id="'+id+'-r"></div>'
+    /* cliente novo: deixa claro de onde sai a ficha de cadastro */
+    +(p.novo?'<div class="mini" style="margin-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Cliente que ainda não compra?'
+      +'<button type="button" class="btn btn-sm btn-ghost" onclick="pkNovo(\''+id+'\')">✚ Cadastrar cliente novo</button>'
+      +'<span>abre a ficha de cadastro (razão social, CNPJ, endereço, fornecedor, preços, compra mensal, linhas e atendimento)</span></div>':'');
+}
+function pkNovo(id){
+  var p=PK[id], q=$(id+'-q'), t=q?q.value.trim():'';
+  if(t.length<3){ toast('Digite o nome do cliente novo no campo acima e toque de novo.'); if(q) q.focus(); return; }
+  p.sel={ clienteId:'', erpId:'', nome:t.toUpperCase(), novo:true }; pkPintar(id); if(p.onSel) p.onSel(p.sel);
 }
 function pkBusca(id){
   var p=PK[id], q=norm($(id+'-q').value).split(' ').filter(Boolean), out=$(id+'-r');
@@ -2318,7 +2327,7 @@ Object.assign(window, {
   verCliente:verCliente, remarcar:remarcar, abrirCliente:abrirCliente,
   fcSit:fcSit, fcForn:fcForn, fcBuscaErp:fcBuscaErp, fcVincular:fcVincular, fcDesvincular:fcDesvincular,
   fcAddPreco:fcAddPreco, fcTirarPreco:fcTirarPreco,
-  pkBusca:pkBusca, pkEscolher:pkEscolher, pkTrocar:pkTrocar, proxSet:proxSet, proxPintar:proxPintar,
+  pkBusca:pkBusca, pkEscolher:pkEscolher, pkTrocar:pkTrocar, pkNovo:pkNovo, proxSet:proxSet, proxPintar:proxPintar,
   abrirVisita:abrirVisita, fvTipo:fvTipo, fvGeo:fvGeo, fvTirarFoto:fvTirarFoto, fvFoto:fvFoto, verVisita:verVisita,
   abrirSolic:abrirSolic, fsTipo:fsTipo, verSolic:verSolic,
   impArquivo:impArquivo, impSelCol:impSelCol, impMapa:impMapa, impConferir:impConferir, impGravar:impGravar,
