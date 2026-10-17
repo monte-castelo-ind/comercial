@@ -2839,15 +2839,44 @@ function abrirPromo(id){
     +'<div class="grid2"><div class="fld"><label>Começa em</label><input type="date" id="fp-de" value="'+esc(p?p.de||'':hoje())+'"></div>'
     +'<div class="fld"><label>Termina em</label><input type="date" id="fp-ate" value="'+esc(p?p.ate||'':somaDias(hoje(),7))+'"></div></div>'
     +'<div class="fld"><label>Imagem (opcional)</label><div class="fotos" id="fp-img"></div>'
-    +'<input type="file" id="fp-file" accept="image/*" style="display:none" onchange="fpFoto(this)"></div>';
+    +'<input type="file" id="fp-file" accept="image/*" style="display:none" onchange="fpFoto(this)"><div id="fp-cat"></div></div>';
   abrirModal({ titulo:p?'Editar promoção':'Nova promoção', corpo:corpo,
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:p?'Salvar':'Publicar', fn:salvarPromo }] });
   fpPintarImg();
+  carregarCatalogo();                        /* para a opção "Do catálogo" abrir na hora */
 }
 function fpPintarImg(){
   var box=$('fp-img'); if(!box) return;
   box.innerHTML=fp.img ? '<div class="foto-prev"><img src="'+fp.img+'" onclick="zoom(this.src)"><button type="button" onclick="fpTirar()">×</button></div>'
-    : '<div class="foto-add" onclick="$(\'fp-file\').click()">🖼<small>Imagem</small></div>';
+    : '<div class="foto-add" onclick="$(\'fp-file\').click()">🖼<small>Enviar imagem</small></div>'
+      +'<div class="foto-add" onclick="fpCatalogo()">▦<small>Do catálogo</small></div>';
+}
+/* foto de um produto do catálogo, escolhida dentro da própria janela da promoção */
+function fpCatalogo(){
+  var box=$('fp-cat'); if(!box) return;
+  if(!catalogo){ carregarCatalogo(); box.innerHTML='<div class="mini" style="margin-top:8px">Carregando o catálogo…</div>';
+    var t=setInterval(function(){ if(catalogo || catErro){ clearInterval(t); if($('fp-cat')) fpCatalogo(); } }, 300); return; }
+  box.innerHTML='<div style="margin-top:10px;border:1px solid var(--border);border-radius:12px;padding:10px">'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="search" id="fp-cat-q" placeholder="Buscar produto no catálogo…" oninput="fpCatPintar()" autocomplete="off">'
+    +'<button type="button" class="btn btn-sm btn-ghost" onclick="$(\'fp-cat\').innerHTML=\'\'">Fechar</button></div>'
+    +'<div id="fp-cat-res" class="prod-grade" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));max-height:300px;overflow:auto"></div></div>';
+  var q=$('fp-cat-q'); var tit=$('fp-tit'); if(tit && tit.value.trim()) q.value=tit.value.trim().split(' ').slice(0,2).join(' ');
+  fpCatPintar(); setTimeout(function(){ q.focus(); }, 0);
+}
+function fpCatPintar(){
+  var res=$('fp-cat-res'); if(!res || !catalogo) return;
+  var q=norm($('fp-cat-q').value).split(' ').filter(Boolean);
+  var l=(catalogo.produtos||[]).filter(function(p){ if(produtoOculto(p)) return false; var t=norm(p.nome+' '+p.linha); return q.every(function(x){ return t.indexOf(x)>=0; }); });
+  if(!l.length && q.length){ q=[]; l=(catalogo.produtos||[]).filter(function(p){ return !produtoOculto(p); }); }   /* nada com esse nome: mostra todos */
+  res.innerHTML=l.slice(0,80).map(function(p){
+    return '<div class="prod" onclick="fpEscolherCat('+p.ordem+')"><img src="'+p.img+'" alt="" loading="lazy">'
+      +'<div class="prod-c" style="padding:6px 8px 8px"><b style="font-size:12px">'+esc(p.nome)+'</b><span style="font-size:10.5px">'+esc(p.pesoUn||'')+'</span></div></div>'; }).join('');
+}
+function fpEscolherCat(ordem){
+  var p=(catalogo.produtos||[]).filter(function(x){ return x.ordem===ordem; })[0]; if(!p) return;
+  fp.img=p.img; fpPintarImg(); $('fp-cat').innerHTML='';
+  var tit=$('fp-tit'); if(tit && !tit.value.trim()) tit.value=p.nome.charAt(0)+p.nome.slice(1).toLowerCase();
+  toast('Foto de '+p.nome+'.');
 }
 function fpTirar(){ fp.img=''; fpPintarImg(); }
 function fpFoto(inp){ var f=inp.files&&inp.files[0]; inp.value=''; if(!f) return;
@@ -2881,7 +2910,7 @@ function gerenciarPromos(){
     : '<div class="empty">Nenhuma promoção ainda.</div>';
   abrirModal({ titulo:'Promoções', sub:'Toque para editar ou republicar', corpo:corpo, botoes:[{ txt:'+ Nova promoção', fn:function(){ abrirPromo(); } }] });
 }
-Object.assign(window, { verPromo:verPromo, abrirPromo:abrirPromo, gerenciarPromos:gerenciarPromos, fpFoto:fpFoto, fpTirar:fpTirar });
+Object.assign(window, { fpCatalogo:fpCatalogo, fpCatPintar:fpCatPintar, fpEscolherCat:fpEscolherCat, verPromo:verPromo, abrirPromo:abrirPromo, gerenciarPromos:gerenciarPromos, fpFoto:fpFoto, fpTirar:fpTirar });
 
 /* ---- tela "Carteira pelo ERP": situação da última sincronização ---- */
 function renderImpStatus(){
