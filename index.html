@@ -546,6 +546,7 @@ details.mais[open]{padding-bottom:4px}
         </select>
         <span class="mini" id="eq-resumo"></span>
         <button class="btn btn-sm btn-ghost" onclick="gerarResumo(true,this)">↻ Atualizar valores dos vendedores</button>
+        <button class="btn btn-sm admin-only" onclick="abrirMetas()" style="display:none">🎯 Definir metas do mês</button>
       </div>
       <div id="eq-kpis" class="kpis"></div>
       <div class="sect">Por vendedor</div>
@@ -2902,7 +2903,8 @@ function ouvirMetas(){
   var q=U.gestor ? query(collection(db,'comMetas'), where('mes','==',metaMes)) : null;
   if(q) subs.push(onSnapshot(q, function(s){ metas={}; s.docs.forEach(function(d){ var x=d.data()||{}; if(x.uid) metas[x.uid]=x.valor||0; }); render(); },
     function(e){ console.warn('comMetas:', e); }));
-  else subs.push(onSnapshot(doc(db,'comMetas', metaMes+'_'+U.uid), function(s){ metas={}; if(s.exists()) metas[U.uid]=(s.data()||{}).valor||0; render(); },
+  else subs.push(onSnapshot(query(collection(db,'comMetas'), where('uid','==',U.uid), where('mes','==',metaMes)),
+    function(s){ metas={}; s.docs.forEach(function(d){ metas[U.uid]=(d.data()||{}).valor||0; }); render(); },
     function(e){ console.warn('comMetas:', e); }));
 }
 /* dias de venda que faltam no mês, contando hoje (segunda a sábado) */
@@ -2918,13 +2920,49 @@ function vendidoNoMes(uid){
 }
 function metaCardHtml(){
   var meta=metas[U.uid]; if(!meta) return '';
-  var v=vendidoNoMes(U.uid); if(v==null) return '';
+  var v=vendidoNoMes(U.uid);
+  if(v==null) return '<div class="card meta-card"><div class="klabel">Meta de '+nomeMes(mesCorrente())+'</div>'
+    +'<div class="kval">'+fmtRS0(meta)+'</div><div class="khint">O valor vendido aparece aqui quando o resumo de vendas for atualizado (acontece quando a diretoria ou um gerente abre o app).</div></div>';
+  var quando=(!U.gestor && fatVend && fatVend.atualizadoEm) ? ' · valores de '+fmtQuando(fatVend.atualizadoEm) : '';
   var pct=Math.round(v/meta*100), falta=Math.max(0, meta-v), dias=diasUteisRestantes();
   return '<div class="card meta-card"><div class="meta-top"><div><div class="klabel">Meta de '+nomeMes(mesCorrente())+'</div>'
     +'<div class="kval">'+fmtRS0(v)+' <span class="mini" style="font-weight:600">de '+fmtRS0(meta)+'</span></div></div>'
     +'<div class="meta-pct" style="color:'+(pct>=100?'var(--green)':'var(--text)')+'">'+pct+'%</div></div>'
     +'<div class="barra" style="height:10px;margin:10px 0 8px"><i style="width:'+Math.min(100,pct)+'%;background:'+(pct>=100?'var(--green)':'var(--primary)')+'"></i></div>'
-    +'<div class="khint">'+(falta ? 'Faltam <b>'+fmtRS0(falta)+'</b> · '+(dias?'<b>'+fmtRS0(falta/dias)+'</b> por dia de venda ('+dias+' dia'+(dias>1?'s':'')+', seg a sáb)':'último dia do mês') : 'Meta batida. 🎉')+'</div></div>';
+    +'<div class="khint">'+(falta ? 'Faltam <b>'+fmtRS0(falta)+'</b> · '+(dias?'<b>'+fmtRS0(falta/dias)+'</b> por dia de venda ('+dias+' dia'+(dias>1?'s':'')+', seg a sáb)':'último dia do mês') : 'Meta batida. 🎉')+quando+'</div></div>';
+}
+/* metas de todos os vendedores do mês, numa tela só */
+function abrirMetas(){
+  if(!U.admin) return;
+  var V={}, vd=vendasPorRep(), mA=mesCorrente(), mAnt=somaDias(mA+'-01', -1).slice(0,7);
+  clientes.forEach(function(c){ if(c.donoUid && c.situacao!=='inativo') V[c.donoUid]=V[c.donoUid]||c.donoNome||'—'; });
+  if(vd) Object.keys(vd.por).forEach(function(u){ V[u]=V[u]||vd.nomes[u]||'—'; });
+  Object.keys(metas).forEach(function(u){ V[u]=V[u]||'—'; });
+  var ids=Object.keys(V).sort(function(a,b){ return String(V[a]).localeCompare(String(V[b]),'pt-BR'); });
+  if(!ids.length){ toast('Nenhum vendedor com carteira ainda.', true); return; }
+  var corpo='<p class="mini" style="margin-top:0">Cada vendedor vê só a própria meta, no início do app, com o quanto já vendeu e quanto falta por dia. Deixe em branco quem não tem meta.</p>'
+    +'<div class="tscroll" style="max-height:56vh"><table class="tb"><tr><th>Vendedor</th><th class="r">Vendeu em '+nomeMes(mAnt)+'</th><th class="r">Vendido em '+nomeMes(mA)+'</th><th class="r" style="width:150px">Meta de '+nomeMes(mA)+' (R$)</th></tr>'
+    +ids.map(function(u){ var semLogin=String(u).indexOf('erp:')===0, pv=vd&&vd.por[u]||{};
+      return '<tr><td><b>'+esc(V[u])+'</b>'+(semLogin?' <span class="mini">sem login (não vê a meta)</span>':'')+'</td>'
+        +'<td class="r">'+(pv[mAnt]?fmtRS0(pv[mAnt]):'<span class="mini">—</span>')+'</td><td class="r">'+(pv[mA]?fmtRS0(pv[mA]):'<span class="mini">—</span>')+'</td>'
+        +'<td class="r"><input type="text" inputmode="decimal" data-u="'+esc(u)+'" data-n="'+esc(V[u])+'" value="'+(metas[u]?String(metas[u]).replace('.',','):'')+'" style="text-align:right;padding:7px 10px"></td></tr>'; }).join('')
+    +'</table></div>';
+  abrirModal({ titulo:'Metas de '+nomeMes(mA), wide:true, corpo:corpo,
+    botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Salvar metas', fn:salvarMetas }] });
+}
+function salvarMetas(el){
+  var mA=mesCorrente(), b=writeBatch(db), n=0, ruim='';
+  document.querySelectorAll('.mbody input[data-u]').forEach(function(i){
+    var u=i.getAttribute('data-u'), t=i.value.trim(), v=t?numBR(t):0;
+    if(t && (v==null || v<0)){ ruim=i.getAttribute('data-n'); return; }
+    if((v||0)===(metas[u]||0)) return;
+    b.set(doc(db,'comMetas', mA+'_'+u), { mes:mA, uid:u, nome:i.getAttribute('data-n'), valor:v||0, atualizadoEm:agoraISO(), por:U.email }); n++;
+  });
+  if(ruim){ toast('Valor inválido na meta de '+ruim+'.', true); return; }
+  if(!n){ fecharModal(); return; }
+  var pare=ocupado(el);
+  b.commit().then(function(){ toast(n+' meta'+(n>1?'s':'')+' salva'+(n>1?'s':'')+'.'); fecharModal(); })
+    .catch(function(e){ pare(); falha('salvar as metas')(e); });
 }
 function editarMeta(uid, nome){
   if(!U.admin) return;
@@ -3318,7 +3356,7 @@ function gravarFichas(el){
     .then(function(){ toast(feitas+' ficha'+(feitas===1?'':'s')+' gravada'+(feitas===1?'':'s')+'.'); fecharModal(); })
     .catch(function(e){ pare(); falha('gravar as fichas ('+feitas+' gravadas)')(e); });
 }
-Object.assign(window, { editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome, alternarSemVinc:alternarSemVinc });
+Object.assign(window, { abrirMetas:abrirMetas, editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome, alternarSemVinc:alternarSemVinc });
 
 /* =====================================================================
    CATÁLOGO — vem do PDF oficial, convertido em catalogo.json (mesmo
