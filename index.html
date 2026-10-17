@@ -574,6 +574,7 @@ details.mais[open]{padding-bottom:4px}
         <input type="search" placeholder="Buscar produto, peso, código de barras…" oninput="setFichaBusca(this.value)">
         <select id="prod-linha" onchange="renderProdutos()"></select>
         <button class="btn btn-sm btn-ghost" id="cat-ocultos" style="display:none" onclick="alternarOcultos()"></button>
+        <button class="btn btn-sm btn-ghost" id="fic-semvinc" style="display:none" onclick="alternarSemVinc()"></button>
         <button class="btn btn-sm" id="cat-share" onclick="compartilharCatalogo(this)">⤴ Compartilhar o catálogo</button>
         <label class="btn btn-sm" id="prod-imp" style="display:none;cursor:pointer">⇪ Importar fichas (.docx)
           <input type="file" accept=".docx" multiple style="display:none" onchange="importarFichas(this)"></label>
@@ -2826,6 +2827,7 @@ function renderProdutos(){
   $('prod-linha').style.display=abaProd==='catalogo'?'':'none';
   $('cat-share').style.display=abaProd==='catalogo'?'':'none';
   if(abaProd!=='catalogo') $('cat-ocultos').style.display='none';
+  if(abaProd!=='fichas') $('fic-semvinc').style.display='none';
   $('ptit').textContent=abaProd==='catalogo'?'Catálogo':'Fichas técnicas';
   document.querySelectorAll('#sub-prod .navsub').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-a')===abaProd); });
   var nCat=catalogo?catalogo.produtos.filter(function(p){ return !produtoOculto(p); }).length:0;
@@ -2835,7 +2837,11 @@ function renderProdutos(){
   if(!catalogo) carregarCatalogo();          /* as fotos das fichas vêm do catálogo */
   if(!fichasLidas){ box.innerHTML='<div class="empty">Carregando…</div>'; return; }
   var q=norm(fichaBusca).split(' ').filter(Boolean);
-  var l=fichas.filter(function(f){ var t=norm([f.nome,f.ean,f.peso,f.ingredientes].join(' ')); return q.every(function(x){ return t.indexOf(x)>=0; }); });
+  /* diretoria: atalho para as fichas que ainda não acharam o produto do catálogo */
+  var semVinc=catalogo ? fichas.filter(function(f){ return !produtoDaFicha(f); }).length : 0, bsv=$('fic-semvinc');
+  bsv.style.display=(U.admin && (semVinc || soSemVinc))?'':'none'; bsv.textContent=soSemVinc?'Mostrar todas':'Sem produto do catálogo ('+semVinc+')';
+  var l=fichas.filter(function(f){ if(soSemVinc && catalogo && produtoDaFicha(f)) return false;
+    var t=norm([f.nome,f.ean,f.peso,f.ingredientes].join(' ')); return q.every(function(x){ return t.indexOf(x)>=0; }); });
   $('psub').textContent=fichas.length+' produto'+(fichas.length===1?'':'s')+' com ficha técnica';
   box.innerHTML=l.length ? '<div class="prod-grade">'+l.map(function(f){
       var foto=fotoFicha(f);
@@ -2844,6 +2850,8 @@ function renderProdutos(){
     : '<div class="empty">'+(fichas.length?'Nenhum produto com esse nome.':(U.admin?'Nenhuma ficha ainda. Use <b>Importar fichas (.docx)</b>.':'Nenhuma ficha técnica cadastrada ainda.'))+'</div>';
 }
 function setFichaBusca(v){ fichaBusca=v; renderProdutos(); }
+var soSemVinc=false;
+function alternarSemVinc(){ soSemVinc=!soSemVinc; renderProdutos(); }
 function fichaTexto(f){
   var L=[f.nome+(f.peso?' — '+f.peso:'')];
   if(f.ean) L.push('Código de barras: '+f.ean);
@@ -2857,8 +2865,10 @@ function fichaTexto(f){
 function verFicha(id){
   var f=fichas.filter(function(x){ return x.id===id; })[0]; if(!f) return;
   var n=f.nutri||{}, corpo='';
-  var foto=fotoFicha(f);
+  var foto=fotoFicha(f), pc=produtoDaFicha(f);
   if(foto) corpo+='<img src="'+foto+'" class="ficha-img" onclick="zoom(this.src)">';
+  if(U.admin) corpo+='<div class="vinc" style="margin-bottom:13px"><span>🔗</span><b>'+(pc?'Catálogo: '+esc(pc.nome)+'<span class="vinc-sub"><small>'+(f.catalogoChave?'vinculado à mão':'achado pelo nome')+'</small></span>':'Sem produto do catálogo<span class="vinc-sub"><small>a foto e o selo no catálogo dependem desse vínculo</small></span>')+'</b>'
+    +'<button type="button" class="btn btn-sm btn-ghost" onclick="abrirVinculo(\''+f.id+'\')">'+(pc?'Trocar':'Vincular')+'</button></div>';
   corpo+='<div class="det"><div><span>'+(f.pesoUn?'Peso do pacote':'Peso')+'</span><b>'+esc(f.peso||'—')+'</b></div>'
     +(f.pesoUn?'<div><span>Peso unitário</span><b>'+esc(f.pesoUn)+'</b></div>':'')
     +'<div><span>Código de barras</span><b class="mono">'+esc(f.ean||'—')+'</b></div>'
@@ -3079,12 +3089,12 @@ function gravarFichas(el){
             nutri:f.nutri ? { porcoes:f.nutri.porcoes||'', cab:f.nutri.cab||null, nota:f.nutri.nota||'',
                               linhas:(f.nutri.linhas||[]).map(function(r){ return { c:r }; }) } : null,
             arquivo:f.arquivo||'', atualizadoEm:agora, atualizadoPor:U.email };
-    return setDoc(doc(db,'comFichas', idFicha(f)), d).then(function(){ feitas++; });
+    return setDoc(doc(db,'comFichas', idFicha(f)), d, { merge:true })       /* merge: importar de novo não apaga o vínculo feito à mão */.then(function(){ feitas++; });
   }); }, Promise.resolve())
     .then(function(){ toast(feitas+' ficha'+(feitas===1?'':'s')+' gravada'+(feitas===1?'':'s')+'.'); fecharModal(); })
     .catch(function(e){ pare(); falha('gravar as fichas ('+feitas+' gravadas)')(e); });
 }
-Object.assign(window, { editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome });
+Object.assign(window, { editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome, alternarSemVinc:alternarSemVinc });
 
 /* =====================================================================
    CATÁLOGO — vem do PDF oficial, convertido em catalogo.json (mesmo
@@ -3098,6 +3108,12 @@ function chaveProduto(n){ return normEmp(n).split(' ').filter(function(w){ retur
 /* foto da ficha técnica: a do catálogo, para todo o app usar a mesma; sem par no catálogo, a do Word */
 function produtoDaFicha(f){
   if(!catalogo || !f) return null;
+  var ps=catalogo.produtos||[];
+  /* vínculo feito à mão pela diretoria vale acima de qualquer comparação */
+  if(f.catalogoChave){ var m=ps.filter(function(p){ return chaveCat(p)===f.catalogoChave; })[0]; if(m) return m; }
+  return produtoAuto(f);
+}
+function produtoAuto(f){
   var ps=catalogo.produtos||[], k=chaveProduto(f.nome);
   var exato=ps.filter(function(p){ return chaveProduto(p.nome)===k; })[0]; if(exato) return exato;
   /* sem par exato: o nome do catálogo inteiro dentro do nome da ficha ("PÃO BRIOCHE 500G" → "BRIOCHE");
@@ -3105,7 +3121,12 @@ function produtoDaFicha(f){
   var fk=k.split(' ').filter(function(w){ return !/^\d{3,}$/.test(w); }), fs={}; fk.forEach(function(w){ fs[w]=1; });
   var cand=ps.map(function(p){ var t=chaveProduto(p.nome).split(' '); return { p:p, t:t, ok:t.length && t.every(function(w){ return fs[w]; }) }; })
     .filter(function(x){ return x.ok; });
-  if(!cand.length) return null;
+  if(!cand.length){
+    /* o contrário: a ficha inteira dentro do nome do catálogo ("BOLINHA DE AIPIM COM CALABRESA"
+       → "MINI BOLINHA DE AIPIM C/ CALABRESA"), só se for um único produto */
+    var inv=ps.filter(function(p){ var t={}; chaveProduto(p.nome).split(' ').forEach(function(w){ t[w]=1; }); return fk.length && fk.every(function(w){ return t[w]; }); });
+    return inv.length===1 ? inv[0] : null;
+  }
   var max=Math.max.apply(null, cand.map(function(x){ return x.t.length; }));
   cand=cand.filter(function(x){ return x.t.length===max; });
   if(cand.length>1){ var pu=norm(f.pesoUn||f.peso||''); var porPeso=cand.filter(function(x){ return pu && pu.indexOf(norm(x.p.pesoUn))===0; }); if(porPeso.length===1) return porPeso[0].p; return null; }
@@ -3119,9 +3140,55 @@ function carregarCatalogo(){
     .then(function(j){ catalogo=j; catLendo=false; if(pagina==='produtos') renderProdutos(); })
     .catch(function(e){ catLendo=false; catErro=e.message||String(e); if(pagina==='produtos') renderProdutos(); });
 }
+/* ficha de cada produto do catálogo: calculado uma vez (são ~130 × ~130 comparações) */
+var mapaFichas=null, mapaFichasDe=null;
 function fichaDoProduto(p){
-  var k=chaveProduto(p.nome);
-  return fichas.filter(function(f){ return chaveProduto(f.nome)===k; })[0] || null;
+  if(!catalogo) return null;
+  if(!mapaFichas || mapaFichasDe!==fichas){
+    mapaFichas={}; mapaFichasDe=fichas;
+    fichas.forEach(function(f){ if(f.catalogoChave){ mapaFichas[f.catalogoChave]=f; } });           /* manuais primeiro */
+    fichas.forEach(function(f){ if(f.catalogoChave) return; var q=produtoAuto(f); if(q){ var k=chaveCat(q); if(!mapaFichas[k]) mapaFichas[k]=f; } });
+  }
+  return mapaFichas[chaveCat(p)] || null;
+}
+
+/* ---- vincular à mão uma ficha a um produto do catálogo (só a diretoria) ---- */
+var vincFicha=null;
+function abrirVinculo(fid){
+  if(!U.admin) return;
+  var f=fichas.filter(function(x){ return x.id===fid; })[0]; if(!f) return;
+  if(!catalogo){ carregarCatalogo(); toast('Carregando o catálogo… tente de novo em instantes.'); return; }
+  vincFicha=f;
+  var atual=produtoDaFicha(f);
+  abrirModal({ titulo:'Vincular ao catálogo', sub:esc(f.nome), wide:true,
+    corpo:'<div class="mini" style="margin-bottom:10px">'+(atual?'Hoje: <b>'+esc(atual.nome)+'</b>'+(f.catalogoChave?' (vinculado à mão)':' (achado pelo nome)'):'Hoje: sem produto do catálogo')+'. Escolha o produto certo — a foto e o selo "ficha técnica" passam a usar ele.</div>'
+      +'<input type="search" id="vinc-q" placeholder="Buscar no catálogo…" oninput="pintarVinculo()" autocomplete="off" value="'+esc(f.nome.split(' ').slice(0,2).join(' '))+'">'
+      +'<div id="vinc-res" class="prod-grade" style="margin-top:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))"></div>',
+    botoes:(f.catalogoChave?[{ txt:'Desfazer vínculo manual', cls:'btn-ghost', fn:function(el){ salvarVinculo(null, el); } }]:[])
+      .concat([{ txt:'Voltar', cls:'btn-ghost', fn:function(){ verFicha(f.id); } }]) });
+  pintarVinculo();
+}
+function pintarVinculo(){
+  var box=$('vinc-res'); if(!box || !vincFicha) return;
+  var q=norm($('vinc-q').value).split(' ').filter(Boolean), atual=produtoDaFicha(vincFicha);
+  var l=(catalogo.produtos||[]).filter(function(p){ var t=norm(p.nome+' '+p.linha); return q.every(function(x){ return t.indexOf(x)>=0; }); }).slice(0,60);
+  box.innerHTML=l.length ? l.map(function(p){
+    var on=atual && chaveCat(atual)===chaveCat(p);
+    return '<div class="prod" style="'+(on?'border-color:var(--primary);box-shadow:0 0 0 2px var(--primary)':'')+'" onclick="escolherVinculo('+p.ordem+',this)"><img src="'+p.img+'" alt="" loading="lazy">'
+      +'<div class="prod-c"><b>'+esc(p.nome)+'</b><span>'+esc(p.pesoUn+' · '+p.linha)+'</span></div></div>'; }).join('')
+    : '<div class="empty" style="grid-column:1/-1">Nenhum produto com esse nome.</div>';
+}
+function escolherVinculo(ordem, el){
+  var p=(catalogo.produtos||[]).filter(function(x){ return x.ordem===ordem; })[0]; if(!p) return;
+  salvarVinculo(p, null);
+}
+function salvarVinculo(p, el){
+  var f=vincFicha; if(!f || !U.admin) return;
+  var pare=el?ocupado(el,'Salvando…'):function(){};
+  updateDoc(doc(db,'comFichas',f.id), { catalogoChave:p?chaveCat(p):'', atualizadoEm:agoraISO(), atualizadoPor:U.email })
+    .then(function(){ f.catalogoChave=p?chaveCat(p):''; mapaFichas=null; delete pdfFichaPronto[f.id];
+      toast(p?'Ficha ligada a '+p.nome+'.':'Vínculo manual desfeito.'); verFicha(f.id); })
+    .catch(function(e){ pare(); falha('vincular a ficha')(e); });
 }
 function setAbaProd(a){ abaProd=a; renderProdutos(); }
 function navProd(a){ abaProd=a||abaProd||'catalogo'; if(pagina!=='produtos') nav('produtos'); else renderProdutos(); }
@@ -3223,7 +3290,8 @@ function excluirFicha(f, el){
   deleteDoc(doc(db,'comFichas',f.id)).then(function(){ toast('Ficha excluída.'); fecharModal(); })
     .catch(function(e){ pare(); falha('excluir a ficha')(e); });
 }
-Object.assign(window, { setAbaProd:setAbaProd, verProduto:verProduto, renderProdutos:renderProdutos, navProd:navProd, compartilharCatalogo:compartilharCatalogo, alternarOcultos:alternarOcultos });
+Object.assign(window, { abrirVinculo:abrirVinculo, pintarVinculo:pintarVinculo, escolherVinculo:escolherVinculo,
+  setAbaProd:setAbaProd, verProduto:verProduto, renderProdutos:renderProdutos, navProd:navProd, compartilharCatalogo:compartilharCatalogo, alternarOcultos:alternarOcultos });
 
 /* =====================================================================
    FICHA TÉCNICA EM PDF — é assim que ela sai do app: arquivo fechado,
