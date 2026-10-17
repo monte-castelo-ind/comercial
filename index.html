@@ -2354,23 +2354,20 @@ function queda(c){
 var resumoRodando=false;
 function autoResumo(){
   if(!U.gestor || !fatErp || !clientesOk || resumoMeta===null || resumoMeta.erro || resumoRodando) return;
-  var t=Date.parse(resumoMeta.atualizadoEm||''); if(t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===3) return;
+  var t=Date.parse(resumoMeta.atualizadoEm||''); if(t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===4) return;
   gerarResumo(false);
 }
 function gerarResumo(manual, el){
   if(!U.gestor) return;
   if(!fatErp){ if(manual) toast(fatErp===false?'Sem acesso ao faturamento do ERP.':'O faturamento ainda está carregando.', true); return; }
   resumoRodando=true;
-  var por={}, prodPor={}, ult2=fatMeses.slice(-2);
+  var por={}, prodPor={}, m90=meses90(fatMeses);
   clientes.forEach(function(c){
     if(!c.donoUid) return;
     por[c.donoUid]=por[c.donoUid]||{}; prodPor[c.donoUid]=prodPor[c.donoUid]||{};
-    /* produtos dos 2 últimos meses (até 15 por mês, os de maior valor) */
-    var pr=prodDe(c);
-    if(pr){ var o={}; ult2.forEach(function(m){ var x=pr[m]||{};
-      var top=Object.keys(x).sort(function(a,b){ return (x[b][0]||0)-(x[a][0]||0); }).slice(0,15);
-      if(top.length){ o[m]={}; top.forEach(function(p){ o[m][p]=[Math.round((x[p][0]||0)*100)/100, x[p][1]||0]; }); } });
-      if(Object.keys(o).length) prodPor[c.donoUid][c.id]=o; }
+    /* compras dos últimos 90 dias: por produto, valor e quantidade somados e o último mês em que comprou */
+    var cp=somaCompras(prodDe(c), m90);
+    if(cp.length){ var o={}; cp.forEach(function(x){ o[x.p]=[Math.round(x.v*100)/100, Math.round(x.q*100)/100, x.ult]; }); prodPor[c.donoUid][c.id]=o; }
     var f=fatDe(c); if(!f) return;
     var a=fatMeses.map(function(m){ return Math.round((f[m]||0)*100)/100; });
     if(a.some(function(x){ return x; })) por[c.donoUid][c.id]=a;
@@ -2382,9 +2379,14 @@ function gerarResumo(manual, el){
   var uids=Object.keys(por);
   ((resumoMeta&&resumoMeta.uids)||[]).forEach(function(u){ if(uids.indexOf(u)<0){ uids.push(u); por[u]={}; } });   /* carteira que esvaziou */
   var agora=agoraISO(), b=writeBatch(db);
-  uids.forEach(function(u){ b.set(doc(db,'comVendResumo',u), { meses:fatMeses, cli:por[u], prod:prodPor[u]||{}, sug:sug[u]||{},
-    vendido:(vd&&vd.por[u])||{}, atualizadoEm:agora, por:U.email, versao:3 }); });
-  b.set(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:3 });
+  var cortados=0;
+  uids.forEach(function(u){
+    var d={ meses:fatMeses, cli:por[u], m90:m90, c90:prodPor[u]||{}, sug:sug[u]||{},
+            vendido:(vd&&vd.por[u])||{}, atualizadoEm:agora, por:U.email, versao:4 };
+    if(caberNoDoc(d)) cortados++;
+    b.set(doc(db,'comVendResumo',u), d); });
+  if(cortados) console.warn('resumo: '+cortados+' carteira(s) grandes — compras limitadas aos produtos de maior valor');
+  b.set(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:4 });
   var pare=el?ocupado(el,'Atualizando…'):function(){};
   b.commit().then(function(){ resumoRodando=false; pare(); if(manual) toast('Valores atualizados para '+uids.length+' vendedor'+(uids.length===1?'':'es')+'.'); })
     .catch(function(e){ resumoRodando=false; pare(); if(manual) falha('atualizar os valores dos vendedores')(e); else console.warn('resumo:', e); });
@@ -2732,22 +2734,51 @@ function prodDe(c){
   for(var i=0;i<ns.length;i++) if(prodErp[ns[i]]) return prodErp[ns[i]];
   return null;
 }
+/* Os últimos 90 dias, no que o ERP permite: o robô soma por MÊS, então entram
+   os meses que cobrem os 90 dias (o primeiro deles inteiro) até hoje. */
+function meses90(ms){ var ini=somaDias(hoje(), -89).slice(0,7); return (ms||[]).filter(function(m){ return m>=ini; }); }
+function somaCompras(pr, ms){
+  if(!pr) return [];
+  var t={};
+  ms.forEach(function(m, i){ var x=pr[m]||{};
+    Object.keys(x).forEach(function(p){ var a=x[p], v=Array.isArray(a)?(a[0]||0):(a||0), q=Array.isArray(a)?(a[1]||0):0;
+      var o=t[p]=t[p]||{ p:p, v:0, q:0, ult:-1 }; o.v+=v; o.q+=q; if(v||q) o.ult=Math.max(o.ult, i); }); });
+  return Object.keys(t).map(function(k){ return t[k]; }).filter(function(o){ return o.v||o.q; })
+    .sort(function(a,b){ return b.v-a.v; });
+}
+/* o documento do vendedor tem limite de 1 MB: carteira muito grande guarda só os produtos de maior valor */
+function caberNoDoc(d){
+  var tam=function(){ return JSON.stringify(d).length; };
+  if(tam()<850000) return false;
+  [40,25,15,10,6].some(function(k){
+    Object.keys(d.c90).forEach(function(cid){ var o=d.c90[cid], ks=Object.keys(o);
+      if(ks.length>k){ var n={}; ks.sort(function(a,b){ return (o[b][0]||0)-(o[a][0]||0); }).slice(0,k).forEach(function(p){ n[p]=o[p]; }); d.c90[cid]=n; } });
+    return tam()<850000; });
+  d.cortado=true; return true;
+}
+function compras90(c){
+  if(U.gestor){ var ms=meses90(fatMeses); return { meses:ms, l:fatErp ? somaCompras(prodDe(c), ms) : null }; }
+  if(!fatVend || !fatVend.c90) return { meses:[], l:null };
+  var o=fatVend.c90[c.id]||{}, mv=fatVend.m90||[];
+  return { meses:mv, l:Object.keys(o).map(function(p){ var a=o[p]; return { p:p, v:a[0]||0, q:a[1]||0, ult:a[2] }; })
+    .sort(function(a,b){ return b.v-a.v; }), cortado:!!fatVend.cortado };
+}
 function comprasRecentesHtml(c){
-  var ms=mesesFat().slice(-2); if(ms.length<2 || c.situacao==='prospect') return '';
-  var pr=U.gestor ? prodDe(c) : (fatVend && fatVend.prod && fatVend.prod[c.id]);
-  var tit='<div class="det-sec">Compras recentes <span class="mini" style="text-transform:none;letter-spacing:0">'+nomeMes(ms[0])+' e '+nomeMes(ms[1])+' até hoje · principais produtos</span></div>';
-  if(!pr) return c.erpId ? tit+'<div class="mini" style="margin-bottom:13px">'+((U.gestor&&!fatErp)||(!U.gestor&&!fatVend)?'Carregando…':'Sem compras nesses dois meses.')+'</div>' : '';
-  var nomes={}; ms.forEach(function(m){ Object.keys(pr[m]||{}).forEach(function(p){ nomes[p]=1; }); });
-  var l=Object.keys(nomes).map(function(p){ var a=(pr[ms[0]]||{})[p]||[0,0], b=(pr[ms[1]]||{})[p]||[0,0]; return { p:p, a:a, b:b, t:(a[0]||0)+(b[0]||0) }; })
-    .sort(function(x,y){ return y.t-x.t; });
-  if(!l.length) return tit+'<div class="mini" style="margin-bottom:13px">Sem compras nesses dois meses.</div>';
-  var q=function(n){ return n ? Math.round(n).toLocaleString('pt-BR') : '<span class="mini">—</span>'; };
-  var v=function(n){ return n ? fmtRS0(n) : '<span class="mini">—</span>'; };
-  var tA=0, tB=0; l.forEach(function(x){ tA+=x.a[0]||0; tB+=x.b[0]||0; });
-  return tit+'<div class="tscroll" style="max-height:300px;margin-bottom:13px"><table class="tb"><tr><th>Produto</th>'
-    +'<th class="r">'+nomeMes(ms[0])+' qtd</th><th class="r">'+nomeMes(ms[0])+' valor</th><th class="r">'+nomeMes(ms[1])+' qtd</th><th class="r">'+nomeMes(ms[1])+' valor</th></tr>'
-    +l.map(function(x){ return '<tr><td>'+esc(x.p)+'</td><td class="r">'+q(x.a[1])+'</td><td class="r">'+v(x.a[0])+'</td><td class="r">'+q(x.b[1])+'</td><td class="r">'+v(x.b[0])+'</td></tr>'; }).join('')
-    +'<tr><td><b>Total</b></td><td></td><td class="r"><b>'+fmtRS0(tA)+'</b></td><td></td><td class="r"><b>'+fmtRS0(tB)+'</b></td></tr></table></div>';
+  if(c.situacao==='prospect') return '';
+  var r=compras90(c), ms=r.meses;
+  var per=ms.length ? nomeMes(ms[0])+' a '+nomeMes(ms[ms.length-1])+' (até hoje)' : '';
+  var tit='<div class="det-sec">Compras dos últimos 90 dias <span class="mini" style="text-transform:none;letter-spacing:0">'+per+'</span></div>';
+  if(!r.l) return !c.erpId ? '' : tit+'<div class="mini" style="margin-bottom:13px">'+(U.gestor
+      ? (fatErp===false?'Sem acesso ao faturamento do ERP.':'Carregando…')
+      : 'Aguardando o resumo de vendas — ele é atualizado quando a diretoria ou um gerente abre o app.')+'</div>';
+  if(!r.l.length) return c.erpId ? tit+'<div class="mini" style="margin-bottom:13px">Sem compras nesse período.</div>' : '';
+  var tv=0, tq=0; r.l.forEach(function(x){ tv+=x.v; tq+=x.q; });
+  var qtd=function(n){ return n ? (Math.round(n*100)/100).toLocaleString('pt-BR') : '<span class="mini">—</span>'; };
+  return tit+'<div class="tscroll" style="max-height:340px;margin-bottom:6px"><table class="tb"><tr><th>Produto</th><th class="r">Quantidade</th><th class="r">Valor</th><th class="r">Última compra</th></tr>'
+    +r.l.map(function(x){ return '<tr><td>'+esc(x.p)+'</td><td class="r">'+qtd(x.q)+'</td><td class="r">'+fmtRS(x.v)+'</td>'
+      +'<td class="r mini">'+(ms[x.ult]?nomeMes(ms[x.ult]):'—')+'</td></tr>'; }).join('')
+    +'<tr><td><b>Total · '+r.l.length+' produto'+(r.l.length===1?'':'s')+'</b></td><td class="r"><b>'+qtd(tq)+'</b></td><td class="r"><b>'+fmtRS(tv)+'</b></td><td></td></tr></table></div>'
+    +'<div class="mini" style="margin-bottom:13px">O ERP soma as vendas por mês: '+(ms.length?nomeMes(ms[0])+' entra inteiro. ':'')+'Mostra os produtos que o robô registra para cada cliente'+(r.cortado?' (nesta carteira, só os de maior valor)':'')+'.</div>';
 }
 
 /* =====================================================================
