@@ -755,7 +755,7 @@ function telLink(t){ var d=String(t||'').replace(/\D/g,''); if(!d) return '';
 /* ---------- modal ---------- */
 var MB=[];
 function abrirModal(o){
-  MB=[];
+  MB=[]; cmAbertoId=null;   /* outra janela por cima: a folha não se redesenha mais */
   var bts=(o.botoes||[]).map(function(b){ MB.push(b.fn); return '<button class="btn '+(b.cls||'')+'" onclick="mbClick('+(MB.length-1)+',this)">'+b.txt+'</button>'; }).join('');
   $('modal-host').innerHTML='<div class="mask" onclick="if(event.target===this)fecharModal()"><div class="modal'+(o.wide?' wide':'')+'">'
     +'<div class="mhead"><div style="min-width:0"><div class="mtitle">'+o.titulo+'</div>'+(o.sub?'<div class="msub">'+o.sub+'</div>':'')+'</div>'
@@ -763,7 +763,7 @@ function abrirModal(o){
     +'<div class="mbody">'+o.corpo+'</div>'
     +(bts?'<div class="mfoot">'+bts+'</div>':'')+'</div></div>';
 }
-function fecharModal(){ $('modal-host').innerHTML=''; MB=[]; }
+function fecharModal(){ $('modal-host').innerHTML=''; MB=[]; cmAbertoId=null; }
 function mbClick(i, el){ var f=MB[i]; if(f) f(el); }
 function ocupado(el, txt){ if(!el) return function(){}; var t=el.innerHTML; el.disabled=true; el.innerHTML=txt||'Salvando…';
   return function(){ el.disabled=false; el.innerHTML=t; }; }
@@ -918,7 +918,7 @@ function ouvir(){
                       : query(collection(db,'comodatoSolicitacoes'), where('solicitadoPor','==',U.email));
       subs.push(onSnapshot(qcm,
         function(s){ cmLista=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); });
-          solFontes.comodato=cmLista.map(cmParaSol); juntarSols(); },
+          solFontes.comodato=cmLista.map(cmParaSol); juntarSols(); cmAtualizarAberto(); },
         function(e){ console.warn('comodatoSolicitacoes:', e); }));
     }
     var cs=collection(db,'comSolicitacoes');
@@ -2235,27 +2235,28 @@ function cmAutDados(sol, solId, valor){
     status:'pendente', criadoPor:sol.solicitadoPor, criadoNome:sol.solicitadoNome, criadoEm:new Date(sol.criadoEm).toISOString(),
     origem:{ app:'comodato', solicitacaoId:solId, cliente:sol.cliente, solicitadoPor:sol.solicitadoPor } };
 }
+/* Detalhe do pedido à manutenção: a MESMA folha do Manut. Comodato, montada
+   pelo arquivo compartilhado folha-solicitacao.js a partir do mesmo documento.
+   Se a manutenção alterar o pedido com a janela aberta, ela se atualiza. */
+var cmAbertoId=null;
 function cmVer(id){
   var x=cmLista.filter(function(c){ return c.id===id; })[0]; if(!x) return;
-  var st=CM_ST[x.status]||'aberta';
-  var lin=function(r,v){ return '<div><span>'+r+'</span><b>'+v+'</b></div>'; };
-  var corpo='<div class="det">'
-    +lin('Situação na manutenção', stTag(st).replace(/>[^<]*</, '>'+esc(CM_ST_NOME[x.status]||x.status)+'<'))
-    +lin('Cliente', esc(x.cliente||'—'))+lin('Equipamento', esc((x.quantidade||1)+'× '+x.equipamento+(x.modelo?' · '+x.modelo:'')))
-    +lin('Serviço', esc(CM_SERV[x.servico]||x.servico||''))+lin('Entrega programada', cmDataBR(x.dataProgramada))
-    +lin('Patrimônio', esc(x.patrimonio||'—'))+lin('Cidade', esc(x.cidade||'—'))+lin('Contato', esc(x.contato||'—'))+'</div>'
-    +(x.endereco?'<div class="det-txt">📍 '+esc(x.endereco)+'</div>':'')
-    +(x.obs?'<div class="det-txt">'+esc(x.obs)+'</div>':'')
-    +(x.obsManut?'<div class="det-txt">↳ Manutenção: '+esc(x.obsManut)+'</div>':'')
-    +(x.novo?'<div class="det-txt">🆕 <b>Equipamento novo</b>'+(x.valorEstimado?' · valor estimado R$ '+Number(x.valorEstimado).toLocaleString('pt-BR',{minimumFractionDigits:2}):'')+' — '
-      +(x.autorizacao&&x.autorizacao.status==='aprovado'?'autorizado por '+esc(x.autorizacao.nome||'')+(x.autorizacao.codigo?' (código '+esc(x.autorizacao.codigo)+')':'')
-        :x.autorizacao&&x.autorizacao.status==='recusado'?'recusado pela diretoria'+(x.autorizacao.motivo?': '+esc(x.autorizacao.motivo):'')
-        :'aguardando a assinatura da diretoria')+'</div>':'')
-    +'<div class="det-sec">Andamento</div><div class="hist">'
-    +(x.historico||[]).map(function(h){ return '<div class="hist-it"><small>'+fmtQuando(h.em?new Date(h.em).toISOString():'')+' · '+esc(h.nome||h.por||'')+'</small><div>'+esc((h.acao||'')+(h.txt?': '+h.txt:''))+'</div></div>'; }).join('')+'</div>';
-  var bts=[{ txt:'Abrir no Manut. Comodato', cls:'btn-ghost', fn:function(){ window.open('https://monte-castelo-ind.github.io/manutencao/','_blank'); } }];
+  var corpo=window.MCSolic ? MCSolic.html(x, { sombra:true })
+    : '<div class="empty">Não foi possível carregar o modelo da folha. Recarregue a página.</div>';
+  var bts=[{ txt:'🖨 Imprimir / PDF', cls:'btn-ghost', fn:function(){ var y=cmLista.filter(function(c){ return c.id===id; })[0]||x; if(window.MCSolic) MCSolic.imprimir(y); else toast('Modelo da folha não carregou. Recarregue a página.', true); } },
+           { txt:'Abrir no Manut. Comodato', cls:'btn-ghost', fn:function(){ window.open('https://monte-castelo-ind.github.io/manutencao/','_blank'); } }];
   if(x.status==='aberta' && x.solicitadoPor===U.email) bts.push({ txt:'Cancelar pedido', cls:'btn-ghost', fn:function(el){ cmCancelar(x,el); } });
-  abrirModal({ titulo:'⚙ '+esc((x.quantidade||1)+'× '+x.equipamento), sub:'Pedido à manutenção por '+esc(x.solicitadoNome||x.solicitadoPor||'')+' · '+fmtQuando(x.criadoEm?new Date(x.criadoEm).toISOString():''), wide:true, corpo:corpo, botoes:bts });
+  var cod=window.MCSolic?MCSolic.codigo(x):'';
+  abrirModal({ titulo:'Solicitação '+esc(cod), sub:stTag(CM_ST[x.status]||'aberta').replace(/>[^<]*</, '>'+esc(CM_ST_NOME[x.status]||x.status)+'<')
+      +' &nbsp;'+esc(x.cliente||'')+' · pedido por '+esc(x.solicitadoNome||x.solicitadoPor||''), wide:true, corpo:corpo, botoes:bts });
+  cmAbertoId=id;
+}
+/* chamado quando chega mudança do banco: redesenha a folha aberta */
+function cmAtualizarAberto(){
+  if(!cmAbertoId) return;
+  var host=$('modal-host'); if(!host || !host.innerHTML){ cmAbertoId=null; return; }
+  if(document.activeElement && host.contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  cmVer(cmAbertoId);
 }
 function cmCancelar(x, el){
   var txt=(prompt('Por que cancelar? (obrigatório)','')||'').trim(); if(!txt){ toast('Cancelamento precisa de motivo.', true); return; }
@@ -3950,6 +3951,7 @@ function compartilharFicha(f, el){
     .catch(function(e){ if(el){ el.disabled=false; el.textContent=t; } console.error(e); toast('Não foi possível gerar o PDF: '+(e.message||e), true); });
 }
 </script>
+<script src="https://monte-castelo-ind.github.io/folha-solicitacao.js?v=1"></script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
 </html>
