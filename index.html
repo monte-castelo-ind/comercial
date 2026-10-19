@@ -911,7 +911,12 @@ function ouvir(){
       function(s){ promos=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); render(); },
       function(e){ console.warn('comPromocoes:', e); }));
     if(U.comodato){
-      subs.push(onSnapshot(query(collection(db,'comodatoSolicitacoes'), where('solicitadoPor','==',U.email)),
+      /* quem vê as solicitações de todos (gerente, chave "Ver as solicitações
+         de todos") vê também todos os pedidos de equipamento à manutenção;
+         os demais, só os que fizeram */
+      var qcm=U.veSol ? query(collection(db,'comodatoSolicitacoes'), orderBy('criadoEm','desc'), limit(300))
+                      : query(collection(db,'comodatoSolicitacoes'), where('solicitadoPor','==',U.email));
+      subs.push(onSnapshot(qcm,
         function(s){ cmLista=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); });
           solFontes.comodato=cmLista.map(cmParaSol); juntarSols(); },
         function(e){ console.warn('comodatoSolicitacoes:', e); }));
@@ -1006,7 +1011,7 @@ function fatDe(c){
 }
 function clientePorId(id){ for(var i=0;i<clientes.length;i++) if(clientes[i].id===id) return clientes[i]; return null; }
 function souDono(x){ return x && x.donoUid===U.uid; }
-function respondo(s){ return meusTipos.indexOf(s.tipo)>=0; }
+function respondo(s){ return !s._cm && meusTipos.indexOf(s.tipo)>=0; }
 
 /* ---------- navegação ---------- */
 var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:['Carteira','Clientes e prospects'],
@@ -2075,7 +2080,8 @@ function cmParaSol(x){
     titulo:(x.quantidade||1)+'× '+x.equipamento+(x.modelo?' · '+x.modelo:''),
     clienteNome:x.cliente||'', clienteCidade:x.cidade||'',
     descricao:(CM_SERV[x.servico]||x.servico||'')+' · entrega '+cmDataBR(x.dataProgramada)+' · Manut. Comodato: '+(CM_ST_NOME[x.status]||x.status),
-    resposta:x.obsManut||'', donoUid:U.uid, donoNome:x.solicitadoNome||'', criadoEm:x.criadoEm?new Date(x.criadoEm).toISOString():'' };
+    resposta:x.obsManut||'', donoUid:(x.solicitadoPor===U.email?U.uid:(x.solicitadoUid||'')), donoNome:x.solicitadoNome||x.solicitadoPor||'',
+    criadoEm:x.criadoEm?new Date(x.criadoEm).toISOString():'' };
 }
 /* endereço completo do ERP (logClientesEndereco): só para quem pode pedir */
 function cmEndCarregar(depois){
@@ -2154,8 +2160,8 @@ function cmVer(id){
     +'<div class="det-sec">Andamento</div><div class="hist">'
     +(x.historico||[]).map(function(h){ return '<div class="hist-it"><small>'+fmtQuando(h.em?new Date(h.em).toISOString():'')+' · '+esc(h.nome||h.por||'')+'</small><div>'+esc((h.acao||'')+(h.txt?': '+h.txt:''))+'</div></div>'; }).join('')+'</div>';
   var bts=[{ txt:'Abrir no Manut. Comodato', cls:'btn-ghost', fn:function(){ window.open('https://monte-castelo-ind.github.io/manutencao/','_blank'); } }];
-  if(x.status==='aberta') bts.push({ txt:'Cancelar pedido', cls:'btn-ghost', fn:function(el){ cmCancelar(x,el); } });
-  abrirModal({ titulo:'⚙ '+esc((x.quantidade||1)+'× '+x.equipamento), sub:'Pedido à manutenção · '+fmtQuando(x.criadoEm?new Date(x.criadoEm).toISOString():''), wide:true, corpo:corpo, botoes:bts });
+  if(x.status==='aberta' && x.solicitadoPor===U.email) bts.push({ txt:'Cancelar pedido', cls:'btn-ghost', fn:function(el){ cmCancelar(x,el); } });
+  abrirModal({ titulo:'⚙ '+esc((x.quantidade||1)+'× '+x.equipamento), sub:'Pedido à manutenção por '+esc(x.solicitadoNome||x.solicitadoPor||'')+' · '+fmtQuando(x.criadoEm?new Date(x.criadoEm).toISOString():''), wide:true, corpo:corpo, botoes:bts });
 }
 function cmCancelar(x, el){
   var txt=(prompt('Por que cancelar? (obrigatório)','')||'').trim(); if(!txt){ toast('Cancelamento precisa de motivo.', true); return; }
