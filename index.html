@@ -669,7 +669,7 @@ const app=initializeApp(cfg), auth=getAuth(app), db=getFirestore(app);
    o vendedor consulta só o que é dele (where donoUid), o gestor consulta tudo.
    ===================================================================== */
 
-var U={ uid:'', email:'', nome:'', admin:false, gestor:false, comercial:false };
+var U={ uid:'', email:'', nome:'', admin:false, gestor:false, comercial:false, comodato:false };
 var CFG={ respondem:{}, diasAlerta:30 }, cfgExiste=false, cfgLido=false;
 var meusTipos=[];                 /* tipos de solicitação que esta pessoa responde */
 var clientes=[], visitas=[], concorrentes=[];
@@ -821,6 +821,9 @@ onAuthStateChanged(auth, async function(u){
   U.admin=(d.role==='admin');
   U.comercial=U.admin || d.comercial===true;
   U.gestor=U.admin || (d.comercial===true && d.comercialGestor===true);
+  /* chave "Pedir equipamento (comercial)": o pedido de equipamento vai direto
+     para o Manut. Comodato (coleção comodatoSolicitacoes) */
+  U.comodato=U.admin || d.comodatoSolicita===true;
   try{ var c=await getDoc(doc(db,'comConfig','app')); cfgExiste=c.exists(); aplicarCfg(c.exists()?c.data():{}); }
   catch(e){ console.warn('comConfig:',e); aplicarCfg({}); }
   if(!U.comercial && !meusTipos.length){ negar('Sua conta não tem acesso ao app Comercial. Fale com a diretoria.'); return; }
@@ -896,6 +899,12 @@ function ouvir(){
                                   : query(collection(db,'comPromocoes'), where('ativa','==',true)),
       function(s){ promos=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); render(); },
       function(e){ console.warn('comPromocoes:', e); }));
+    if(U.comodato){
+      subs.push(onSnapshot(query(collection(db,'comodatoSolicitacoes'), where('solicitadoPor','==',U.email)),
+        function(s){ cmLista=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); });
+          solFontes.comodato=cmLista.map(cmParaSol); juntarSols(); },
+        function(e){ console.warn('comodatoSolicitacoes:', e); }));
+    }
     var cs=collection(db,'comSolicitacoes');
     subs.push(onSnapshot(query(cs, where('donoUid','==',U.uid)),
       function(s){ delete erros.solicitacoes; solFontes.minhas=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); juntarSols(); },
@@ -1931,16 +1940,20 @@ function abrirSolic(tipo, clienteId){
   var corpo='<label>O que você precisa? *</label><div class="tipos-sol" id="fs-tipos">'
     +TIPO_IDS.map(function(t){ return '<button type="button" class="tipo-sol'+(fs.tipo===t?' on':'')+'" onclick="fsTipo(\''+t+'\')">'+TIPOS[t].ico+' '+TIPOS[t].nome+'<small>'+TIPOS[t].dica+'</small></button>'; }).join('')+'</div>'
     +'<div class="fld"><label id="fs-cli-lab">Cliente</label><div id="fs-cli"></div></div>'
-    +'<div class="fld"><label>Assunto *</label><input type="text" id="fs-tit" maxlength="120" placeholder="Resumo em uma linha"></div>'
+    +'<div class="fld" id="fs-tit-w"><label>Assunto *</label><input type="text" id="fs-tit" maxlength="120" placeholder="Resumo em uma linha"></div>'
     +'<div id="fs-campos"></div>'
-    +'<div class="fld"><label>Detalhes</label><textarea id="fs-desc" placeholder="Explique o pedido e o motivo"></textarea></div>';
+    +'<div class="fld" id="fs-desc-w"><label>Detalhes</label><textarea id="fs-desc" placeholder="Explique o pedido e o motivo"></textarea></div>';
   abrirModal({ titulo:'Nova solicitação', wide:true, corpo:corpo,
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Enviar', fn:salvarSolic }] });
-  pkMontar('fs-cli', { sel:pkSelDeCliente(clienteId?clientePorId(clienteId):null), ph:'Nome do cliente (carteira ou ERP)…' });
+  pkMontar('fs-cli', { sel:pkSelDeCliente(clienteId?clientePorId(clienteId):null), ph:'Nome do cliente (carteira ou ERP)…', onSel:fsCliMudou });
   fsPintarCampos();
 }
 function fsTipo(t){ fs.tipo=t; document.querySelectorAll('#fs-tipos .tipo-sol').forEach(function(b,i){ b.classList.toggle('on', TIPO_IDS[i]===t); }); fsPintarCampos(); }
 function fsPintarCampos(){
+  var paraComodato=(fs.tipo==='equipamento' && U.comodato);
+  if($('fs-tit-w')) $('fs-tit-w').style.display=paraComodato?'none':'';
+  if($('fs-desc-w')) $('fs-desc-w').style.display=paraComodato?'none':'';
+  if(paraComodato){ cmPintarCampos(); return; }
   var lab=$('fs-cli-lab'); if(lab) lab.innerHTML=fs.tipo==='equipamento' ? 'Cliente * <span class="mini">— obrigatório para equipamento</span>' : 'Cliente <span class="mini">(opcional)</span>';
   var box=$('fs-campos'); if(!box) return;
   var t=TIPOS[fs.tipo]; if(!t||!t.campos.length){ box.innerHTML=''; return; }
@@ -1948,6 +1961,7 @@ function fsPintarCampos(){
 }
 function salvarSolic(el){
   if(!fs.tipo){ toast('Escolha o tipo da solicitação.', true); return; }
+  if(fs.tipo==='equipamento' && U.comodato){ cmSalvar(el); return; }
   var sel=PK['fs-cli']&&PK['fs-cli'].sel;
   if(fs.tipo==='equipamento' && !sel){ toast('Para equipamento, escolha o cliente.', true); var q=$('fs-cli-q'); if(q) q.focus(); return; }
   var tit=$('fs-tit').value.trim();
@@ -1969,6 +1983,7 @@ function salvarSolic(el){
 function solPorId(id){ for(var i=0;i<sols.length;i++) if(sols[i].id===id) return sols[i]; return null; }
 function verSolic(id){
   var s=solPorId(id); if(!s) return;
+  if(s._cm){ cmVer(s._cm); return; }
   var t=TIPOS[s.tipo]||{nome:s.tipo,campos:[],fim:['concluida','recusada'],ico:''};
   var aberta=ABERTAS.includes(s.status), resp=respondo(s) && aberta, dono=souDono(s);
   var corpo='<div class="det"><div><span>Tipo</span><b>'+esc(t.nome)+'</b></div><div><span>Situação</span><b>'+stTag(s.status)+'</b></div>'
@@ -2028,6 +2043,118 @@ function cancelarSolic(s, el){
     .then(function(){ toast('Solicitação cancelada.'); fecharModal(); })
     .catch(function(e){ pare(); falha('cancelar')(e); });
 }
+
+/* =====================================================================
+   EQUIPAMENTO → MANUT. COMODATO
+   Quem tem a chave "Pedir equipamento (comercial)" (e a diretoria) pede
+   direto à manutenção: grava em comodatoSolicitacoes, com os MESMOS campos
+   do formulário do Manut. Comodato, e acompanha aqui em Solicitações.
+   Os demais vendedores seguem o caminho de antes (pedido para quem
+   responde equipamento, em comSolicitacoes).
+   ===================================================================== */
+var CM_TIPOS=['Forno','Padeiro Noturno','Esqueleto','Armário','Freezer','Esteira','Lata','Fritadeira','Mini Câmara Fria'];
+var CM_SERV={ entregar:'Entregar / instalar', retirar:'Retirar', trocar:'Trocar', consertar:'Consertar no cliente' };
+var CM_ST={ aberta:'aberta', separacao:'andamento', entregue:'concluida', cancelada:'cancelada' };
+var CM_ST_NOME={ aberta:'Aberta', separacao:'Em separação', entregue:'Entregue', cancelada:'Cancelada' };
+var cmLista=[], cmEnd=null, cmEndLendo=false;
+function cmDataBR(ymd){ if(!ymd) return '—'; var p=String(ymd).slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+/* pedido do Comodato no formato da lista de solicitações daqui */
+function cmParaSol(x){
+  return { id:'cm_'+x.id, _cm:x.id, tipo:'equipamento', status:CM_ST[x.status]||'aberta',
+    titulo:(x.quantidade||1)+'× '+x.equipamento+(x.modelo?' · '+x.modelo:''),
+    clienteNome:x.cliente||'', clienteCidade:x.cidade||'',
+    descricao:(CM_SERV[x.servico]||x.servico||'')+' · entrega '+cmDataBR(x.dataProgramada)+' · Manut. Comodato: '+(CM_ST_NOME[x.status]||x.status),
+    resposta:x.obsManut||'', donoUid:U.uid, donoNome:x.solicitadoNome||'', criadoEm:x.criadoEm?new Date(x.criadoEm).toISOString():'' };
+}
+/* endereço completo do ERP (logClientesEndereco): só para quem pode pedir */
+function cmEndCarregar(depois){
+  if(cmEnd){ depois&&depois(); return; } if(cmEndLendo) return; cmEndLendo=true;
+  getDocs(collection(db,'logClientesEndereco')).then(function(r){
+    var m={}; r.docs.forEach(function(d){ var cl=(d.data()||{}).clientes||{}; Object.keys(cl).forEach(function(k){ m[k]=cl[k]; }); });
+    cmEnd=m; cmEndLendo=false; depois&&depois();
+  }).catch(function(e){ console.warn('logClientesEndereco:', e); cmEnd={}; cmEndLendo=false; depois&&depois(); });
+}
+function cmEndDe(sel){
+  if(!sel) return '';
+  var a=(sel.erpId && cmEnd) ? cmEnd[sel.erpId] : null;
+  if(a){ var cep=String(a.cep||'').replace(/\D/g,''); if(cep.length===8) cep=cep.slice(0,5)+'-'+cep.slice(5);
+    return [a.end, a.bairro, [a.cidade||sel.cidade, a.uf].filter(Boolean).join('/'), cep].filter(Boolean).join(' · '); }
+  return pkEnd(sel);
+}
+function cmEndLinha(sel){ var t=cmEndDe(sel); return t ? '📍 Endereço para entrega: '+t : ''; }
+function cmPintarCampos(){
+  var lab=$('fs-cli-lab'); if(lab) lab.innerHTML='Cliente * <span class="mini">— carteira ou ERP</span>';
+  var box=$('fs-campos'); if(!box) return;
+  var sel=PK['fs-cli']&&PK['fs-cli'].sel;
+  var opT='<option value="">Escolha…</option>'+CM_TIPOS.map(function(t){ return '<option>'+esc(t)+'</option>'; }).join('')+'<option value="__outro">Outro…</option>';
+  var opS=Object.keys(CM_SERV).map(function(k){ return '<option value="'+k+'">'+CM_SERV[k]+'</option>'; }).join('');
+  box.innerHTML='<div class="mini" style="margin:-4px 0 12px">Vai direto para a <b>manutenção</b> (Manut. Comodato), que separa e entrega. O andamento aparece aqui em Solicitações.</div>'
+    +'<div class="fld" id="cm-end-w" style="margin-top:-6px"><div class="mini" id="cm-end">'+esc(cmEndLinha(sel))+'</div></div>'
+    +'<div class="grid2">'
+    +'<div class="fld"><label>Cidade</label><input type="text" id="cm-cid" value="'+esc(sel&&sel.cidade||'')+'"></div>'
+    +'<div class="fld"><label>Contato / telefone</label><input type="text" id="cm-ctt"></div>'
+    +'<div class="fld"><label>Equipamento *</label><select id="cm-eq" onchange="$(\'cm-outro-w\').style.display=this.value===\'__outro\'?\'\':\'none\'">'+opT+'</select></div>'
+    +'<div class="fld" id="cm-outro-w" style="display:none"><label>Qual equipamento? *</label><input type="text" id="cm-outro"></div>'
+    +'<div class="fld"><label>Modelo / detalhe</label><input type="text" id="cm-mod" placeholder="ex.: 2 portas, 220V"></div>'
+    +'<div class="fld"><label>Nº do patrimônio</label><input type="text" id="cm-pat" placeholder="vários: separe por vírgula"></div>'
+    +'<div class="fld"><label>Quantidade *</label><input type="number" min="1" step="1" inputmode="numeric" id="cm-qtd" value="1"></div>'
+    +'<div class="fld"><label>Serviço *</label><select id="cm-serv">'+opS+'</select></div>'
+    +'<div class="fld"><label>Data programada para entrega *</label><input type="date" id="cm-data"></div></div>'
+    +'<div class="fld"><label>Observações</label><textarea id="cm-obs" placeholder="Endereço de entrega, horário, quem recebe…"></textarea></div>';
+  cmEndCarregar(function(){ var e=$('cm-end'); if(e) e.textContent=cmEndLinha(PK['fs-cli']&&PK['fs-cli'].sel); });
+}
+function fsCliMudou(sel){
+  if(!(fs && fs.tipo==='equipamento' && U.comodato)) return;
+  var e=$('cm-end'); if(e) e.textContent=cmEndLinha(sel);
+  var c=$('cm-cid'); if(c && sel && !c.value.trim()) c.value=sel.cidade||'';
+}
+function cmSalvar(el){
+  var sel=PK['fs-cli']&&PK['fs-cli'].sel;
+  if(!sel){ toast('Escolha o cliente.', true); var q=$('fs-cli-q'); if(q) q.focus(); return; }
+  var g=function(id){ var x=$(id); return x?String(x.value||'').trim():''; };
+  var eq=g('cm-eq'); if(eq==='__outro') eq=g('cm-outro');
+  var qtd=parseInt(g('cm-qtd'),10), data=g('cm-data');
+  if(!eq){ toast('Escolha o equipamento.', true); $(g('cm-eq')==='__outro'?'cm-outro':'cm-eq').focus(); return; }
+  if(!(qtd>0)){ toast('Informe a quantidade (1 ou mais).', true); $('cm-qtd').focus(); return; }
+  if(!data){ toast('Informe a data programada para entrega.', true); $('cm-data').focus(); return; }
+  var agora=Date.now();
+  var d={ cliente:sel.nome, clienteId:sel.erpId||'', endereco:cmEndDe(sel), patrimonio:g('cm-pat'),
+    cidade:g('cm-cid'), contato:g('cm-ctt'), equipamento:eq, modelo:g('cm-mod'), quantidade:qtd,
+    servico:g('cm-serv')||'entregar', dataProgramada:data, obs:g('cm-obs'),
+    status:'aberta', solicitadoPor:U.email, solicitadoNome:U.nome, solicitadoUid:U.uid,
+    criadoEm:agora, atualizadoEm:agora, historico:[{ em:agora, por:U.email, nome:U.nome, acao:'pediu' }] };
+  var pare=ocupado(el,'Enviando…');
+  setDoc(doc(collection(db,'comodatoSolicitacoes')), d)
+    .then(function(){ toast('Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); })
+    .catch(function(e){ pare(); if(e.code==='permission-denied') toast('Sem permissão para pedir equipamento à manutenção. Peça a chave na Gestão → Acessos.', true); else falha('enviar o pedido')(e); });
+}
+function cmVer(id){
+  var x=cmLista.filter(function(c){ return c.id===id; })[0]; if(!x) return;
+  var st=CM_ST[x.status]||'aberta';
+  var lin=function(r,v){ return '<div><span>'+r+'</span><b>'+v+'</b></div>'; };
+  var corpo='<div class="det">'
+    +lin('Situação na manutenção', stTag(st).replace(/>[^<]*</, '>'+esc(CM_ST_NOME[x.status]||x.status)+'<'))
+    +lin('Cliente', esc(x.cliente||'—'))+lin('Equipamento', esc((x.quantidade||1)+'× '+x.equipamento+(x.modelo?' · '+x.modelo:'')))
+    +lin('Serviço', esc(CM_SERV[x.servico]||x.servico||''))+lin('Entrega programada', cmDataBR(x.dataProgramada))
+    +lin('Patrimônio', esc(x.patrimonio||'—'))+lin('Cidade', esc(x.cidade||'—'))+lin('Contato', esc(x.contato||'—'))+'</div>'
+    +(x.endereco?'<div class="det-txt">📍 '+esc(x.endereco)+'</div>':'')
+    +(x.obs?'<div class="det-txt">'+esc(x.obs)+'</div>':'')
+    +(x.obsManut?'<div class="det-txt">↳ Manutenção: '+esc(x.obsManut)+'</div>':'')
+    +'<div class="det-sec">Andamento</div><div class="hist">'
+    +(x.historico||[]).map(function(h){ return '<div class="hist-it"><small>'+fmtQuando(h.em?new Date(h.em).toISOString():'')+' · '+esc(h.nome||h.por||'')+'</small><div>'+esc((h.acao||'')+(h.txt?': '+h.txt:''))+'</div></div>'; }).join('')+'</div>';
+  var bts=[{ txt:'Abrir no Manut. Comodato', cls:'btn-ghost', fn:function(){ window.open('https://monte-castelo-ind.github.io/manutencao/','_blank'); } }];
+  if(x.status==='aberta') bts.push({ txt:'Cancelar pedido', cls:'btn-ghost', fn:function(el){ cmCancelar(x,el); } });
+  abrirModal({ titulo:'⚙ '+esc((x.quantidade||1)+'× '+x.equipamento), sub:'Pedido à manutenção · '+fmtQuando(x.criadoEm?new Date(x.criadoEm).toISOString():''), wide:true, corpo:corpo, botoes:bts });
+}
+function cmCancelar(x, el){
+  var txt=(prompt('Por que cancelar? (obrigatório)','')||'').trim(); if(!txt){ toast('Cancelamento precisa de motivo.', true); return; }
+  var agora=Date.now(), pare=ocupado(el,'Cancelando…');
+  updateDoc(doc(db,'comodatoSolicitacoes',x.id), { status:'cancelada', atualizadoEm:agora, atualizadoPor:U.email, atualizadoNome:U.nome,
+      historico:(x.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome, acao:'cancelou', txt:txt }]) })
+    .then(function(){ toast('Pedido cancelado.'); fecharModal(); })
+    .catch(function(e){ pare(); falha('cancelar')(e); });
+}
+Object.assign(window, { fsCliMudou:fsCliMudou });
 
 /* =====================================================================
    IMPORTAR CARTEIRA (só admin: precisa ler a lista de usuários)
