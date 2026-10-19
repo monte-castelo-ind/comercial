@@ -1337,8 +1337,65 @@ function renderSolic(){
   });
   if(segSol==='responder') l.sort(function(a,b){ var o={aberta:0,andamento:1}; var x=(o[a.status]!=null?o[a.status]:2), y=(o[b.status]!=null?o[b.status]:2);
     return x-y || String(a.criadoEm).localeCompare(String(b.criadoEm)); });
-  $('s-lista').innerHTML=l.length ? l.map(cartaoSol).join('')
-    : '<div class="empty">'+(segSol==='minhas'?'Nenhuma solicitação sua neste filtro.':'Nada neste filtro.')+'</div>';
+  if(!l.length){ $('s-lista').innerHTML='<div class="empty">'+(segSol==='minhas'?'Nenhuma solicitação sua neste filtro.':'Nada neste filtro.')+'</div>'; return; }
+  _solModo=ctCelular()?'cel':'pc';
+  /* no celular, cartões; no computador, tabela no mesmo formato da aba
+     Solicitações do Manut. Comodato */
+  if(_solModo==='cel'){ $('s-lista').innerHTML=l.map(cartaoSol).join(''); return; }
+  $('s-lista').innerHTML='<div class="tscroll ct-wrap"><table class="tb ct"><thead><tr>'
+    +'<th>Data da solicitação</th><th>Entrega programada</th><th>Cliente</th><th>Equipamento / pedido</th><th style="text-align:right">Qtd</th>'
+    +'<th>Patrimônio</th><th>Serviço</th><th>Pedido por</th><th>Situação</th></tr></thead><tbody>'
+    +l.map(linhaSol).join('')+'</tbody></table></div>';
+}
+var _solModo='';
+window.addEventListener('resize', function(){
+  var m=ctCelular()?'cel':'pc';
+  if(_solModo && m!==_solModo && pagina==='solic') renderSolic();
+});
+function solDataHtml(iso){
+  if(!iso) return '<span class="ct-mut">—</span>';
+  var d=new Date(iso); if(isNaN(d)) return esc(String(iso).slice(0,10));
+  return '<b>'+d.toLocaleDateString('pt-BR')+'</b><div class="ct-sub">'+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</div>';
+}
+/* uma linha da tabela de solicitações: pedido à manutenção (com todos os
+   campos do Comodato) ou solicitação do comercial (preço, bonificação…) */
+function linhaSol(s){
+  var t=TIPOS[s.tipo]||{nome:s.tipo,ico:'•'}, c=s.campos||{};
+  var x=s._cm ? cmLista.filter(function(m){ return m.id===s._cm; })[0] : null;
+  var borda=s.status==='aberta'?'b-amber':(s.status==='andamento'?'b-blue':(s.status==='recusada'?'b-red':(s.status==='cancelada'?'b-muted':'')));
+  var mut='<span class="ct-mut">—</span>', sub=function(v){ return v?'<div class="ct-sub">'+esc(v)+'</div>':''; };
+  var cli, eq, qtd, pat, serv, sit, ent=mut;
+  if(x){
+    cli='<div class="ct-nome">'+esc(x.cliente||'')+'</div>'+sub(x.endereco||x.cidade);
+    eq=esc(x.equipamento||'')+sub(x.modelo);
+    qtd='<b>'+(x.quantidade||1)+'</b>';
+    pat=x.patrimonio?esc(x.patrimonio):mut;
+    serv=esc(CM_SERV[x.servico]||x.servico||'');
+    if(x.dataProgramada){
+      var dd=difDias(hoje(), String(x.dataProgramada).slice(0,10)), aberto=(x.status==='aberta'||x.status==='separacao');
+      var rel=!aberto?'':(dd<0?'atrasada '+(-dd)+' dia'+(dd===-1?'':'s'):(dd===0?'hoje':(dd===1?'amanhã':'em '+dd+' dias')));
+      ent='<b'+(aberto&&dd<0?' class="ct-red"':'')+'>'+cmDataBR(x.dataProgramada)+'</b>'+(rel?'<div class="ct-sub'+(dd<0?' ct-red':'')+'">'+rel+'</div>':'');
+    }
+    sit=stTag(s.status).replace(/>[^<]*</, '>'+esc(CM_ST_NOME[x.status]||x.status)+'<')+'<div class="ct-sub">Manut. Comodato</div>';
+  } else {
+    cli='<div class="ct-nome">'+esc(s.clienteNome||'—')+'</div>'+sub(s.clienteCidade);
+    if(s.tipo==='equipamento'){ eq=esc(c.equipamento||s.titulo||'')+sub(c.equipamento&&s.titulo!==c.equipamento?s.titulo:''); serv=c.servico?esc(c.servico):mut; }
+    else { eq=t.ico+' '+esc(t.nome)+sub(s.titulo); serv=mut; }
+    qtd=c.quantidade?'<b>'+esc(c.quantidade)+'</b>':mut;
+    pat=mut;
+    sit=stTag(s.status);
+  }
+  var por=(s.donoUid===U.uid)?'Você':(s.donoNome||'—');
+  return '<tr class="'+borda+'" onclick="verSolic(\''+s.id+'\')">'
+    +'<td class="ct-uc">'+solDataHtml(s.criadoEm)+'</td>'
+    +'<td class="ct-uc">'+ent+'</td>'
+    +'<td style="max-width:340px">'+cli+'</td>'
+    +'<td>'+eq+'</td>'
+    +'<td class="ct-val" style="font-weight:600">'+qtd+'</td>'
+    +'<td>'+pat+'</td>'
+    +'<td>'+serv+'</td>'
+    +'<td>'+esc(por)+'</td>'
+    +'<td>'+sit+'</td></tr>';
 }
 function setSegSol(s){ segSol=s; renderSolic(); }
 
@@ -2070,8 +2127,8 @@ function cancelarSolic(s, el){
    ===================================================================== */
 var CM_TIPOS=['Forno','Padeiro Noturno','Esqueleto','Armário','Freezer','Esteira','Lata','Fritadeira','Mini Câmara Fria'];
 var CM_SERV={ entregar:'Entregar / instalar', retirar:'Retirar', trocar:'Trocar', consertar:'Consertar no cliente' };
-var CM_ST={ aberta:'aberta', separacao:'andamento', entregue:'concluida', cancelada:'cancelada' };
-var CM_ST_NOME={ aberta:'Aberta', separacao:'Em separação', entregue:'Entregue', cancelada:'Cancelada' };
+var CM_ST={ autorizacao:'aberta', aberta:'aberta', separacao:'andamento', entregue:'concluida', cancelada:'cancelada', recusada:'recusada' };
+var CM_ST_NOME={ autorizacao:'Aguardando autorização', aberta:'Aberta', separacao:'Em separação', entregue:'Entregue', cancelada:'Cancelada', recusada:'Recusada pela diretoria' };
 var cmLista=[], cmEnd=null, cmEndLendo=false;
 function cmDataBR(ymd){ if(!ymd) return '—'; var p=String(ymd).slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
 /* pedido do Comodato no formato da lista de solicitações daqui */
@@ -2117,7 +2174,12 @@ function cmPintarCampos(){
     +'<div class="fld"><label>Quantidade *</label><input type="number" min="1" step="1" inputmode="numeric" id="cm-qtd" value="1"></div>'
     +'<div class="fld"><label>Serviço *</label><select id="cm-serv">'+opS+'</select></div>'
     +'<div class="fld"><label>Data programada para entrega *</label><input type="date" id="cm-data"></div></div>'
-    +'<div class="fld"><label>Observações</label><textarea id="cm-obs" placeholder="Endereço de entrega, horário, quem recebe…"></textarea></div>';
+    +'<div class="fld"><label>Observações</label><textarea id="cm-obs" placeholder="Endereço de entrega, horário, quem recebe…"></textarea></div>'
+    +'<div class="fld" style="border:1px dashed var(--border);border-radius:10px;padding:10px 12px">'
+    +  '<label class="chk" style="margin:0"><input type="checkbox" id="cm-novo" onchange="$(\'cm-novo-w\').style.display=this.checked?\'\':\'none\'"> '
+    +  '<b>Equipamento NOVO</b> — precisa da autorização da diretoria antes de a manutenção separar</label>'
+    +  '<div id="cm-novo-w" style="display:none;margin-top:10px"><label>Valor estimado (R$)</label>'
+    +  '<input type="text" inputmode="decimal" id="cm-val" placeholder="ex.: 4.500,00 — ajuda a diretoria a decidir"></div></div>';
   cmEndCarregar(function(){ var e=$('cm-end'); if(e) e.textContent=cmEndLinha(PK['fs-cli']&&PK['fs-cli'].sel); });
 }
 function fsCliMudou(sel){
@@ -2140,10 +2202,38 @@ function cmSalvar(el){
     servico:g('cm-serv')||'entregar', dataProgramada:data, obs:g('cm-obs'),
     status:'aberta', solicitadoPor:U.email, solicitadoNome:U.nome, solicitadoUid:U.uid,
     criadoEm:agora, atualizadoEm:agora, historico:[{ em:agora, por:U.email, nome:U.nome, acao:'pediu' }] };
-  var pare=ocupado(el,'Enviando…');
-  setDoc(doc(collection(db,'comodatoSolicitacoes')), d)
-    .then(function(){ toast('Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); })
+  var pare=ocupado(el,'Enviando…'), pr;
+  if($('cm-novo') && $('cm-novo').checked){
+    /* equipamento NOVO: o pedido e a autorização nascem juntos (um lote só);
+       a manutenção só vê para separar depois que a diretoria assina */
+    var solRef=doc(collection(db,'comodatoSolicitacoes')), autRef=doc(collection(db,'assinaturas'));
+    var val=numBR(g('cm-val'))||0;
+    d.status='autorizacao'; d.novo=true; d.autorizacaoId=autRef.id; if(val>0) d.valorEstimado=val;
+    d.historico=[{ em:agora, por:U.email, nome:U.nome, acao:'pediu equipamento novo (vai para a autorização da diretoria)' }];
+    var lote=writeBatch(db);
+    lote.set(solRef, d);
+    lote.set(autRef, cmAutDados(d, solRef.id, val));
+    pr=lote.commit();
+  } else pr=setDoc(doc(collection(db,'comodatoSolicitacoes')), d);
+  pr.then(function(){ toast(d.novo?'Pedido enviado. Aguarda a autorização da diretoria.':'Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); })
     .catch(function(e){ pare(); if(e.code==='permission-denied') toast('Sem permissão para pedir equipamento à manutenção. Peça a chave na Gestão → Acessos.', true); else falha('enviar o pedido')(e); });
+}
+function cmAutDados(sol, solId, valor){
+  var linhas=[
+    'Cliente: '+sol.cliente+(sol.cidade?' ('+sol.cidade+')':''),
+    sol.endereco?'Endereço: '+sol.endereco:'',
+    'Equipamento NOVO: '+sol.quantidade+'× '+sol.equipamento+(sol.modelo?' · '+sol.modelo:''),
+    'Serviço: '+(CM_SERV[sol.servico]||sol.servico||''),
+    'Entrega programada: '+cmDataBR(sol.dataProgramada),
+    sol.patrimonio?'Patrimônio: '+sol.patrimonio:'',
+    sol.obs?'Observações: '+sol.obs:'',
+    'Pedido por '+sol.solicitadoNome+' pelo Comercial.'
+  ].filter(Boolean);
+  return { tipo:'Equipamento novo (comodato)', modelo:'simples', setor:'Comercial',
+    titulo:'Equipamento novo: '+sol.quantidade+'× '+sol.equipamento+' — '+sol.cliente,
+    descricao:linhas.join('\n'), valor:valor||0, prazo:sol.dataProgramada||'', pix:false, pixChave:'',
+    status:'pendente', criadoPor:sol.solicitadoPor, criadoNome:sol.solicitadoNome, criadoEm:new Date(sol.criadoEm).toISOString(),
+    origem:{ app:'comodato', solicitacaoId:solId, cliente:sol.cliente, solicitadoPor:sol.solicitadoPor } };
 }
 function cmVer(id){
   var x=cmLista.filter(function(c){ return c.id===id; })[0]; if(!x) return;
@@ -2157,6 +2247,10 @@ function cmVer(id){
     +(x.endereco?'<div class="det-txt">📍 '+esc(x.endereco)+'</div>':'')
     +(x.obs?'<div class="det-txt">'+esc(x.obs)+'</div>':'')
     +(x.obsManut?'<div class="det-txt">↳ Manutenção: '+esc(x.obsManut)+'</div>':'')
+    +(x.novo?'<div class="det-txt">🆕 <b>Equipamento novo</b>'+(x.valorEstimado?' · valor estimado R$ '+Number(x.valorEstimado).toLocaleString('pt-BR',{minimumFractionDigits:2}):'')+' — '
+      +(x.autorizacao&&x.autorizacao.status==='aprovado'?'autorizado por '+esc(x.autorizacao.nome||'')+(x.autorizacao.codigo?' (código '+esc(x.autorizacao.codigo)+')':'')
+        :x.autorizacao&&x.autorizacao.status==='recusado'?'recusado pela diretoria'+(x.autorizacao.motivo?': '+esc(x.autorizacao.motivo):'')
+        :'aguardando a assinatura da diretoria')+'</div>':'')
     +'<div class="det-sec">Andamento</div><div class="hist">'
     +(x.historico||[]).map(function(h){ return '<div class="hist-it"><small>'+fmtQuando(h.em?new Date(h.em).toISOString():'')+' · '+esc(h.nome||h.por||'')+'</small><div>'+esc((h.acao||'')+(h.txt?': '+h.txt:''))+'</div></div>'; }).join('')+'</div>';
   var bts=[{ txt:'Abrir no Manut. Comodato', cls:'btn-ghost', fn:function(){ window.open('https://monte-castelo-ind.github.io/manutencao/','_blank'); } }];
