@@ -46,9 +46,16 @@ html[data-theme="dark"] .brand-logo-box{background-image:var(--logo-gold)}
 
 /* ---- login ---- */
 #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px}
-.auth-cx{width:100%;max-width:360px;background:var(--card);border:1px solid var(--border);
-         border-radius:16px;padding:30px 28px;box-shadow:var(--shadow)}
-.auth-logo{height:82px;width:100%;background:var(--logo-v-light) no-repeat center;background-size:contain;margin-bottom:8px}
+.auth-cx{width:320px;max-width:88vw;background:var(--card);border:1px solid var(--border);
+         border-radius:18px;padding:30px 26px;box-shadow:var(--shadow)}
+/* mesmo tamanho e jeito da entrada da Gestão */
+.auth-logo{height:96px;width:100%;background:var(--logo-v-light) no-repeat center;background-size:contain;margin-bottom:16px}
+.auth-cx h1{font-size:18px;font-weight:700}
+.auth-cx p.auth-p{font-size:12.5px;color:var(--muted);margin:4px 0 18px}
+.auth-cx input[type=email],.auth-cx input[type=password]{padding:12px 14px;border-radius:11px;font-size:14px;margin-bottom:11px}
+.auth-cx .auth-lembrar{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);cursor:pointer;margin:2px 0 12px;font-weight:400}
+.auth-cx .auth-lembrar input{accent-color:var(--primary);width:16px;height:16px;margin:0}
+.auth-cx .btn-full{padding:12px;border-radius:11px;font-size:14px}
 html[data-theme="dark"] .auth-logo{background-image:var(--logo-v-gold)}
 .auth-sub{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:22px}
 label{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin:0 0 5px}
@@ -416,12 +423,12 @@ details.mais[open]{padding-bottom:4px}
 <div id="auth">
   <form class="auth-cx" id="fLogin">
     <div class="auth-logo" role="img" aria-label="Monte Castelo"></div>
-    <div class="auth-sub">Comercial · acompanhamento de clientes</div>
+    <h1>Comercial</h1>
+    <p class="auth-p">Acesso restrito · use seu login do Comodato</p>
     <div class="erro" id="erro"></div>
-    <div class="fld"><label for="em">E-mail</label>
-      <input type="email" id="em" autocomplete="username" required></div>
-    <div class="fld"><label for="pw">Senha</label>
-      <input type="password" id="pw" autocomplete="current-password" required></div>
+    <input type="email" id="em" autocomplete="username" placeholder="E-mail" aria-label="E-mail" required>
+    <input type="password" id="pw" autocomplete="current-password" placeholder="Senha" aria-label="Senha" required>
+    <label class="auth-lembrar"><input type="checkbox" id="lembrar" checked> Manter conectado</label>
     <button class="btn btn-full" type="submit" id="bEntrar">Entrar</button>
   </form>
 </div>
@@ -642,7 +649,7 @@ details.mais[open]{padding-bottom:4px}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
-         setPersistence, browserLocalPersistence }
+         setPersistence, browserLocalPersistence, browserSessionPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, onSnapshot, doc, getDoc, getDocs, setDoc, updateDoc,
          query, where, orderBy, limit, writeBatch, serverTimestamp, deleteDoc }
@@ -669,7 +676,7 @@ const app=initializeApp(cfg), auth=getAuth(app), db=getFirestore(app);
    o vendedor consulta só o que é dele (where donoUid), o gestor consulta tudo.
    ===================================================================== */
 
-var U={ uid:'', email:'', nome:'', admin:false, gestor:false, comercial:false, comodato:false };
+var U={ uid:'', email:'', nome:'', admin:false, gestor:false, comercial:false, comodato:false, veSol:false };
 var CFG={ respondem:{}, diasAlerta:30 }, cfgExiste=false, cfgLido=false;
 var meusTipos=[];                 /* tipos de solicitação que esta pessoa responde */
 var clientes=[], visitas=[], concorrentes=[];
@@ -786,7 +793,8 @@ $('fLogin').addEventListener('submit', async function(ev){
   var e=$('erro'); e.style.display='none';
   var b=$('bEntrar'); b.disabled=true; b.textContent='Entrando…';
   try{
-    await setPersistence(auth, browserLocalPersistence);
+    /* "Manter conectado" desmarcado: a sessão acaba ao fechar o navegador */
+    await setPersistence(auth, ($('lembrar') && !$('lembrar').checked) ? browserSessionPersistence : browserLocalPersistence);
     await signInWithEmailAndPassword(auth, $('em').value.trim(), $('pw').value);
   }catch(err){
     console.error('login:',err);
@@ -824,6 +832,9 @@ onAuthStateChanged(auth, async function(u){
   /* chave "Pedir equipamento (comercial)": o pedido de equipamento vai direto
      para o Manut. Comodato (coleção comodatoSolicitacoes) */
   U.comodato=U.admin || d.comodatoSolicita===true;
+  /* chave "Ver as solicitações de todos" (ex.: Jeferson): vê o que todos os
+     vendedores pediram, sem virar gerente (não vê as carteiras dos outros) */
+  U.veSol=U.gestor || (U.comercial && d.comercialSolicitacoes===true);
   try{ var c=await getDoc(doc(db,'comConfig','app')); cfgExiste=c.exists(); aplicarCfg(c.exists()?c.data():{}); }
   catch(e){ console.warn('comConfig:',e); aplicarCfg({}); }
   if(!U.comercial && !meusTipos.length){ negar('Sua conta não tem acesso ao app Comercial. Fale com a diretoria.'); return; }
@@ -909,7 +920,7 @@ function ouvir(){
     subs.push(onSnapshot(query(cs, where('donoUid','==',U.uid)),
       function(s){ delete erros.solicitacoes; solFontes.minhas=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); juntarSols(); },
       erroLeitura('solicitações')));
-    if(U.gestor){
+    if(U.veSol){
       subs.push(onSnapshot(query(cs, orderBy('criadoEm','desc'), limit(500)),
         function(s){ solFontes.todas=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); juntarSols(); },
         erroLeitura('solicitações')));
@@ -1301,7 +1312,7 @@ function renderSolic(){
   var segs=[];
   if(U.comercial) segs.push(['minhas','Minhas']);
   if(meusTipos.length) segs.push(['responder','Para responder']);
-  if(U.gestor) segs.push(['todas','Todas']);
+  if(U.veSol) segs.push(['todas','Todas']);
   if(!segs.some(function(s){ return s[0]===segSol; })) segSol=segs.length?segs[0][0]:'minhas';
   var base=function(k){ return sols.filter(function(s){ return k==='minhas'?souDono(s):(k==='responder'?respondo(s):true); }); };
   $('s-seg').innerHTML=segs.map(function(s){
