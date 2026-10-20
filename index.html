@@ -2012,7 +2012,9 @@ function abrirSolic(tipo, clienteId){
   fs={ tipo:tipo||'' };
   var corpo='<label>O que você precisa? *</label><div class="tipos-sol" id="fs-tipos">'
     +TIPO_IDS.map(function(t){ return '<button type="button" class="tipo-sol'+(fs.tipo===t?' on':'')+'" onclick="fsTipo(\''+t+'\')">'+TIPOS[t].ico+' '+TIPOS[t].nome+'<small>'+TIPOS[t].dica+'</small></button>'; }).join('')+'</div>'
-    +'<div class="fld"><label id="fs-cli-lab">Cliente</label><div id="fs-cli"></div></div>'
+    +'<div class="fld"><label id="fs-cli-lab">Cliente</label><div id="fs-cli"></div>'
+    +'<label class="chk" style="margin:8px 0 0"><input type="checkbox" id="fs-cnovo" onchange="fsCliNovo(this)"> <b>Cliente novo</b> — ainda não está na carteira nem no ERP</label>'
+    +'<div id="fs-cnovo-w" style="display:none;margin-top:8px"><input type="text" id="fs-cnovo-nome" placeholder="Nome do cliente novo *" autocomplete="off"></div></div>'
     +'<div class="fld" id="fs-tit-w"><label>Assunto *</label><input type="text" id="fs-tit" maxlength="120" placeholder="Resumo em uma linha"></div>'
     +'<div id="fs-campos"></div>'
     +'<div class="fld" id="fs-desc-w"><label>Detalhes</label><textarea id="fs-desc" placeholder="Explique o pedido e o motivo"></textarea></div>';
@@ -2020,6 +2022,20 @@ function abrirSolic(tipo, clienteId){
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Enviar', fn:salvarSolic }] });
   pkMontar('fs-cli', { sel:pkSelDeCliente(clienteId?clientePorId(clienteId):null), ph:'Nome do cliente (carteira ou ERP)…', onSel:fsCliMudou });
   fsPintarCampos();
+}
+/* cliente da solicitação: o escolhido na lista ou, marcado "Cliente novo", o nome digitado */
+function fsNovo(){ var c=$('fs-cnovo'); return !!(c && c.checked); }
+function fsSel(){
+  if(!fsNovo()) return (PK['fs-cli']&&PK['fs-cli'].sel)||null;
+  var n=($('fs-cnovo-nome')&&$('fs-cnovo-nome').value||'').replace(/\s+/g,' ').trim();
+  return n ? { clienteId:'', erpId:'', nome:n.toUpperCase(), cidade:(($('cm-cid')&&$('cm-cid').value)||'').trim(), novo:true } : false;
+}
+function fsCliNovo(cb){
+  var on=cb.checked;
+  $('fs-cli').style.display=on?'none':''; $('fs-cnovo-w').style.display=on?'':'none';
+  var w=$('cm-endnovo-w'); if(w) w.style.display=on?'':'none';
+  var e=$('cm-end'); if(e) e.style.display=on?'none':'';
+  if(on) setTimeout(function(){ $('fs-cnovo-nome').focus(); }, 0);
 }
 function fsTipo(t){ fs.tipo=t; document.querySelectorAll('#fs-tipos .tipo-sol').forEach(function(b,i){ b.classList.toggle('on', TIPO_IDS[i]===t); }); fsPintarCampos(); }
 function fsPintarCampos(){
@@ -2035,7 +2051,8 @@ function fsPintarCampos(){
 function salvarSolic(el){
   if(!fs.tipo){ toast('Escolha o tipo da solicitação.', true); return; }
   if(fs.tipo==='equipamento' && U.comodato){ cmSalvar(el); return; }
-  var sel=PK['fs-cli']&&PK['fs-cli'].sel;
+  var sel=fsSel();
+  if(sel===false){ toast('Escreva o nome do cliente novo.', true); $('fs-cnovo-nome').focus(); return; }
   if(fs.tipo==='equipamento' && !sel){ toast('Para equipamento, escolha o cliente.', true); var q=$('fs-cli-q'); if(q) q.focus(); return; }
   var tit=$('fs-tit').value.trim();
   if(!tit){ toast('Escreva o assunto.', true); $('fs-tit').focus(); return; }
@@ -2044,7 +2061,7 @@ function salvarSolic(el){
   var agora=agoraISO();
   var d={ tipo:fs.tipo, titulo:tit, descricao:$('fs-desc').value.trim(), campos:campos,
           clienteId:sel?sel.clienteId||'':'', clienteErpId:sel?sel.erpId||'':'',
-          clienteNome:sel?sel.nome:'', clienteCidade:sel?sel.cidade||'':'',
+          clienteNome:sel?sel.nome:'', clienteCidade:sel?sel.cidade||'':'', clienteNovo:!!(sel&&sel.novo),
           status:'aberta', donoUid:U.uid, donoNome:U.nome, donoEmail:U.email,
           criadoEm:agora, atualizadoEm:agora,
           historico:[{ em:agora, por:U.email, nome:U.nome, st:'aberta', txt:'Solicitação aberta' }] };
@@ -2127,6 +2144,9 @@ function cancelarSolic(s, el){
    ===================================================================== */
 var CM_TIPOS=['Forno','Padeiro Noturno','Esqueleto','Armário','Freezer','Esteira','Lata','Fritadeira','Mini Câmara Fria'];
 var CM_SERV={ entregar:'Entregar / instalar', retirar:'Retirar', trocar:'Trocar', consertar:'Consertar no cliente' };
+/* tipo do pedido para a manutenção: cada um com os serviços que fazem sentido */
+var CM_CAT={ remessa:{ nome:'Remessa / retorno de equipamento', serv:['entregar','retirar','trocar'], data:'Data programada para entrega ou retirada' },
+             externa:{ nome:'Manutenção externa', serv:['consertar'], data:'Data programada para a visita' } };
 var CM_ST={ autorizacao:'aberta', aberta:'aberta', separacao:'andamento', entregue:'concluida', cancelada:'cancelada', recusada:'recusada' };
 var CM_ST_NOME={ autorizacao:'Aguardando autorização', aberta:'Aberta', separacao:'Em separação', entregue:'Entregue', cancelada:'Cancelada', recusada:'Recusada pela diretoria' };
 var cmLista=[], cmEnd=null, cmEndLendo=false;
@@ -2135,8 +2155,8 @@ function cmDataBR(ymd){ if(!ymd) return '—'; var p=String(ymd).slice(0,10).spl
 function cmParaSol(x){
   return { id:'cm_'+x.id, _cm:x.id, tipo:'equipamento', status:CM_ST[x.status]||'aberta',
     titulo:(x.quantidade||1)+'× '+x.equipamento+(x.modelo?' · '+x.modelo:''),
-    clienteNome:x.cliente||'', clienteCidade:x.cidade||'',
-    descricao:(CM_SERV[x.servico]||x.servico||'')+' · entrega '+cmDataBR(x.dataProgramada)+' · Manut. Comodato: '+(CM_ST_NOME[x.status]||x.status),
+    clienteNome:(x.cliente||'')+(x.clienteNovo?' (cliente novo)':''), clienteCidade:x.cidade||'',
+    descricao:(x.categoria&&CM_CAT[x.categoria]?CM_CAT[x.categoria].nome+' · ':'')+(CM_SERV[x.servico]||x.servico||'')+' · data '+cmDataBR(x.dataProgramada)+' · Manut. Comodato: '+(CM_ST_NOME[x.status]||x.status),
     resposta:x.obsManut||'', donoUid:(x.solicitadoPor===U.email?U.uid:(x.solicitadoUid||'')), donoNome:x.solicitadoNome||x.solicitadoPor||'',
     criadoEm:x.criadoEm?new Date(x.criadoEm).toISOString():'' };
 }
@@ -2163,7 +2183,10 @@ function cmPintarCampos(){
   var opT='<option value="">Escolha…</option>'+CM_TIPOS.map(function(t){ return '<option>'+esc(t)+'</option>'; }).join('')+'<option value="__outro">Outro…</option>';
   var opS=Object.keys(CM_SERV).map(function(k){ return '<option value="'+k+'">'+CM_SERV[k]+'</option>'; }).join('');
   box.innerHTML='<div class="mini" style="margin:-4px 0 12px">Vai direto para a <b>manutenção</b> (Manut. Comodato), que separa e entrega. O andamento aparece aqui em Solicitações.</div>'
-    +'<div class="fld" id="cm-end-w" style="margin-top:-6px"><div class="mini" id="cm-end">'+esc(cmEndLinha(sel))+'</div></div>'
+    +'<div class="fld"><label>Tipo do pedido *</label><div class="chips" id="cm-cat">'
+    +Object.keys(CM_CAT).map(function(k){ return '<button type="button" class="chip" data-v="'+k+'" onclick="cmCat(this)">'+CM_CAT[k].nome+'</button>'; }).join('')+'</div></div>'
+    +'<div class="fld" id="cm-end-w" style="margin-top:-6px"><div class="mini" id="cm-end"'+(fsNovo()?' style="display:none"':'')+'>'+esc(cmEndLinha(sel))+'</div></div>'
+    +'<div class="fld" id="cm-endnovo-w"'+(fsNovo()?'':' style="display:none"')+'><label>Endereço do cliente novo *</label><input type="text" id="cm-endnovo" placeholder="rua, número, bairro"></div>'
     +'<div class="grid2">'
     +'<div class="fld"><label>Cidade</label><input type="text" id="cm-cid" value="'+esc(sel&&sel.cidade||'')+'"></div>'
     +'<div class="fld"><label>Contato / telefone</label><input type="text" id="cm-ctt"></div>'
@@ -2173,31 +2196,49 @@ function cmPintarCampos(){
     +'<div class="fld"><label>Nº do patrimônio</label><input type="text" id="cm-pat" placeholder="vários: separe por vírgula"></div>'
     +'<div class="fld"><label>Quantidade *</label><input type="number" min="1" step="1" inputmode="numeric" id="cm-qtd" value="1"></div>'
     +'<div class="fld"><label>Serviço *</label><select id="cm-serv">'+opS+'</select></div>'
-    +'<div class="fld"><label>Data programada para entrega *</label><input type="date" id="cm-data"></div></div>'
+    +'<div class="fld"><label id="cm-data-lab">Data programada *</label><input type="date" id="cm-data"></div></div>'
     +'<div class="fld"><label>Observações</label><textarea id="cm-obs" placeholder="Endereço de entrega, horário, quem recebe…"></textarea></div>'
-    +'<div class="fld" style="border:1px dashed var(--border);border-radius:10px;padding:10px 12px">'
+    +'<div class="fld" id="cm-novo-box" style="border:1px dashed var(--border);border-radius:10px;padding:10px 12px">'
     +  '<label class="chk" style="margin:0"><input type="checkbox" id="cm-novo" onchange="$(\'cm-novo-w\').style.display=this.checked?\'\':\'none\'"> '
     +  '<b>Equipamento NOVO</b> — precisa da autorização da diretoria antes de a manutenção separar</label>'
     +  '<div id="cm-novo-w" style="display:none;margin-top:10px"><label>Valor estimado (R$)</label>'
     +  '<input type="text" inputmode="decimal" id="cm-val" placeholder="ex.: 4.500,00 — ajuda a diretoria a decidir"></div></div>';
   cmEndCarregar(function(){ var e=$('cm-end'); if(e) e.textContent=cmEndLinha(PK['fs-cli']&&PK['fs-cli'].sel); });
 }
+function cmCat(b){
+  var k=b.getAttribute('data-v'), c=CM_CAT[k]; if(!c) return;
+  document.querySelectorAll('#cm-cat .chip').forEach(function(x){ x.classList.toggle('on', x===b); });
+  var s=$('cm-serv'), atual=s.value;
+  s.innerHTML=c.serv.map(function(v){ return '<option value="'+v+'">'+CM_SERV[v]+'</option>'; }).join('');
+  if(c.serv.indexOf(atual)>=0) s.value=atual;
+  $('cm-data-lab').textContent=c.data+' *';
+  /* equipamento NOVO só existe em remessa */
+  var nb=$('cm-novo-box'); if(nb) nb.style.display=k==='remessa'?'':'none';
+  if(k!=='remessa' && $('cm-novo')){ $('cm-novo').checked=false; $('cm-novo-w').style.display='none'; }
+}
+function cmCatSel(){ var b=document.querySelector('#cm-cat .chip.on'); return b?b.getAttribute('data-v'):''; }
 function fsCliMudou(sel){
   if(!(fs && fs.tipo==='equipamento' && U.comodato)) return;
   var e=$('cm-end'); if(e) e.textContent=cmEndLinha(sel);
   var c=$('cm-cid'); if(c && sel && !c.value.trim()) c.value=sel.cidade||'';
 }
 function cmSalvar(el){
-  var sel=PK['fs-cli']&&PK['fs-cli'].sel;
+  var sel=fsSel();
+  if(sel===false){ toast('Escreva o nome do cliente novo.', true); $('fs-cnovo-nome').focus(); return; }
   if(!sel){ toast('Escolha o cliente.', true); var q=$('fs-cli-q'); if(q) q.focus(); return; }
   var g=function(id){ var x=$(id); return x?String(x.value||'').trim():''; };
+  var cat=cmCatSel();
+  if(!cat){ toast('Escolha o tipo do pedido: remessa/retorno ou manutenção externa.', true); return; }
+  if(sel.novo && !g('cm-cid')){ toast('Cliente novo: informe a cidade.', true); $('cm-cid').focus(); return; }
+  if(sel.novo && !g('cm-endnovo')){ toast('Cliente novo: informe o endereço.', true); $('cm-endnovo').focus(); return; }
   var eq=g('cm-eq'); if(eq==='__outro') eq=g('cm-outro');
   var qtd=parseInt(g('cm-qtd'),10), data=g('cm-data');
   if(!eq){ toast('Escolha o equipamento.', true); $(g('cm-eq')==='__outro'?'cm-outro':'cm-eq').focus(); return; }
   if(!(qtd>0)){ toast('Informe a quantidade (1 ou mais).', true); $('cm-qtd').focus(); return; }
-  if(!data){ toast('Informe a data programada para entrega.', true); $('cm-data').focus(); return; }
+  if(!data){ toast('Informe a data programada.', true); $('cm-data').focus(); return; }
   var agora=Date.now();
-  var d={ cliente:sel.nome, clienteId:sel.erpId||'', endereco:cmEndDe(sel), patrimonio:g('cm-pat'),
+  var d={ cliente:sel.nome, clienteId:sel.erpId||'', endereco:sel.novo?g('cm-endnovo'):cmEndDe(sel), patrimonio:g('cm-pat'),
+    categoria:cat, clienteNovo:!!sel.novo,
     cidade:g('cm-cid'), contato:g('cm-ctt'), equipamento:eq, modelo:g('cm-mod'), quantidade:qtd,
     servico:g('cm-serv')||'entregar', dataProgramada:data, obs:g('cm-obs'),
     status:'aberta', solicitadoPor:U.email, solicitadoNome:U.nome, solicitadoUid:U.uid,
@@ -2210,17 +2251,26 @@ function cmSalvar(el){
     var val=numBR(g('cm-val'))||0;
     d.status='autorizacao'; d.novo=true; d.autorizacaoId=autRef.id; if(val>0) d.valorEstimado=val;
     d.historico=[{ em:agora, por:U.email, nome:U.nome, acao:'pediu equipamento novo (vai para a autorização da diretoria)' }];
-    var lote=writeBatch(db);
-    lote.set(solRef, d);
-    lote.set(autRef, cmAutDados(d, solRef.id, val));
-    pr=lote.commit();
-  } else pr=setDoc(doc(collection(db,'comodatoSolicitacoes')), d);
+    var gravarNovo=function(dd){ var lote=writeBatch(db); lote.set(solRef, dd); lote.set(autRef, cmAutDados(dd, solRef.id, val)); return lote.commit(); };
+    pr=cmComReserva(d, gravarNovo);
+  } else pr=cmComReserva(d, function(dd){ return setDoc(doc(collection(db,'comodatoSolicitacoes')), dd); });
   pr.then(function(){ toast(d.novo?'Pedido enviado. Aguarda a autorização da diretoria.':'Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); })
     .catch(function(e){ pare(); if(e.code==='permission-denied') toast('Sem permissão para pedir equipamento à manutenção. Peça a chave na Gestão → Acessos.', true); else falha('enviar o pedido')(e); });
 }
+/* Os campos "categoria" e "clienteNovo" são novos no pedido. Se a regra do
+   banco ainda não os aceitar, o pedido vai sem eles, com a informação escrita
+   nas observações — a manutenção recebe do mesmo jeito. */
+function cmComReserva(d, gravar){
+  return gravar(d).catch(function(e){
+    if(!(e && e.code==='permission-denied')) throw e;
+    var dd=Object.assign({}, d); delete dd.categoria; delete dd.clienteNovo;
+    dd.obs=['['+CM_CAT[d.categoria].nome+(d.clienteNovo?' · CLIENTE NOVO':'')+']', d.obs].filter(Boolean).join(' ');
+    return gravar(dd);
+  });
+}
 function cmAutDados(sol, solId, valor){
   var linhas=[
-    'Cliente: '+sol.cliente+(sol.cidade?' ('+sol.cidade+')':''),
+    'Cliente: '+sol.cliente+(sol.cidade?' ('+sol.cidade+')':'')+(sol.clienteNovo?' — CLIENTE NOVO':''),
     sol.endereco?'Endereço: '+sol.endereco:'',
     'Equipamento NOVO: '+sol.quantidade+'× '+sol.equipamento+(sol.modelo?' · '+sol.modelo:''),
     'Serviço: '+(CM_SERV[sol.servico]||sol.servico||''),
@@ -2266,7 +2316,7 @@ function cmCancelar(x, el){
     .then(function(){ toast('Pedido cancelado.'); fecharModal(); })
     .catch(function(e){ pare(); falha('cancelar')(e); });
 }
-Object.assign(window, { fsCliMudou:fsCliMudou });
+Object.assign(window, { fsCliMudou:fsCliMudou, fsCliNovo:fsCliNovo, cmCat:cmCat });
 
 /* =====================================================================
    IMPORTAR CARTEIRA (só admin: precisa ler a lista de usuários)
@@ -3951,7 +4001,7 @@ function compartilharFicha(f, el){
     .catch(function(e){ if(el){ el.disabled=false; el.textContent=t; } console.error(e); toast('Não foi possível gerar o PDF: '+(e.message||e), true); });
 }
 </script>
-<script src="https://monte-castelo-ind.github.io/folha-solicitacao.js?v=1"></script>
+<script src="https://monte-castelo-ind.github.io/folha-solicitacao.js?v=2"></script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
 </html>
