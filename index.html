@@ -351,6 +351,27 @@ table.ct .ct-uc{white-space:nowrap}
 .eq-corr td{white-space:nowrap}
 .eq-corr td.eq-loja{white-space:normal}
 .eq-rol{max-height:calc(100vh - 250px);overflow:auto}
+.eq-avs{display:flex;gap:4px}
+.eh-tl{position:relative;margin-left:8px;padding-left:18px;border-left:2px solid var(--border)}
+.eh-ev{position:relative;margin-bottom:12px}
+.eh-ev:before{content:'';position:absolute;left:-25px;top:4px;width:11px;height:11px;border-radius:50%;background:var(--card);border:2px solid var(--muted)}
+.eh-ev.cli:before{border-color:var(--green);background:var(--green)}
+.eh-ev.man:before{border-color:var(--amber)}
+.eh-ev.mc:before{border-color:var(--muted);background:var(--card-2)}
+.eh-ev b{font-size:13px}
+.eh-pat{font-family:'JetBrains Mono',monospace;cursor:pointer;border-bottom:1px dotted var(--muted)}
+.eq-av{background:var(--card-2);border:1px solid var(--border);color:var(--muted);font:700 11px 'Archivo',sans-serif;padding:4px 9px;border-radius:14px;cursor:pointer}
+.eq-av:disabled{cursor:default;opacity:.55}
+.eq-av.on.fica{background:rgba(28,196,126,.16);border-color:rgba(28,196,126,.6);color:var(--green)}
+.eq-av.on.recolhe{background:rgba(242,106,106,.16);border-color:rgba(242,106,106,.6);color:var(--red)}
+.eq-cf{background:var(--card-2);border:1px solid var(--border);color:var(--muted);font:700 11px 'Archivo',sans-serif;padding:4px 8px;border-radius:14px;cursor:pointer;margin-right:4px}
+.eq-cf.on{color:var(--text);border-color:var(--muted)}
+.eq-fl{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.eq-fi{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:9px 11px;border-bottom:1px solid var(--border)}
+.eq-fi:last-child{border-bottom:none}
+.eq-fa{flex:0 0 auto;text-align:right}
+.eq-fa .eq-avs{justify-content:flex-end}
+@media(max-width:600px){ .eq-fi{flex-direction:column} .eq-fa{text-align:left} .eq-fa .eq-avs{justify-content:flex-start} }
 .eq-loja a{color:var(--text);text-decoration:none;border-bottom:1px dotted var(--muted);cursor:pointer}
 .eq-end{font-weight:400;font-size:11.5px;color:var(--muted);margin-top:2px}
 .ev-lin{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start;padding:12px 14px;margin-bottom:9px}
@@ -504,6 +525,7 @@ details.mais[open]{padding-bottom:4px}
     <button class="navbtn gestor-only so-desk" data-p="equipe" onclick="nav('equipe')" style="display:none"><span class="side-ico">◫</span><span class="lbl lab-d">Equipe</span><span class="lab-m">Equipe</span></button>
     <div class="side-sec lbl com-only so-desk">Equipamento</div>
     <button class="navbtn com-only so-desk" data-p="equip" onclick="nav('equip')"><span class="side-ico">❄</span><span class="lbl lab-d">Nos clientes</span><span class="lab-m">Equip.</span></button>
+    <button class="navbtn so-desk gestor-only" data-p="eqhist" onclick="nav('eqhist')" style="display:none"><span class="side-ico">◷</span><span class="lbl">Histórico</span></button>
     <button class="navbtn so-desk admin-only" data-p="eqvinc" onclick="nav('eqvinc')" style="display:none"><span class="side-ico">⇄</span><span class="lbl">Vincular nomes</span></button>
     <div class="side-sec lbl">Pedidos</div>
     <button class="navbtn" data-p="solic" onclick="nav('solic')"><span class="side-ico">✉</span><span class="lbl lab-d">Solicitações</span><span class="lab-m">Pedidos</span><span class="cnt" id="cntSol" hidden>0</span></button>
@@ -568,14 +590,39 @@ details.mais[open]{padding-bottom:4px}
           <option value="semcomprar">Ordem: mais tempo sem comprar</option>
           <option value="antigo">Ordem: há mais tempo no cliente</option>
           <option value="nome">Ordem: nome</option>
+          <option value="rende" class="gestor-only">Ordem: pior rendimento (compra ÷ valor)</option>
         </select>
         <button class="btn btn-sm btn-ghost" onclick="eqRelatorio()">⎙ Relatório PDF</button>
+        <button class="btn btn-sm btn-ghost gestor-only" onclick="nav('eqhist')" style="display:none">◷ Histórico</button>
         <button class="btn btn-sm btn-ghost" onclick="exportarEquip()">⤓ Excel</button>
         <button class="btn btn-sm admin-only" onclick="$('eq-arq').click()" style="display:none">⇪ Atualizar pela planilha</button>
         <input type="file" id="eq-arq" accept=".xlsx,.xls" style="display:none" onchange="eqLerArquivo(this)">
       </div>
       <div class="chips" id="eq-filtros" style="margin-bottom:14px"></div>
       <div id="eq-lista"></div>
+    </div>
+
+    <!-- HISTÓRICO DOS EQUIPAMENTOS (gerentes e diretoria) -->
+    <div class="page" id="page-eqhist">
+      <div class="tools">
+        <div class="seg" id="eh-modo">
+          <button class="on" data-m="mov" onclick="ehModo('mov')">Movimentações</button>
+          <button data-m="pat" onclick="ehModo('pat')">Por equipamento</button>
+          <button data-m="imp" onclick="ehModo('imp')">Importações</button>
+        </div>
+        <input type="search" id="eh-busca" placeholder="Cliente, patrimônio, NF, cidade…" oninput="EH.lim=500;renderEqHist()">
+        <select id="eh-tipo" onchange="EH.lim=500;renderEqHist()"></select>
+        <select id="eh-sit" onchange="EH.lim=500;renderEqHist()">
+          <option value="">Remessas e retornos</option>
+          <option value="cli">Só os que estão no cliente</option>
+          <option value="ret">Só os que retornaram</option>
+        </select>
+        <input type="date" id="eh-de" title="Movimentação a partir de" onchange="EH.lim=500;renderEqHist()" style="width:auto">
+        <input type="date" id="eh-ate" title="até" onchange="EH.lim=500;renderEqHist()" style="width:auto">
+        <button class="btn btn-sm btn-ghost" onclick="ehExcel()">⤓ Excel</button>
+      </div>
+      <div id="eh-info" class="mini" style="margin-bottom:10px"></div>
+      <div id="eh-lista"></div>
     </div>
 
     <!-- DE-PARA DOS EQUIPAMENTOS (diretoria) -->
@@ -879,16 +926,22 @@ function telLink(t){ var d=String(t||'').replace(/\D/g,''); if(!d) return '';
    Gerentes e diretoria veem tudo; o vendedor, só os clientes dele.
    Leitura sob demanda (página ou ficha): nada fica escutando o banco.
    ==================================================================== */
-var EQ={ docs:null, meta:null, lendo:false, erro:'', filtro:'todos', lim:500, plano:null, ab:{} };
+var EQ={ docs:null, meta:null, lendo:false, erro:'', filtro:'todos', lim:500, plano:null, ab:{}, aval:{}, hist:null };
 function carregarEquip(forcar){
   if(EQ.lendo || (EQ.docs && !forcar)) return Promise.resolve();
   EQ.lendo=true;
   var col=collection(db,'comEquipamentos');
   var q1=U.gestor ? getDocs(query(col, limit(6000))) : getDocs(query(col, where('donoUid','==',U.uid)));
   var q2=getDoc(doc(db,'comEquipamentos','_meta')).catch(function(){ return null; });
-  return Promise.all([q1, q2]).then(function(r){
+  /* avaliações (fica / recolhe / conferido): ficam fora dos documentos da planilha, para não se perderem a cada importação */
+  var ca=collection(db,'comEquipAval');
+  var q3=(U.gestor ? getDocs(query(ca, limit(30000))) : getDocs(query(ca, where('donoUid','==',U.uid)))).catch(function(e){ console.warn('comEquipAval:', e); return null; });
+  var q4=U.gestor ? getDocs(query(collection(db,'comEquipHist'), orderBy('em','desc'), limit(36))).catch(function(e){ console.warn('comEquipHist:', e); return null; }) : Promise.resolve(null);
+  return Promise.all([q1, q2, q3, q4]).then(function(r){
     EQ.docs=r[0].docs.filter(function(x){ return x.id!=='_meta'; }).map(function(x){ return Object.assign({ id:x.id }, x.data()); });
     EQ.meta=(r[1] && r[1].exists()) ? r[1].data() : null;
+    EQ.aval={}; if(r[2]) r[2].docs.forEach(function(x){ EQ.aval[x.id]=x.data(); });
+    EQ.hist=r[3] ? r[3].docs.map(function(x){ return x.data(); }) : null;
     EQ.lendo=false; EQ.erro=''; if(pagina==='equip') render();
   }).catch(function(e){
     console.warn('comEquipamentos:', e); EQ.lendo=false; EQ.docs=[];
@@ -917,6 +970,23 @@ function eqData(v){                               /* data da planilha → AAAA-M
 }
 function eqNum(v){ if(typeof v==='number') return v; var n=numBR(String(v||'').replace(/R\$\s*/,'')); return n==null?0:n; }
 function eqCliDe(d){ return d.clienteId ? clientePorId(d.clienteId) : null; }
+/* chave de um equipamento: pelo patrimônio; sem patrimônio (esteira, lata…), pela remessa */
+function eqKey(d, it){ return (d.id+'__'+(it.p ? 'P'+it.p : (it.t||'')+'_'+(it.nf||'')+'_'+(it.d||''))).replace(/[^\w\-]/g,'_').slice(0,300); }
+function eqAv(d, it){ return EQ.aval[eqKey(d, it)]||null; }
+function eqPodeAvaliar(d){ return U.gestor || (U.comercial && d.donoUid===U.uid); }
+var EQ_MOTIVOS=['Parado / pouco uso','Venda não compensa','Cliente pediu','Com defeito','Cliente fechou','Outro'];
+/* compra média por mês (meses fechados) — só para quem vê o faturamento (gestor) */
+function eqCompraMes(d){
+  if(!U.gestor || !fatErp) return null;
+  var c=eqCliDe(d), e=eqErpDe(d), f=null;
+  [c&&c.nome, c&&c.erpNome, e&&e.n, e&&e.nErp, d.cliente].filter(Boolean).some(function(n){
+    return eqNomes(n).some(function(k){ if(fatErp[k]){ f=fatErp[k]; return true; } return false; }); });
+  if(!f) return null;                                        /* não achou no faturamento: não dá para dizer */
+  var atual=hoje().slice(0,7), ms=fatMeses.filter(function(m){ return m<atual; });
+  if(!ms.length) return null;
+  return ms.reduce(function(t,m){ return t+(f[m]||0); },0)/ms.length;
+}
+function eqRende(d){ var cm=eqCompraMes(d); return (cm==null || !(d.valor>0)) ? null : cm/d.valor; }
 function eqErpDe(d){ var c=eqCliDe(d); return (c && erpDe(c)) || (d.erpId && erp[d.erpId]) || null; }
 function eqVendNome(d){ var c=eqCliDe(d); return (c && c.donoNome) || d.rep || '—'; }
 function eqDiasSem(d){ var c=eqCliDe(d); if(c) return diasSemComprar(c);
@@ -929,27 +999,51 @@ function eqTempo(dias){                          /* 146 dias · 1 ano e 5 meses 
   var a=Math.floor(dias/365), m=Math.floor((dias%365)/30.5);
   return a+' ano'+(a>1?'s':'')+(m?' e '+m+' '+(m>1?'meses':'mês'):'');
 }
-function eqItensHtml(itens){
-  return '<div class="tscroll"><table class="eq-tab"><tr><th>Equipamento</th><th>Marca · modelo</th><th>Patrimônio</th><th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th></tr>'
+function eqItensHtml(itens, dd){
+  var acoes=!!dd;
+  if(acoes){                                   /* ficha do cliente (também no celular): compacto, com os botões da visita */
+    return '<div class="eq-fl">'+itens.map(function(it){
+      var d=dd(it), dias=it.d ? difDias(it.d, hoje()) : null;
+      return '<div class="eq-fi"><div style="min-width:0"><b>'+esc(it.t||'—')+'</b>'+((it.q||1)>1?' × '+it.q:'')
+        + ' <span class="eq-pat">'+esc(it.p||'s/ nº')+'</span>'
+        + '<div class="mini">'+esc([it.ma, (it.mo&&it.mo!=='N/D')?it.mo:''].filter(Boolean).join(' · '))
+        + (it.d?' · desde '+fmtDia(it.d)+' ('+eqTempo(dias)+')':'')+(it.v?' · '+fmtRS0(it.v):'')+'</div></div>'
+        + '<div class="eq-fa">'+eqConfCelula(d, it).replace(/^<td[^>]*>|<\/td>$/g,'')+'<div style="margin-top:4px">'+eqAvalHtml(d, it, true)+'</div></div></div>';
+    }).join('')+'</div>';
+  }
+  return '<div class="tscroll"><table class="eq-tab"><tr><th>Equipamento</th><th>Marca · modelo</th><th>Patrimônio</th><th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th>'
+    + (acoes?'<th>Na visita</th><th>Fica ou recolhe</th>':'')+'</tr>'
     + itens.map(function(it){
         var dias=it.d ? difDias(it.d, hoje()) : null;
         return '<tr><td><b>'+esc(it.t||'—')+'</b></td><td>'+esc([it.ma, (it.mo&&it.mo!=='N/D')?it.mo:''].filter(Boolean).join(' · ')||'—')+'</td>'
           + '<td class="eq-pat">'+esc(it.p||'s/ nº')+'</td><td class="r">'+(it.q||1)+'</td>'
           + '<td>'+(it.d?fmtDia(it.d)+' <span class="mini">· '+eqTempo(dias)+'</span>':'—')+'</td>'
-          + '<td class="mini">'+esc(it.nf||'—')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td></tr>';
+          + '<td class="mini">'+esc(it.nf||'—')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td>'
+          + (acoes ? eqConfCelula(dd(it), it)+'<td>'+eqAvalHtml(dd(it), it)+'</td>' : '')+'</tr>';
       }).join('')+'</table></div>';
+}
+function eqConfCelula(d, it){
+  var a=eqAv(d, it), k=eqKey(d, it), pode=eqPodeAvaliar(d);
+  if(!pode) return '<td class="mini">'+(a&&a.conf?(a.conf==='ok'?'✓ conferido':'✗ não encontrado'):'—')+'</td>';
+  return '<td style="white-space:nowrap"><button class="eq-cf'+(a&&a.conf==='ok'?' on':'')+'" onclick="eqConferir(\''+k+'\',\'ok\')">✓ Conferido</button>'
+    + '<button class="eq-cf'+(a&&a.conf==='nao'?' on':'')+'" onclick="eqConferir(\''+k+'\',\'nao\')">Não achei</button>'
+    + (a&&a.confEm?'<div class="mini">'+(a.conf==='ok'?'conferido':'não achado')+' em '+fmtDia(String(a.confEm).slice(0,10))+'</div>':'')+'</td>';
 }
 /* ficha do cliente: equipamentos dele (pelo vínculo gravado na importação) */
 function eqFichaPreencher(c){
+  EQ.fichaCli=c;
   var mostra=function(lista){
     var el=$('cli-eq'); if(!el) return;
     if(!lista.length){ el.innerHTML=''; return; }
-    var itens=[], val=0, q=0; lista.forEach(function(d){ (d.itens||[]).forEach(function(it){ itens.push(it); val+=it.v||0; q+=it.q||1; }); });
+    var itens=[], val=0, q=0, dono=new Map(); lista.forEach(function(d){ (d.itens||[]).forEach(function(it){ itens.push(it); dono.set(it, d); val+=it.v||0; q+=it.q||1; }); });
     el.innerHTML='<div class="det-sec">Equipamentos em comodato <span class="mini" style="text-transform:none;letter-spacing:0">'
       + q+' '+(q===1?'item':'itens')+' · '+fmtRS0(val)+(EQ.meta&&EQ.meta.importadoEm?' · planilha de '+fmtQuando(EQ.meta.importadoEm):'')+'</span></div>'
-      + eqItensHtml(itens);
+      + eqItensHtml(itens, function(it){ return dono.get(it); })
+      + '<div class="mini" style="margin-top:6px">Na visita, confira cada equipamento e marque se fica ou se deve ser recolhido.</div>';
   };
   if(EQ.docs){ mostra(EQ.docs.filter(function(d){ return d.clienteId===c.id; })); return; }
+  carregarEquip().then(function(){ if(EQ.docs) mostra(EQ.docs.filter(function(d){ return d.clienteId===c.id; })); });
+  return;
   var col=collection(db,'comEquipamentos');
   var q=U.gestor ? query(col, where('clienteId','==',c.id)) : query(col, where('clienteId','==',c.id), where('donoUid','==',U.uid));
   getDocs(q).then(function(r){ mostra(r.docs.map(function(x){ return x.data(); })); })
@@ -959,6 +1053,9 @@ function eqLista(){
   var q=norm(($('eq-busca')||{}).value||''), tipo=($('eq-tipo')||{}).value||'', vend=($('eq-vend')||{}).value||'';
   return (EQ.docs||[]).filter(function(d){
     if(EQ.filtro==='alerta' && !eqAlerta(d)) return false;
+    if(EQ.filtro==='recolher' && !(d.itens||[]).some(function(it){ var a=eqAv(d,it); return a && a.decisao==='recolhe'; })) return false;
+    if(EQ.filtro==='semaval' && !(d.itens||[]).some(function(it){ var a=eqAv(d,it); return !(a && a.decisao); })) return false;
+    if(EQ.filtro==='rende' && !(eqRende(d)!=null && eqRende(d)<0.1)) return false;
     if(EQ.filtro==='semvinc' && d.clienteId) return false;
     if(tipo && !(d.itens||[]).some(function(it){ return it.t===tipo; })) return false;
     if(vend && eqVendNome(d)!==vend) return false;
@@ -971,7 +1068,11 @@ function renderEquip(){
   var topo=$('eq-topo'), lista=$('eq-lista');
   if(!EQ.docs){ carregarEquip(); lista.innerHTML='<div class="empty">Lendo os equipamentos…</div>'; return; }
   var m=EQ.meta;
+  var pb=(m&&m.problemas)||null, nPb=pb ? (pb.patDup||[]).length+(pb.semPat||[]).length : 0;
   topo.innerHTML=(EQ.erro?'<div class="alert a-err">⚠ '+esc(EQ.erro)+'</div>':'')
+    + (U.gestor && nPb ? '<div class="alert a-warn" style="cursor:pointer" onclick="eqConferencia()">▲ <div>Conferência da planilha: '
+        + ((pb.patDup||[]).length?'<b>'+pb.patDup.length+'</b> patrimônio(s) em mais de um cliente':'')+((pb.patDup||[]).length&&(pb.semPat||[]).length?' · ':'')
+        + ((pb.semPat||[]).length?'<b>'+pb.semPat.length+'</b> equipamento(s) de valor sem patrimônio':'')+' — <u>ver lista</u></div></div>' : '')
     + (m ? '<div class="mini" style="margin-bottom:12px">Planilha de comodato importada em '+esc(fmtQuando(m.importadoEm))+(m.porNome?' por '+esc(m.porNome):'')
            + (m.arquivo?' · '+esc(m.arquivo):'')+' · '+(m.linhas||0).toLocaleString('pt-BR')+' linhas lidas, '+(m.itens||0).toLocaleString('pt-BR')+' equipamentos ainda nos clientes.</div>'
          : '<div class="alert a-info">ⓘ Ainda não há equipamentos carregados.'+(U.admin?' Use “⇪ Atualizar pela planilha” com a planilha de remessa e retorno da manutenção.':' A diretoria carrega pela planilha da manutenção.')+'</div>');
@@ -983,7 +1084,13 @@ function renderEquip(){
   sv.innerHTML='<option value="">Todos os vendedores</option>'+Object.keys(vends).sort().map(function(v){ return '<option>'+esc(v)+'</option>'; }).join('');
   st.value=at; sv.value=av;
   var nAl=EQ.docs.filter(eqAlerta).length, nSv=EQ.docs.filter(function(d){ return !d.clienteId; }).length;
-  $('eq-filtros').innerHTML=[['todos','Todos'], ['alerta','Sem comprar há +'+CFG.diasAlerta+' dias ('+nAl+')']].concat(U.gestor?[['semvinc','Fora da carteira ('+nSv+')']]:[])
+  var nRec=0, vRec=0, nSem=0;
+  EQ.docs.forEach(function(d){ (d.itens||[]).forEach(function(it){ var a=eqAv(d,it); if(a && a.decisao==='recolhe'){ nRec+=it.q||1; vRec+=it.v||0; } else if(!(a&&a.decisao)) nSem+=it.q||1; }); });
+  var nRende=U.gestor && fatErp ? EQ.docs.filter(function(d){ var r=eqRende(d); return r!=null && r<0.1; }).length : 0;
+  $('eq-filtros').innerHTML=[['todos','Todos'], ['alerta','Sem comprar há +'+CFG.diasAlerta+' dias ('+nAl+')'],
+      ['recolher','Para recolher ('+nRec.toLocaleString('pt-BR')+')'], ['semaval','Sem avaliação ('+nSem.toLocaleString('pt-BR')+')']]
+    .concat(U.gestor && fatErp?[['rende','Rende pouco ('+nRende+')']]:[])
+    .concat(U.gestor?[['semvinc','Fora da carteira ('+nSv+')']]:[])
     .map(function(f){ return '<button class="chip'+(EQ.filtro===f[0]?' on':'')+'" onclick="EQ.filtro=\''+f[0]+'\';EQ.lim=500;renderEquip()">'+f[1]+'</button>'; }).join('');
   var l=eqLista(), ord=($('eq-ord')||{}).value||'valor';
   var maisAnt=function(d){ return (d.itens||[]).reduce(function(m,it){ return it.d && (!m || it.d<m) ? it.d : m; }, ''); };
@@ -991,6 +1098,7 @@ function renderEquip(){
     if(ord==='nome') return String(a.cliente).localeCompare(String(b.cliente),'pt-BR');
     if(ord==='antigo') return String(maisAnt(a)||'9').localeCompare(String(maisAnt(b)||'9'));
     if(ord==='semcomprar'){ var x=eqDiasSem(a), y=eqDiasSem(b); return (y==null?-1:y)-(x==null?-1:x); }
+    if(ord==='rende'){ var ra=eqRende(a), rb=eqRende(b); return (ra==null?9:ra)-(rb==null?9:rb); }
     return (b.valor||0)-(a.valor||0);
   });
   var tq=0, tv=0; l.forEach(function(d){ tq+=d.qtd||0; tv+=d.valor||0; });
@@ -998,28 +1106,315 @@ function renderEquip(){
       '<div class="card"><div class="klabel">Clientes com equipamento</div><div class="kval">'+l.length.toLocaleString('pt-BR')+'</div></div>'
     + '<div class="card"><div class="klabel">Equipamentos nos clientes</div><div class="kval">'+tq.toLocaleString('pt-BR')+'</div><div class="khint">soma das quantidades</div></div>'
     + '<div class="card"><div class="klabel">Valor em comodato</div><div class="kval">'+fmtRS0(tv)+'</div></div>'
-    + '<div class="card kpi" onclick="EQ.filtro=\'alerta\';renderEquip()"><div class="klabel">Sem comprar há +'+CFG.diasAlerta+' dias</div><div class="kval" style="color:'+(nAl?'var(--red)':'inherit')+'">'+nAl+'</div><div class="khint">candidatos a recolher</div></div>';
+    + '<div class="card kpi" onclick="EQ.filtro=\'alerta\';renderEquip()"><div class="klabel">Sem comprar há +'+CFG.diasAlerta+' dias</div><div class="kval" style="color:'+(nAl?'var(--red)':'inherit')+'">'+nAl+'</div><div class="khint">candidatos a recolher</div></div>'
+    + '<div class="card kpi" onclick="EQ.filtro=\'recolher\';renderEquip()"><div class="klabel">Marcados para recolher</div><div class="kval">'+nRec.toLocaleString('pt-BR')+'</div><div class="khint">'+fmtRS0(vRec)+' em equipamento</div></div>';
   if(!l.length){ lista.innerHTML='<div class="empty">'+(EQ.docs.length?'Nenhum cliente nesse filtro.':'Nenhum equipamento carregado.')+'</div>'; return; }
   /* lista corrida: uma linha por equipamento, com a razão social em todas as linhas */
   var rows=eqLinhas(l, ($('eq-tipo')||{}).value||'');
   var corte=rows.slice(0, EQ.lim);
   lista.innerHTML='<div class="card" style="padding:0;overflow:hidden"><div class="eq-rol"><table class="eq-tab eq-corr"><thead><tr>'
     + '<th>Loja / endereço</th><th>Vendedor</th><th>Equipamento</th><th>Marca</th><th>Modelo</th><th>Patrimônio</th>'
-    + '<th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th></tr></thead><tbody>'
+    + '<th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th><th>Fica ou recolhe</th></tr></thead><tbody>'
     + corte.map(function(r){
         var d=r.d, c=r.c, it=r.it, nome=esc(r.nome);
         return '<tr'+(r.ini?' class="ini"':'')+'><td class="eq-loja"><div class="nm">'
           + (c ? '<a onclick="verCliente(\''+esc(c.id)+'\')">'+nome+'</a>' : nome)
           + (r.ini ? '<div class="eq-end">'+esc(r.onde)+(r.ds!=null?' · <span class="'+(r.al?'eq-alerta':'')+'">última compra há '+r.ds+' d</span>':'')
+              + eqRendeTxt(d) + eqRetiradaBtn(d)
               + (U.admin && !c ? ' · <a style="cursor:pointer;color:var(--accent,#e0303d);font-weight:700" onclick="eqLigar(\''+esc(d.id)+'\')">🔗 ligar</a>' : '')+'</div>' : '')
           + '</div></td><td>'+esc(r.vend)+'</td><td><b>'+esc(it.t||'—')+'</b></td><td>'+esc(it.ma||'')+'</td>'
-          + '<td>'+esc(it.mo&&it.mo!=='N/D'?it.mo:'')+'</td><td class="eq-pat">'+esc(it.p||'s/ nº')+'</td><td class="r">'+(it.q||1)+'</td>'
+          + '<td>'+esc(it.mo&&it.mo!=='N/D'?it.mo:'')+'</td><td class="eq-pat">'+(it.p&&U.gestor?'<span class="eh-pat" title="Ver o caminho deste equipamento" onclick="ehLinha(\''+esc(it.p)+'\')">'+esc(it.p)+'</span>':esc(it.p||'s/ nº'))+'</td><td class="r">'+(it.q||1)+'</td>'
           + '<td>'+(it.d?fmtDia(it.d)+'<div class="mini">'+eqTempo(difDias(it.d, hoje()))+'</div>':'—')+'</td>'
-          + '<td class="mini">'+esc(it.nf||'—')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td></tr>';
+          + '<td class="mini">'+esc(it.nf||'—')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td>'
+          + '<td>'+eqAvalHtml(d, it)+'</td></tr>';
       }).join('')
     + '</tbody></table></div></div>'
     + (rows.length>EQ.lim ? '<div style="text-align:center;margin:10px 0 20px"><button class="btn btn-ghost" onclick="EQ.lim+=500;renderEquip()">Mostrar mais ('
         + (rows.length-EQ.lim).toLocaleString('pt-BR')+' linhas)</button></div>' : '');
+}
+/* ---------- fica ou recolhe ---------- */
+function eqAvalHtml(d, it, semConf){
+  var a=eqAv(d, it), k=eqKey(d, it), pode=eqPodeAvaliar(d), dec=a&&a.decisao;
+  var info=[];
+  if(dec==='recolhe' && a.motivo) info.push(esc(a.motivo));
+  if(a && a.pedidoEm) info.push('retirada pedida '+fmtDia(String(a.pedidoEm).slice(0,10)));
+  if(a && a.conf && !semConf) info.push(a.conf==='ok'?'✓ conferido '+fmtDia(String(a.confEm||'').slice(0,10)):'✗ não encontrado '+fmtDia(String(a.confEm||'').slice(0,10)));
+  if(a && a.porNome && dec) info.push(esc(a.porNome.split(' ')[0]));
+  var b=function(v, t){ return '<button class="eq-av'+(dec===v?' on '+v:'')+'" '+(pode?'onclick="eqAvaliar(\''+k+'\',\''+v+'\')"':'disabled')+'>'+t+'</button>'; };
+  return '<div class="eq-avs">'+b('fica','Fica')+b('recolhe','Recolhe')+'</div>'+(info.length?'<div class="mini">'+info.join(' · ')+'</div>':'');
+}
+function eqAchar(k){
+  var r=null; (EQ.docs||[]).some(function(d){ return (d.itens||[]).some(function(it){ if(eqKey(d,it)===k){ r={ d:d, it:it }; return true; } return false; }); });
+  return r;
+}
+function eqSalvarAval(k, dados){
+  var x=eqAchar(k); if(!x) return Promise.reject(new Error('equipamento não encontrado'));
+  var d=x.d, it=x.it;
+  var base={ docId:d.id, cliente:(eqCliDe(d)&&eqCliDe(d).nome)||d.cliente||'', clienteId:d.clienteId||'', erpId:d.erpId||'',
+             donoUid:d.donoUid||'', tipo:it.t||'', patrimonio:it.p||'', qtd:it.q||1, valor:it.v||0, atualizadoEm:agoraISO() };
+  var tudo=Object.assign(base, dados);
+  return setDoc(doc(db,'comEquipAval',k), tudo, { merge:true }).then(function(){
+    EQ.aval[k]=Object.assign({}, EQ.aval[k]||{}, tudo);
+  });
+}
+function eqAvaliar(k, v){
+  var a=EQ.aval[k];
+  if(a && a.decisao===v){                                   /* tocar de novo desmarca */
+    eqSalvarAval(k, { decisao:'', motivo:'', obs:'', por:U.email, porNome:U.nome, em:agoraISO() }).then(render).catch(falha('desmarcar'));
+    return;
+  }
+  if(v==='fica'){ eqSalvarAval(k, { decisao:'fica', motivo:'', obs:'', por:U.email, porNome:U.nome, em:agoraISO() }).then(render).catch(falha('salvar a avaliação')); return; }
+  var x=eqAchar(k); if(!x) return;
+  EQ.motivo='';
+  abrirModal({ titulo:'Recolher '+esc(x.it.t||'equipamento')+(x.it.p?' '+esc(x.it.p):''), sub:esc(x.d.cliente||''),
+    corpo:'<div class="fld"><label>Por que recolher? *</label><div class="chips" id="eq-mot">'
+      + EQ_MOTIVOS.map(function(m){ return '<button type="button" class="chip" onclick="EQ.motivo=this.textContent;document.querySelectorAll(\'#eq-mot .chip\').forEach(function(b){ b.classList.toggle(\'on\', b.textContent===EQ.motivo); })">'+esc(m)+'</button>'; }).join('')
+      + '</div></div><div class="fld"><label>Observação</label><input type="text" id="eq-mot-obs" maxlength="160" placeholder="opcional"></div>',
+    botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Marcar para recolher', fn:function(el){
+      if(!EQ.motivo){ toast('Escolha o motivo.', true); return; }
+      var pare=ocupado(el);
+      eqSalvarAval(k, { decisao:'recolhe', motivo:EQ.motivo, obs:($('eq-mot-obs')||{}).value||'', por:U.email, porNome:U.nome, em:agoraISO() })
+        .then(function(){ fecharModal(); toast('Marcado para recolher.'); render(); }).catch(function(e){ pare(); falha('salvar a avaliação')(e); });
+    } }] });
+}
+/* conferido na visita (pela ficha do cliente) */
+function eqConferir(k, v){
+  eqSalvarAval(k, { conf:v, confEm:agoraISO(), confPor:U.email, confNome:U.nome })
+    .then(function(){ toast(v==='ok'?'Conferido.':'Marcado como não encontrado.'); render(); var c=EQ.fichaCli; if(c) eqFichaPreencher(c); })
+    .catch(falha('salvar a conferência'));
+}
+function eqRendeTxt(d){
+  var cm=eqCompraMes(d); if(cm==null) return '';
+  var r=d.valor>0 ? cm/d.valor : null;
+  return ' · compra '+fmtRS0(cm)+'/mês'+(r!=null?' <span class="'+(r<0.1?'eq-alerta':'')+'">('+(r*100).toLocaleString('pt-BR',{maximumFractionDigits:0})+'% do valor em comodato)</span>':'');
+}
+/* ---------- pedido de retirada para a manutenção ---------- */
+function eqRetPendentes(d){
+  return (d.itens||[]).filter(function(it){ var a=eqAv(d,it); return a && a.decisao==='recolhe' && !a.pedidoEm; });
+}
+function eqRetiradaBtn(d){
+  var p=eqRetPendentes(d); if(!p.length || !eqPodeAvaliar(d)) return '';
+  return '<div style="margin-top:5px"><button class="btn btn-sm" onclick="eqPedirRetirada(\''+esc(d.id)+'\')">⇢ Pedir retirada ('+p.reduce(function(t,it){ return t+(it.q||1); },0)+')</button></div>';
+}
+function eqPedirRetirada(id){
+  var d=(EQ.docs||[]).filter(function(x){ return x.id===id; })[0]; if(!d) return;
+  var its=eqRetPendentes(d); if(!its.length) return;
+  var c=eqCliDe(d), e=d.erpId?erp[d.erpId]:null;
+  EQ.retPend={ docId:id, chaves:its.map(function(it){ return eqKey(d,it); }) };
+  /* agrupa por tipo e modelo: quantidade somada e patrimônios juntos */
+  var g={}; its.forEach(function(it){ var k=(it.t||'')+'|'+(it.mo&&it.mo!=='N/D'?it.mo:''); var o=g[k]||(g[k]={ t:it.t||'', mo:(it.mo&&it.mo!=='N/D')?it.mo:'', q:0, p:[] }); o.q+=it.q||1; if(it.p) o.p.push(it.p); });
+  var grupos=Object.keys(g).map(function(k){ return g[k]; });
+  var motivos={}; its.forEach(function(it){ var a=eqAv(d,it); if(a&&a.motivo) motivos[a.motivo]=1; });
+  var obs='Recolher (avaliado no app Comercial): '+Object.keys(motivos).join(', ');
+  abrirSolic('equipamento', c?c.id:null);
+  setTimeout(function(){
+    if(!c){                                                  /* cliente do ERP fora da carteira */
+      PK['fs-cli'].sel={ clienteId:'', erpId:d.erpId||'', nome:(e&&e.n)||d.cliente, cidade:(e&&e.c)||d.cidade||'' };
+      pkPintar('fs-cli'); if(PK['fs-cli'].onSel) PK['fs-cli'].onSel(PK['fs-cli'].sel);
+    }
+    if(U.comodato){
+      var bt=document.querySelector('#cm-cat .chip[data-v="remessa"]'); if(bt) cmCat(bt);
+      var sv=$('cm-serv'); if(sv) sv.value='retirar';
+      grupos.forEach(function(o, i){
+        if(i>0) cmItemAdd();
+        var linhas=document.querySelectorAll('#cm-itens .cm-it'), lin=linhas[linhas.length-1], n=lin.getAttribute('data-i');
+        var opc=CM_TIPOS.filter(function(t){ return norm(t)===norm(o.t); })[0];
+        var se=$('cm-eq-'+n); if(se){ se.value=opc||'__outro'; cmEqMudou(n); }
+        if(!opc && $('cm-outro-'+n)) $('cm-outro-'+n).value=o.t;
+        if($('cm-mod-'+n)) $('cm-mod-'+n).value=o.mo;
+        if($('cm-qtd-'+n)) $('cm-qtd-'+n).value=o.q;
+        if($('cm-pat-'+n)) $('cm-pat-'+n).value=o.p.join(', ');
+      });
+      if($('cm-obs')) $('cm-obs').value=obs;
+      toast('Confira e escolha a data da retirada.');
+    }else{
+      var tit=$('fs-tit'); if(tit) tit.value='Retirar equipamentos — '+(d.cliente||'');
+      var de=$('fs-desc'); if(de) de.value=obs+'\n'+grupos.map(function(o){ return o.q+'× '+o.t+(o.mo?' '+o.mo:'')+(o.p.length?' (patrimônio '+o.p.join(', ')+')':''); }).join('\n');
+      var ie=document.querySelector('#fs-campos input[data-k="equipamento"]'); if(ie) ie.value=grupos.map(function(o){ return o.q+'× '+o.t; }).join(', ');
+      var is=document.querySelector('#fs-campos input[data-k="servico"]'); if(is) is.value='Retirar';
+    }
+  }, 80);
+}
+/* chamado quando o pedido de equipamento foi enviado: marca os equipamentos como "retirada pedida" */
+function eqRetiradaEnviada(){
+  var R=EQ.retPend; EQ.retPend=null; if(!R) return;
+  var em=agoraISO();
+  Promise.all(R.chaves.map(function(k){ return eqSalvarAval(k, { pedidoEm:em, pedidoPor:U.email }); }))
+    .then(function(){ if(pagina==='equip') render(); }).catch(function(e){ console.warn('marcar retirada pedida:', e); });
+}
+/* ---------- conferência da planilha ---------- */
+function eqConferencia(){
+  var pb=(EQ.meta&&EQ.meta.problemas)||{};
+  abrirModal({ titulo:'Conferência da planilha', sub:EQ.meta&&EQ.meta.arquivo?esc(EQ.meta.arquivo):'', wide:true,
+    corpo:((pb.patDup||[]).length?'<div class="det-sec">Mesmo patrimônio em mais de um cliente ('+pb.patDup.length+')</div>'
+        +'<div class="mini" style="margin-bottom:6px">Um equipamento não pode estar em dois lugares: provavelmente faltou a data de retorno no cliente anterior.</div>'
+        +'<div class="tscroll" style="max-height:38vh"><table class="eq-tab"><tr><th>Patrimônio</th><th>Tipo</th><th>Clientes</th></tr>'
+        + pb.patDup.map(function(x){ return '<tr><td class="eq-pat">'+esc(x.p)+'</td><td>'+esc(x.t||'')+'</td><td>'+x.clientes.map(esc).join('<br>')+'</td></tr>'; }).join('')+'</table></div>':'')
+      + ((pb.semPat||[]).length?'<div class="det-sec">Equipamento de valor sem número de patrimônio ('+pb.semPat.length+')</div>'
+        +'<div class="tscroll" style="max-height:38vh"><table class="eq-tab"><tr><th>Cliente</th><th>Equipamento</th><th>Remessa</th><th class="r">Valor</th></tr>'
+        + pb.semPat.map(function(x){ return '<tr><td>'+esc(x.cliente)+'</td><td>'+esc(x.t)+(x.mo?' · '+esc(x.mo):'')+'</td><td>'+(x.d?fmtDia(x.d):'—')+(x.nf?' · NF '+esc(x.nf):'')+'</td><td class="r">'+fmtRS0(x.v)+'</td></tr>'; }).join('')+'</table></div>':'')
+      + (!(pb.patDup||[]).length && !(pb.semPat||[]).length ? '<div class="empty">Nenhum problema encontrado na última importação.</div>' : '')
+      + '<div class="mini" style="margin-top:10px">A correção é na planilha da manutenção; na próxima importação a lista se atualiza.</div>',
+    botoes:[{ txt:'Fechar', cls:'btn-ghost', fn:fecharModal }] });
+}
+/* ====================================================================
+   HISTÓRICO DOS EQUIPAMENTOS — todas as linhas da planilha (remessas e
+   retornos), guardadas a cada importação em comEquipMov. Três visões:
+   movimentações (como na planilha), por equipamento (o caminho de cada
+   patrimônio, com as passagens pela manutenção) e as importações.
+   ==================================================================== */
+var EH={ modo:'mov', lim:500, lendo:false, erro:'' };
+function carregarMov(){
+  if(EQ.mov || EH.lendo) return; EH.lendo=true;
+  getDocs(collection(db,'comEquipMov')).then(function(r){
+    var l=[], meta=null;
+    r.docs.sort(function(a,b){ return a.id.localeCompare(b.id); }).forEach(function(x){ if(x.id==='_meta'){ meta=x.data(); return; } l=l.concat((x.data()||{}).linhas||[]); });
+    EQ.mov=l; EQ.movMeta=meta; EH.lendo=false; EH.erro=''; if(pagina==='eqhist') renderEqHist();
+  }).catch(function(e){ EH.lendo=false; EQ.mov=[]; EH.erro=e.code==='permission-denied'?'Sem permissão para ler o histórico (regra do Firestore publicada?).':'Não foi possível ler o histórico.'; console.warn('comEquipMov', e); if(pagina==='eqhist') renderEqHist(); });
+}
+function ehModo(m){ EH.modo=m; EH.lim=500; document.querySelectorAll('#eh-modo button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-m')===m); }); renderEqHist(); }
+function ehFiltrados(){
+  var q=norm(($('eh-busca')||{}).value||'').split(' ').filter(Boolean), tipo=($('eh-tipo')||{}).value||'', sit=($('eh-sit')||{}).value||'';
+  var de=($('eh-de')||{}).value||'', ate=($('eh-ate')||{}).value||'';
+  return (EQ.mov||[]).filter(function(m){
+    if(tipo && m.t!==tipo) return false;
+    if(sit==='cli' && m.rt) return false;
+    if(sit==='ret' && !m.rt) return false;
+    if(de || ate){ var ok=[m.re, m.rt].some(function(x){ return x && (!de || x>=de) && (!ate || x<=ate); }); if(!ok) return false; }
+    if(q.length){ var t=norm([m.c, m.ci, m.r, m.p, m.nr, m.nt, m.t, m.ma, m.mo, m.io].join(' ')); if(q.some(function(w){ return t.indexOf(w)<0; })) return false; }
+    return true;
+  });
+}
+function renderEqHist(){
+  var lista=$('eh-lista'), info=$('eh-info');
+  if(!U.gestor){ lista.innerHTML='<div class="empty">Só a diretoria e os gerentes veem o histórico.</div>'; return; }
+  if(EH.modo==='imp'){ info.textContent=''; lista.innerHTML=ehImportacoesHtml(); if(!EQ.docs) carregarEquip().then(function(){ if(pagina==='eqhist' && EH.modo==='imp') renderEqHist(); }); return; }
+  if(!EQ.mov){ carregarMov(); lista.innerHTML='<div class="empty">'+(EH.lendo?'Lendo o histórico…':'')+'</div>'; return; }
+  if(EH.erro){ lista.innerHTML='<div class="alert a-err">⚠ '+esc(EH.erro)+'</div>'; return; }
+  if(!EQ.mov.length){ lista.innerHTML='<div class="alert a-info">ⓘ O histórico completo começa na próxima importação da planilha (Nos clientes → ⇪ Atualizar pela planilha).</div>'; return; }
+  var st=$('eh-tipo'), at=st.value, tipos={};
+  EQ.mov.forEach(function(m){ if(m.t) tipos[m.t]=1; });
+  st.innerHTML='<option value="">Todos os equipamentos</option>'+Object.keys(tipos).sort().map(function(t){ return '<option>'+esc(t)+'</option>'; }).join(''); st.value=at;
+  var l=ehFiltrados();
+  if(EH.modo==='pat'){ ehPorEquipamento(l); return; }
+  l.sort(function(a,b){ return String(b.rt||b.re||'').localeCompare(String(a.rt||a.re||'')); });   /* mais recentes primeiro */
+  var nCli=l.filter(function(m){ return !m.rt; }).length;
+  info.innerHTML=l.length.toLocaleString('pt-BR')+' movimentações · '+nCli.toLocaleString('pt-BR')+' ainda no cliente · '+(l.length-nCli).toLocaleString('pt-BR')+' retornaram'
+    + (EQ.movMeta&&EQ.movMeta.em?' · planilha de '+esc(fmtQuando(EQ.movMeta.em)):'');
+  lista.innerHTML='<div class="card" style="padding:0;overflow:hidden"><div class="eq-rol"><table class="eq-tab eq-corr"><thead><tr>'
+    + '<th>Remessa</th><th>Retorno</th><th>Cliente</th><th>Cidade</th><th>Repres.</th><th>Equipamento</th><th>Marca</th><th>Modelo</th>'
+    + '<th>Patrimônio</th><th class="r">Qtd</th><th>NF rem.</th><th>NF ret.</th><th class="r">Valor</th></tr></thead><tbody>'
+    + l.slice(0, EH.lim).map(function(m){
+        var dias=m.re ? difDias(m.re, m.rt||hoje()) : null;
+        return '<tr><td>'+(m.re?fmtDia(m.re):'—')+'</td>'
+          + '<td>'+(m.rt?fmtDia(m.rt):'<span style="color:var(--green);font-weight:700">no cliente</span>'+(m.rtx?'<div class="mini">“'+esc(m.rtx)+'”</div>':''))
+          + (dias!=null?'<div class="mini">'+eqTempo(dias)+(m.rt?' lá':'')+'</div>':'')+'</td>'
+          + '<td class="eq-loja" style="min-width:220px"><div class="nm">'+esc(m.c)+'</div>'+(m.io?'<div class="eq-end">IO '+esc(m.io)+'</div>':'')+'</td>'
+          + '<td>'+esc(m.ci)+'</td><td>'+esc(m.r)+'</td><td><b>'+esc(m.t)+'</b></td><td>'+esc(m.ma)+'</td><td>'+esc(m.mo&&m.mo!=='N/D'?m.mo:'')+'</td>'
+          + '<td class="eq-pat">'+(m.p?'<span class="eh-pat" onclick="ehLinha(\''+esc(m.p)+'\')">'+esc(m.p)+'</span>':'s/ nº')+'</td><td class="r">'+m.q+'</td>'
+          + '<td class="mini">'+esc(m.nr||'—')+'</td><td class="mini">'+esc(m.nt||'—')+'</td><td class="r">'+(m.v?fmtRS0(m.v):'—')+'</td></tr>';
+      }).join('')+'</tbody></table></div></div>'
+    + (l.length>EH.lim ? '<div style="text-align:center;margin:10px 0 20px"><button class="btn btn-ghost" onclick="EH.lim+=1000;renderEqHist()">Mostrar mais ('+(l.length-EH.lim).toLocaleString('pt-BR')+')</button></div>' : '');
+}
+/* por equipamento: cada patrimônio com o caminho resumido; tocar abre a linha do tempo */
+function ehPorEquipamento(l){
+  var info=$('eh-info'), lista=$('eh-lista'), P={};
+  l.forEach(function(m){ if(!m.p) return; var o=P[m.p]||(P[m.p]={ p:m.p, t:m.t, ma:m.ma, mo:m.mo, mov:[] }); o.mov.push(m); });
+  var ps=Object.keys(P).map(function(k){ var o=P[k]; o.mov.sort(function(a,b){ return String(a.re).localeCompare(String(b.re)); });
+    o.ult=o.mov[o.mov.length-1]; o.clientes={}; o.mov.forEach(function(m){ o.clientes[m.c]=1; }); o.nCli=Object.keys(o.clientes).length; return o; })
+    .sort(function(a,b){ return b.nCli-a.nCli || String(a.p).localeCompare(String(b.p)); });
+  info.innerHTML=ps.length.toLocaleString('pt-BR')+' equipamentos com patrimônio. Toque no número para ver o caminho completo, com as passagens pela manutenção.'
+    + ' <span class="mini">(Esteira, lata e outros sem número não dá para seguir um a um.)</span>';
+  lista.innerHTML='<div class="card" style="padding:0;overflow:hidden"><div class="eq-rol"><table class="eq-tab eq-corr"><thead><tr>'
+    + '<th>Patrimônio</th><th>Equipamento</th><th class="r">Clientes por onde passou</th><th>Onde está agora</th><th>Desde</th></tr></thead><tbody>'
+    + ps.slice(0, EH.lim).map(function(o){ var u=o.ult, agora=!u.rt;
+        return '<tr><td class="eq-pat"><span class="eh-pat" onclick="ehLinha(\''+esc(o.p)+'\')">'+esc(o.p)+'</span></td>'
+          + '<td><b>'+esc(o.t)+'</b> <span class="mini">'+esc([o.ma, o.mo&&o.mo!=='N/D'?o.mo:''].filter(Boolean).join(' · '))+'</span></td>'
+          + '<td class="r">'+o.nCli+'</td>'
+          + '<td>'+(agora?'<b>'+esc(u.c)+'</b> <span class="mini">'+esc(u.ci)+'</span>':'<span class="mini">na Monte Castelo (retornou de '+esc(u.c)+')</span>')+'</td>'
+          + '<td>'+(agora?(u.re?fmtDia(u.re):'—'):(u.rt?fmtDia(u.rt):'—'))+'</td></tr>'; }).join('')+'</tbody></table></div></div>'
+    + (ps.length>EH.lim ? '<div style="text-align:center;margin:10px 0 20px"><button class="btn btn-ghost" onclick="EH.lim+=1000;renderEqHist()">Mostrar mais</button></div>' : '');
+}
+function ehDataTxt(v){                              /* data do Manut. Comodato: texto ou Timestamp */
+  if(!v) return '';
+  if(typeof v==='object' && v.seconds) return diaLocal(new Date(v.seconds*1000));
+  if(typeof v==='number') return diaLocal(new Date(v));
+  return eqData(v) || String(v).slice(0,10);
+}
+/* linha do tempo de um patrimônio: clientes (remessa → retorno), tempo na Monte Castelo entre um e outro,
+   e as entradas na manutenção do Comodato */
+function ehLinha(pat){
+  var montar=function(man){
+    var mv=(EQ.mov||[]).filter(function(m){ return m.p===pat; }).sort(function(a,b){ return String(a.re).localeCompare(String(b.re)); });
+    var ev=[];
+    mv.forEach(function(m, i){
+      ev.push({ d:m.re||'', tipo:'cli', m:m });
+      var prox=mv[i+1];
+      if(m.rt && prox && prox.re && prox.re>m.rt) ev.push({ d:m.rt, tipo:'mc', ate:prox.re });
+      if(m.rt && !prox) ev.push({ d:m.rt, tipo:'mc', ate:'' });
+    });
+    (man||[]).forEach(function(x){ var de=ehDataTxt(x.dataEntrada); ev.push({ d:de, tipo:'man', x:x, ate:ehDataTxt(x.dataSaida) }); });
+    ev.sort(function(a,b){ return String(a.d).localeCompare(String(b.d)) || (a.tipo==='cli'?-1:1); });
+    var t0=mv[0]||{}, cls={};
+    mv.forEach(function(m){ cls[m.c]=1; });
+    var html=ev.length ? '<div class="eh-tl">'+ev.map(function(e){
+      if(e.tipo==='cli'){ var m=e.m, dias=m.re?difDias(m.re, m.rt||hoje()):null;
+        return '<div class="eh-ev'+(m.rt?'':' cli')+'"><b>'+esc(m.c)+'</b> <span class="mini">'+esc(m.ci||'')+(m.r?' · '+esc(m.r):'')+'</span>'
+          + '<div class="mini">'+(m.re?'remessa '+fmtDia(m.re):'remessa sem data')+(m.nr?' (NF '+esc(m.nr)+')':'')
+          + (m.rt?' → retorno '+fmtDia(m.rt)+(m.nt?' (NF '+esc(m.nt)+')':''):' → <b style="color:var(--green)">está lá</b>'+(m.rtx?' · “'+esc(m.rtx)+'”':''))
+          + (dias!=null?' · '+eqTempo(dias):'')+'</div></div>'; }
+      if(e.tipo==='mc') return '<div class="eh-ev mc"><span class="mini">Na Monte Castelo'+(e.ate?' de '+fmtDia(e.d)+' a '+fmtDia(e.ate)+' · '+eqTempo(difDias(e.d, e.ate)):' desde '+fmtDia(e.d)+' · '+eqTempo(difDias(e.d, hoje())))+'</span></div>';
+      var x=e.x;
+      return '<div class="eh-ev man"><b>Manutenção</b> <span class="mini">'+(e.d?'entrada '+fmtDia(e.d):'')+(e.ate?' → saída '+fmtDia(e.ate):' · ainda na manutenção')
+        + (x.nf?' · NF '+esc(x.nf):'')+'</span>'+(x.problema?'<div class="mini">Problema: '+esc(x.problema)+'</div>':'')
+        + (x.servicos&&x.servicos.length?'<div class="mini">Serviços: '+esc(x.servicos.map(function(s){ return typeof s==='string'?s:(s.desc||s.nome||s.descricao||''); }).filter(Boolean).join('; '))+'</div>':'')+'</div>';
+    }).join('')+'</div>' : '<div class="empty">Nenhuma movimentação com esse patrimônio.</div>';
+    abrirModal({ titulo:'Equipamento '+esc(pat), sub:esc([t0.t, t0.ma, t0.mo&&t0.mo!=='N/D'?t0.mo:''].filter(Boolean).join(' · ')), wide:true,
+      corpo:'<div class="mini" style="margin-bottom:12px">'+mv.length+' remessa(s) · '+Object.keys(cls).length+' cliente(s)'+((man||[]).length?' · '+man.length+' entrada(s) na manutenção':'')+'</div>'+html,
+      botoes:[{ txt:'Fechar', cls:'btn-ghost', fn:fecharModal }] });
+  };
+  var seguir=function(){
+    getDocs(query(collection(db,'equipamentosEstoque'), where('patrimonio','==',pat)))
+      .then(function(r){ montar(r.docs.map(function(x){ return x.data(); })); })
+      .catch(function(e){ console.warn('equipamentosEstoque:', e); montar([]); });
+  };
+  if(!EQ.mov){ carregarMov(); var n=0, t=setInterval(function(){ if(EQ.mov || ++n>40){ clearInterval(t); seguir(); } }, 200); }
+  else seguir();
+}
+function ehImportacoesHtml(){
+  var h=(EQ.hist||[]).slice().sort(function(a,b){ return String(b.em).localeCompare(String(a.em)); });
+  return h.length ? '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll"><table class="eq-tab eq-corr"><thead><tr><th>Importação</th><th class="r">Clientes</th><th class="r">Equipamentos</th><th class="r">Valor em comodato</th>'
+      +'<th class="r">Entraram</th><th class="r">Saíram (retornaram)</th></tr></thead><tbody>'
+      + h.map(function(x){ return '<tr><td>'+esc(fmtQuando(x.em))+'<div class="mini">'+esc(x.porNome||'')+(x.arquivo?' · '+esc(x.arquivo):'')+'</div></td><td class="r">'+(x.clientes||0).toLocaleString('pt-BR')+'</td>'
+        +'<td class="r">'+(x.itens||0).toLocaleString('pt-BR')+'</td><td class="r">'+fmtRS0(x.valor||0)+'</td>'
+        +'<td class="r">'+(x.entraram?'+'+x.entraram.q.toLocaleString('pt-BR')+'<div class="mini">'+fmtRS0(x.entraram.v)+'</div>':'—')+'</td>'
+        +'<td class="r">'+(x.sairam?'−'+x.sairam.q.toLocaleString('pt-BR')+'<div class="mini">'+fmtRS0(x.sairam.v)+'</div>':'—')+'</td></tr>'; }).join('')+'</tbody></table></div></div>'
+      + '<div class="mini" style="margin-top:8px">Cada importação da planilha vira uma linha; "Entraram" e "Saíram" comparam com a anterior.</div>'
+    : '<div class="empty">'+(EQ.docs?'O resumo começa na próxima importação da planilha.':'Lendo…')+'</div>';
+}
+function ehExcel(){
+  if(!EQ.mov || !EQ.mov.length){ toast('Nada para exportar.', true); return; }
+  carregarXLSX().then(function(){
+    var aoa=[['IO','Cliente','Cidade','Representante','Remessa','Retorno','Situação','Qtd','Equipamento','Marca','Modelo','Valor (R$)','Patrimônio','NF remessa','NF retorno']];
+    ehFiltrados().forEach(function(m){ aoa.push([m.io, m.c, m.ci, m.r, m.re?fmtDia(m.re):'', m.rt?fmtDia(m.rt):(m.rtx||''), m.rt?'retornou':'no cliente', m.q, m.t, m.ma, m.mo, m.v, m.p, m.nr, m.nt]); });
+    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:7},{wch:38},{wch:20},{wch:14},{wch:11},{wch:11},{wch:10},{wch:5},{wch:13},{wch:15},{wch:13},{wch:10},{wch:11},{wch:10},{wch:10}];
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Movimentações');
+    XLSX.writeFile(wb, 'equipamentos-historico-'+hoje()+'.xlsx');
+  }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
+}
+/* ---------- histórico das importações ---------- */
+function eqHistorico(){
+  var h=(EQ.hist||[]).slice().sort(function(a,b){ return String(b.em).localeCompare(String(a.em)); });
+  abrirModal({ titulo:'Histórico das importações', wide:true,
+    corpo:h.length ? '<div class="tscroll"><table class="eq-tab"><tr><th>Importação</th><th class="r">Clientes</th><th class="r">Equipamentos</th><th class="r">Valor em comodato</th>'
+        +'<th class="r">Entraram</th><th class="r">Saíram (retornaram)</th></tr>'
+        + h.map(function(x){ return '<tr><td>'+esc(fmtQuando(x.em))+'<div class="mini">'+esc(x.porNome||'')+'</div></td><td class="r">'+(x.clientes||0).toLocaleString('pt-BR')+'</td>'
+          +'<td class="r">'+(x.itens||0).toLocaleString('pt-BR')+'</td><td class="r">'+fmtRS0(x.valor||0)+'</td>'
+          +'<td class="r">'+(x.entraram?'+'+x.entraram.q.toLocaleString('pt-BR')+'<div class="mini">'+fmtRS0(x.entraram.v)+'</div>':'—')+'</td>'
+          +'<td class="r">'+(x.sairam?'−'+x.sairam.q.toLocaleString('pt-BR')+'<div class="mini">'+fmtRS0(x.sairam.v)+'</div>':'—')+'</td></tr>'; }).join('')+'</table></div>'
+        + '<div class="mini" style="margin-top:8px">Cada importação da planilha vira uma linha. "Entraram" e "Saíram" comparam com a importação anterior.</div>'
+      : '<div class="empty">O histórico começa na próxima importação da planilha.</div>',
+    botoes:[{ txt:'Fechar', cls:'btn-ghost', fn:fecharModal }] });
 }
 /* linhas da lista corrida (tela e relatório): cliente na ordem da tela, equipamentos por tipo */
 function eqLinhas(l, tipo){
@@ -1031,7 +1426,12 @@ function eqLinhas(l, tipo){
     var cid=d.cidade||(c&&c.cidade)||'';
     if(cid && end && norm(end).indexOf(evCid(cid))>=0) cid='';      /* a cidade já está no endereço */
     var onde=[end, cid].filter(Boolean).join(' · '), vend=eqVendNome(d);
-    (d.itens||[]).filter(function(it){ return !tipo || it.t===tipo; }).forEach(function(it, i){
+    (d.itens||[]).filter(function(it){
+      if(tipo && it.t!==tipo) return false;
+      var a=eqAv(d, it);
+      if(EQ.filtro==='recolher') return !!(a && a.decisao==='recolhe');
+      if(EQ.filtro==='semaval') return !(a && a.decisao);
+      return true; }).forEach(function(it, i){
       out.push({ d:d, c:c, it:it, ini:i===0, nome:nome, onde:onde, vend:vend, ds:ds, al:al });
     });
   });
@@ -1051,7 +1451,8 @@ function eqRelatorio(){
     });
     var tipo=($('eq-tipo')||{}).value||'', vend=($('eq-vend')||{}).value||'', busca=(($('eq-busca')||{}).value||'').trim();
     var filtros=[tipo?'equipamento: '+tipo:'', vend?'vendedor: '+vend:'', busca?'busca: “'+busca+'”':'',
-                 EQ.filtro==='alerta'?'só sem comprar há +'+CFG.diasAlerta+' dias':'', EQ.filtro==='semvinc'?'só fora da carteira':''].filter(Boolean);
+                 EQ.filtro==='alerta'?'só sem comprar há +'+CFG.diasAlerta+' dias':'', EQ.filtro==='semvinc'?'só fora da carteira':'',
+                 EQ.filtro==='recolher'?'só marcados para recolher':'', EQ.filtro==='semaval'?'só sem avaliação':'', EQ.filtro==='rende'?'só os que rendem pouco':''].filter(Boolean);
     var tq=0, tv=0, linhas=0, h='';
     eqLinhas(l, tipo).forEach(function(r){
       var it=r.it; tq+=it.q||1; tv+=it.v||0; linhas++;
@@ -1060,7 +1461,8 @@ function eqRelatorio(){
         + '<td>'+esc(r.vend)+(r.ini && r.ds!=null?'<div class="end">última compra há '+r.ds+' d</div>':'')+'</td>'
         + '<td><b>'+esc(it.t||'—')+'</b></td><td>'+esc(it.ma||'')+'</td><td>'+esc(it.mo&&it.mo!=='N/D'?it.mo:'')+'</td>'
         + '<td class="pat">'+esc(it.p||'s/ nº')+'</td><td class="r">'+(it.q||1)+'</td>'
-        + '<td>'+(it.d?fmtDia(it.d):'—')+'</td><td>'+esc(it.nf||'')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td></tr>';
+        + '<td>'+(it.d?fmtDia(it.d):'—')+'</td><td>'+esc(it.nf||'')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td>'
+        + '<td>'+(function(a){ return a&&a.decisao==='recolhe'?'<b>RECOLHE</b>'+(a.motivo?'<div class="end">'+esc(a.motivo)+'</div>':''):(a&&a.decisao==='fica'?'fica':''); })(eqAv(r.d, it))+'</td></tr>';
     });
     $('eq-print').innerHTML='<h1>Equipamentos em comodato nos clientes</h1>'
       + '<div class="sub">Panificadora Monte Castelo · gerado em '+new Date().toLocaleString('pt-BR')+' por '+esc(U.nome||U.email)
@@ -1069,7 +1471,7 @@ function eqRelatorio(){
       + '<div class="tot"><span><b>'+l.length.toLocaleString('pt-BR')+'</b> clientes</span><span><b>'+tq.toLocaleString('pt-BR')+'</b> equipamentos</span>'
       + '<span>Valor em comodato: <b>'+fmtRS0(tv)+'</b></span></div>'
       + '<table><thead><tr><th style="width:24%">Loja / endereço</th><th style="width:9%">Vendedor</th><th>Equipamento</th><th>Marca</th><th>Modelo</th>'
-      + '<th>Patrimônio</th><th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th></tr></thead><tbody>'+h+'</tbody></table>';
+      + '<th>Patrimônio</th><th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th><th>Fica / recolhe</th></tr></thead><tbody>'+h+'</tbody></table>';
     document.body.classList.add('imp-eq');
     var fim=function(){ document.body.classList.remove('imp-eq'); window.removeEventListener('afterprint', fim); };
     window.addEventListener('afterprint', fim);
@@ -1085,10 +1487,13 @@ function eqAbrirTodos(){ if(Object.keys(EQ.ab).length) EQ.ab={}; else eqLista().
 function exportarEquip(){
   if(!EQ.docs || !EQ.docs.length){ toast('Nada para exportar.', true); return; }
   carregarXLSX().then(function(){
-    var aoa=[['Cliente','Cidade','Vendedor','IO','Última compra (dias)','Equipamento','Marca','Modelo','Patrimônio','Qtd','No cliente desde','NF remessa','Valor (R$)','Fica ou recolhe']];
-    eqLista().forEach(function(d){ var ds=eqDiasSem(d);
-      (d.itens||[]).forEach(function(it){ aoa.push([d.cliente||'', d.cidade||'', eqVendNome(d), d.io||'', ds==null?'':ds, it.t||'', it.ma||'', it.mo||'', it.p||'', it.q||1, it.d?fmtDia(it.d):'', it.nf||'', it.v||0, '']); }); });
-    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:38},{wch:20},{wch:16},{wch:7},{wch:10},{wch:13},{wch:15},{wch:13},{wch:11},{wch:5},{wch:11},{wch:10},{wch:10},{wch:14}];
+    var aoa=[['Cliente','Cidade','Vendedor','IO','Última compra (dias)','Compra média/mês (R$)','Equipamento','Marca','Modelo','Patrimônio','Qtd','No cliente desde','NF remessa','Valor (R$)','Fica ou recolhe','Motivo','Avaliado por','Conferido na visita','Retirada pedida em']];
+    eqLista().forEach(function(d){ var ds=eqDiasSem(d), cm=eqCompraMes(d);
+      (d.itens||[]).forEach(function(it){ var a=eqAv(d,it)||{};
+        aoa.push([d.cliente||'', d.cidade||'', eqVendNome(d), d.io||'', ds==null?'':ds, cm==null?'':Math.round(cm), it.t||'', it.ma||'', it.mo||'', it.p||'', it.q||1, it.d?fmtDia(it.d):'', it.nf||'', it.v||0,
+                  a.decisao==='recolhe'?'RECOLHE':(a.decisao==='fica'?'FICA':''), a.motivo||'', a.porNome||'',
+                  a.conf==='ok'?'conferido':(a.conf==='nao'?'não encontrado':''), a.pedidoEm?fmtDia(String(a.pedidoEm).slice(0,10)):'']); }); });
+    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:38},{wch:20},{wch:16},{wch:7},{wch:10},{wch:12},{wch:13},{wch:15},{wch:13},{wch:11},{wch:5},{wch:11},{wch:10},{wch:10},{wch:12},{wch:20},{wch:14},{wch:14},{wch:12}];
     var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Equipamentos');
     XLSX.writeFile(wb, 'equipamentos-nos-clientes-'+hoje()+'.xlsx');
   }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
@@ -1113,7 +1518,7 @@ function eqMontarPlano(rows, arq){
   var col=function(){ for(var k=0;k<arguments.length;k++){ var j=H.indexOf(arguments[k]); if(j>=0) return j; } return -1; };
   var C={ io:col('IO'), cli:col('CLIENTE'), rep:col('REPRESENTANTE','VENDEDOR'), cid:col('CIDADE'), rem:col('REMESSA'), ret:col('RETORNO'),
           qtd:col('QTD','QUANTIDADE'), tipo:col('TIPO','EQUIPAMENTO'), marca:col('MARCA'), mod:col('MODELO'), val:col('VALOR'),
-          pat:col('PATRIMONIO'), nfr:col('NF REM','NF REMESSA') };
+          pat:col('PATRIMONIO'), nfr:col('NF REM','NF REMESSA'), nft:col('NF RET','NF RETORNO') };
   var g=function(r,k){ return C[k]>=0 ? r[C[k]] : ''; };
   /* índice da carteira pelo nome (com e sem o CNPJ na frente) */
   var porNome={};
@@ -1121,13 +1526,19 @@ function eqMontarPlano(rows, arq){
     [c.nome, c.erpNome, e&&e.n, e&&e.nErp].forEach(function(n){ eqNomes(n).forEach(function(k){ if(!porNome[k]) porNome[k]=c; }); }); });
   var porNomeDono={}; clientes.forEach(function(c){ var n=normEmp(c.donoNome); if(n && c.donoUid && !porNomeDono[n]) porNomeDono[n]=c.donoUid; });
   var porNomeErp={}; Object.keys(erp||{}).forEach(function(k){ var e=erp[k]; [e.n, e.nErp].forEach(function(n){ eqNomes(n).forEach(function(x){ if(!porNomeErp[x]) porNomeErp[x]=k; }); }); });
-  var grupos={}, linhas=0, noCli=0, retTexto=0, retEx={};
+  var grupos={}, linhas=0, noCli=0, retTexto=0, retEx={}, mov=[];
   var textoVolta=!!(EQ.opcTexto==='voltou');
   for(var r=hi+1;r<rows.length;r++){
     var L=rows[r]||[]; var cli=String(g(L,'cli')||'').replace(/\t/g,' ').replace(/\s+/g,' ').trim(), tipo=String(g(L,'tipo')||'').trim();
     if(!cli && !tipo) continue;
     linhas++;
     var ret=g(L,'ret'), dRet=eqData(ret);
+    /* toda linha vai para o histórico (remessa e retorno), como na planilha */
+    var patM=String(g(L,'pat')||'').trim(); if(/^S\/?N$/i.test(patM)) patM='';
+    mov.push({ io:String(g(L,'io')||'').replace(/\.0$/,'').trim(), c:cli, ci:String(g(L,'cid')||'').trim(), r:String(g(L,'rep')||'').trim(),
+               re:eqData(g(L,'rem')), rt:dRet, rtx:dRet?'':String(ret||'').trim().slice(0,40), q:Math.max(1, Math.round(eqNum(g(L,'qtd'))||1)),
+               t:tipo.toUpperCase(), ma:String(g(L,'marca')||'').trim(), mo:String(g(L,'mod')||'').trim(), v:Math.round(eqNum(g(L,'val'))*100)/100,
+               p:patM.toUpperCase(), nr:String(g(L,'nfr')||'').replace(/\.0$/,'').trim(), nt:String(g(L,'nft')||'').replace(/\.0$/,'').trim() });
     if(dRet) continue;                                     /* tem data de retorno: já voltou */
     var tRet=String(ret||'').trim();
     if(tRet){ retTexto++; var kx=tRet.slice(0,40).toUpperCase(); retEx[kx]=(retEx[kx]||0)+1;
@@ -1154,7 +1565,15 @@ function eqMontarPlano(rows, arq){
     G.qtd=G.itens.reduce(function(t,x){ return t+x.q; },0); G.valor=Math.round(G.itens.reduce(function(t,x){ return t+x.v; },0)*100)/100;
     return G;
   });
-  return { arq:arq, linhas:linhas, noCli:noCli, retTexto:retTexto, retEx:retEx, docs:docs, rows:rows };
+  /* conferência: mesmo patrimônio em mais de um cliente; equipamento de valor sem patrimônio */
+  var porPat={}, semPat=[];
+  docs.forEach(function(G){ G.itens.forEach(function(it){
+    if(it.p){ var o=porPat[it.p]||(porPat[it.p]={ p:it.p, t:it.t, clientes:[] }); if(o.clientes.indexOf(G.cliente)<0) o.clientes.push(G.cliente); }
+    else if((it.v||0)>=1000 && (it.q||1)===1) semPat.push({ cliente:G.cliente, t:it.t, mo:it.mo, v:it.v, d:it.d, nf:it.nf });
+  }); });
+  var patDup=Object.keys(porPat).map(function(k){ return porPat[k]; }).filter(function(o){ return o.clientes.length>1; }).slice(0,300);
+  semPat.sort(function(a,b){ return b.v-a.v; }); semPat=semPat.slice(0,300);
+  return { arq:arq, linhas:linhas, noCli:noCli, retTexto:retTexto, retEx:retEx, docs:docs, rows:rows, mov:mov, problemas:{ patDup:patDup, semPat:semPat } };
 }
 function eqMostrarPlano(){
   var P=EQ.plano, lig=P.docs.filter(function(d){ return d.clienteId; }), sem=P.docs.filter(function(d){ return !d.clienteId; });
@@ -1174,6 +1593,9 @@ function eqMostrarPlano(){
           +(semDono<sem.length?'; os que têm representante ligado a um vendedor aparecem também para ele':'')+'.</div>'
           +'<div class="mini" style="max-height:170px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px 10px">'
           + sem.slice(0,300).map(function(d){ return esc(d.cliente)+(d.cidade?' · '+esc(d.cidade):'')+(d.rep?' · '+esc(d.rep):''); }).join('<br>')+(sem.length>300?'<br>…':'')+'</div>':'')
+      + ((P.problemas.patDup.length||P.problemas.semPat.length)?'<div class="alert a-info" style="margin-top:10px">ⓘ Conferência: '
+          + (P.problemas.patDup.length?P.problemas.patDup.length+' patrimônio(s) em mais de um cliente':'')+(P.problemas.patDup.length&&P.problemas.semPat.length?' · ':'')
+          + (P.problemas.semPat.length?P.problemas.semPat.length+' equipamento(s) de R$ 1.000 ou mais sem patrimônio':'')+'. A lista fica no topo da tela de equipamentos.</div>':'')
       + '<div class="alert a-warn" style="margin-top:12px">▲ Substitui os equipamentos carregados antes: cliente que não aparece mais sem data de retorno sai da lista.</div>',
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Gravar '+P.docs.length.toLocaleString('pt-BR')+' clientes', fn:eqGravar }] });
 }
@@ -1326,11 +1748,37 @@ function evBuscar(i){
   box.innerHTML=res.length ? '<div class="ev-res">'+res.map(function(o){ return evOpHtml(o, inp.getAttribute('data-doc')); }).join('')+'</div>'
     : '<div class="mini" style="margin-top:6px">Nenhum cliente com esse nome na carteira nem no ERP.</div>';
 }
+/* histórico completo da planilha: comEquipMov/p00, p01… (1.800 linhas por documento) + _meta */
+function eqGravarMov(mov, agora){
+  var POR=1800, col=collection(db,'comEquipMov');
+  return getDocs(col).then(function(snap){
+    var partes=Math.ceil(mov.length/POR), ops=[];
+    for(var k=0;k<partes;k++) ops.push(['set', 'p'+String(k).padStart(2,'0'), { parte:k, linhas:mov.slice(k*POR,(k+1)*POR) }]);
+    snap.docs.forEach(function(x){ if(x.id!=='_meta' && !(/^p\d+$/.test(x.id) && +x.id.slice(1)<partes)) ops.push(['del', x.id]); });
+    ops.push(['set', '_meta', { em:agora, linhas:mov.length, partes:partes, por:U.email }]);
+    /* poucos documentos grandes: um lote a cada 3, para não passar do limite de uma gravação */
+    var i=0; var prox=function(){ if(i>=ops.length) return Promise.resolve(); var b=writeBatch(db);
+      ops.slice(i, i+3).forEach(function(o){ if(o[0]==='set') b.set(doc(db,'comEquipMov',o[1]), o[2]); else b.delete(doc(db,'comEquipMov',o[1])); });
+      i+=3; return b.commit().then(prox); };
+    return prox().then(function(){ EQ.mov=null; });
+  });
+}
 function eqGravar(el){
   var P=EQ.plano; if(!P) return;
   var pare=ocupado(el, 'Gravando…'), col=collection(db,'comEquipamentos'), agora=agoraISO();
   getDocs(query(col, limit(6000))).then(function(snap){
     var novos={}; P.docs.forEach(function(d){ novos[d.id]=1; });
+    /* histórico: o que entrou e o que saiu desde a importação anterior */
+    var antes={}, depois={};
+    snap.docs.forEach(function(x){ if(x.id==='_meta') return; var d=Object.assign({ id:x.id }, x.data()); (d.itens||[]).forEach(function(it){ antes[eqKey(d,it)]=it; }); });
+    P.docs.forEach(function(d){ (d.itens||[]).forEach(function(it){ depois[eqKey(d,it)]=it; }); });
+    var soma=function(a, b){ var q=0, v=0; Object.keys(a).forEach(function(k){ if(!b[k]){ q+=a[k].q||1; v+=a[k].v||0; } }); return { q:q, v:Math.round(v) }; };
+    var temAntes=Object.keys(antes).length>0;
+    var porTipo={}; P.docs.forEach(function(d){ (d.itens||[]).forEach(function(it){ var o=porTipo[it.t||'—']||(porTipo[it.t||'—']={ q:0, v:0 }); o.q+=it.q||1; o.v+=it.v||0; }); });
+    Object.keys(porTipo).forEach(function(k){ porTipo[k].v=Math.round(porTipo[k].v); });
+    var hist={ em:agora, por:U.email, porNome:U.nome, arquivo:P.arq, clientes:P.docs.length,
+               itens:P.docs.reduce(function(t,d){ return t+d.qtd; },0), valor:Math.round(P.docs.reduce(function(t,d){ return t+d.valor; },0)),
+               entraram:temAntes?soma(depois, antes):null, sairam:temAntes?soma(antes, depois):null, porTipo:porTipo };
     var ops=[];
     P.docs.forEach(function(d){ ops.push(['set', d.id, { io:d.io, cliente:d.cliente, cidade:d.cidade, rep:d.rep, clienteId:d.clienteId, donoUid:d.donoUid, erpId:d.erpId||'',
                                                        itens:d.itens, qtd:d.qtd, valor:d.valor, atualizadoEm:agora }]); });
@@ -1338,11 +1786,12 @@ function eqGravar(el){
     var lotes=[], b=writeBatch(db), n=0;
     ops.forEach(function(o){ if(o[0]==='set') b.set(doc(db,'comEquipamentos',o[1]), o[2]); else b.delete(doc(db,'comEquipamentos',o[1]));
       if(++n>=400){ lotes.push(b); b=writeBatch(db); n=0; } });
-    b.set(doc(db,'comEquipamentos','_meta'), { importadoEm:agora, por:U.email, porNome:U.nome, arquivo:P.arq, linhas:P.linhas,
+    b.set(doc(db,'comEquipHist', agora.replace(/[^\dT]/g,'').slice(0,15)), hist);
+    b.set(doc(db,'comEquipamentos','_meta'), { importadoEm:agora, por:U.email, porNome:U.nome, arquivo:P.arq, linhas:P.linhas, problemas:P.problemas,
       clientes:P.docs.length, itens:P.docs.reduce(function(t,d){ return t+d.qtd; },0), valor:Math.round(P.docs.reduce(function(t,d){ return t+d.valor; },0)) });
     lotes.push(b);
     var i=0; var prox=function(){ if(i>=lotes.length) return Promise.resolve(); el.innerHTML='Gravando '+(i+1)+'/'+lotes.length+'…'; return lotes[i++].commit().then(prox); };
-    return prox();
+    return prox().then(function(){ el.innerHTML='Gravando o histórico…'; return eqGravarMov(P.mov, agora); });
   }).then(function(){
     fecharModal(); toast('Equipamentos atualizados: '+P.docs.length+' clientes.'); EQ.plano=null; EQ.docs=null; carregarEquip(true);
   }).catch(function(e){ pare(); falha('gravar os equipamentos')(e); });
@@ -1619,7 +2068,8 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'],
   produtos:['Produtos','Catálogo e fichas técnicas'],
   equip:['Equipamentos nos clientes','Equipamentos em comodato que estão nos clientes'],
-  eqvinc:['Vincular nomes','De-para: cliente da planilha de equipamentos → cliente da carteira ou do ERP'] };
+  eqvinc:['Vincular nomes','De-para: cliente da planilha de equipamentos → cliente da carteira ou do ERP'],
+  eqhist:['Histórico dos equipamentos','Todas as remessas e retornos da planilha, e o caminho de cada equipamento'] };
 var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };
 function nav(p){
   pagina=p;
@@ -1656,6 +2106,7 @@ function render(){
   else if(pagina==='produtos') renderProdutos();
   else if(pagina==='equip') renderEquip();
   else if(pagina==='eqvinc') renderEqVinc();
+  else if(pagina==='eqhist') renderEqHist();
   else if(pagina==='importar') renderImpStatus();
   var nAnt=erpEstado==='ok' ? Object.keys(erp).filter(function(k){ return erp[k].x; }).length : 0;
   $('frescor').textContent=erpEstado==='ok' ? 'Base do ERP: '+Object.keys(erp).length+' clientes'+(nAnt?' ('+nAnt+' antigos)':'') : (erpEstado==='lendo'?'Lendo a base do ERP…':'');
@@ -2673,7 +3124,7 @@ function salvarSolic(el){
           historico:[{ em:agora, por:U.email, nome:U.nome, st:'aberta', txt:'Solicitação aberta' }] };
   var pare=ocupado(el,'Enviando…');
   setDoc(doc(collection(db,'comSolicitacoes')), d)
-    .then(function(){ toast('Solicitação enviada.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); })
+    .then(function(){ toast('Solicitação enviada.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); if(fs.tipo==='equipamento') eqRetiradaEnviada(); })
     .catch(function(e){ pare(); falha('enviar a solicitação')(e); });
 }
 function solPorId(id){ for(var i=0;i<sols.length;i++) if(sols[i].id===id) return sols[i]; return null; }
@@ -2914,7 +3365,7 @@ function cmSalvar(el){
     var gravarNovo=function(dd){ var lote=writeBatch(db); lote.set(solRef, dd); lote.set(autRef, cmAutDados(dd, solRef.id, val)); return lote.commit(); };
     pr=cmComReserva(d, gravarNovo);
   } else pr=cmComReserva(d, function(dd){ return setDoc(doc(collection(db,'comodatoSolicitacoes')), dd); });
-  pr.then(function(){ toast(d.novo?'Pedido enviado. Aguarda a autorização da diretoria.':'Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); })
+  pr.then(function(){ toast(d.novo?'Pedido enviado. Aguarda a autorização da diretoria.':'Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); eqRetiradaEnviada(); })
     .catch(function(e){ pare(); if(e.code==='permission-denied') toast(d.itens?CM_MSG_VARIOS:'Sem permissão para pedir equipamento à manutenção. Peça a chave na Gestão → Acessos.', true); else falha('enviar o pedido')(e); });
 }
 /* Os campos "categoria" e "clienteNovo" são novos no pedido. Se a regra do
@@ -4338,7 +4789,9 @@ function gravarFichas(el){
 }
 Object.assign(window, { EQ:EQ, renderEquip:renderEquip, exportarEquip:exportarEquip, eqLerArquivo:eqLerArquivo,
   eqOpcTexto:eqOpcTexto, eqLigar:eqLigar, eqLigarBusca:eqLigarBusca, eqSalvarVinc:eqSalvarVinc,
-  eqAbrir:eqAbrir, eqAbrirTodos:eqAbrirTodos, eqRelatorio:eqRelatorio, renderEqVinc:renderEqVinc, evBuscar:evBuscar, EV:EV,
+  eqAbrir:eqAbrir, eqAbrirTodos:eqAbrirTodos, eqRelatorio:eqRelatorio, eqAvaliar:eqAvaliar, eqConferir:eqConferir,
+  eqPedirRetirada:eqPedirRetirada, eqConferencia:eqConferencia, eqHistorico:eqHistorico,
+  renderEqHist:renderEqHist, ehModo:ehModo, ehLinha:ehLinha, ehExcel:ehExcel, EH:EH, renderEqVinc:renderEqVinc, evBuscar:evBuscar, EV:EV,
   abrirMetas:abrirMetas, editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome, alternarSemVinc:alternarSemVinc });
 
 /* =====================================================================
