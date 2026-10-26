@@ -342,6 +342,17 @@ table.ct .ct-uc{white-space:nowrap}
 .eq-seta.ab{transform:rotate(90deg)}
 .eq-cli.fech .eq-cab{margin-bottom:0}
 .eq-tipos{font-size:11.5px;color:var(--muted);margin-top:4px}
+.eq-corr thead th{position:sticky;top:0;background:var(--card);z-index:1;padding:9px 8px}
+.eq-corr td{padding:6px 8px}
+.eq-corr tr.ini td{border-top:1px solid var(--muted)}
+.eq-corr tbody tr:first-child td{border-top:none}
+.eq-loja{font-weight:700}
+.eq-loja .nm{max-width:300px;white-space:normal;line-height:1.3}
+.eq-corr td{white-space:nowrap}
+.eq-corr td.eq-loja{white-space:normal}
+.eq-rol{max-height:calc(100vh - 250px);overflow:auto}
+.eq-loja a{color:var(--text);text-decoration:none;border-bottom:1px dotted var(--muted);cursor:pointer}
+.eq-end{font-weight:400;font-size:11.5px;color:var(--muted);margin-top:2px}
 .ev-lin{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start;padding:12px 14px;margin-bottom:9px}
 .ev-pl b{font-size:13.5px}
 .ev-res{margin-top:6px;border:1px solid var(--border);border-radius:10px;max-height:300px;overflow:auto}
@@ -549,16 +560,15 @@ details.mais[open]{padding-bottom:4px}
       <div id="eq-topo"></div>
       <div class="kpis" id="eq-kpis"></div>
       <div class="tools">
-        <input type="search" id="eq-busca" placeholder="Buscar cliente, patrimônio, cidade, marca…" oninput="EQ.lim=60;renderEquip()">
-        <select id="eq-tipo" onchange="EQ.lim=60;renderEquip()"></select>
-        <select id="eq-vend" onchange="EQ.lim=60;renderEquip()" class="gestor-only" style="display:none"></select>
+        <input type="search" id="eq-busca" placeholder="Buscar cliente, patrimônio, cidade, marca…" oninput="EQ.lim=500;renderEquip()">
+        <select id="eq-tipo" onchange="EQ.lim=500;renderEquip()"></select>
+        <select id="eq-vend" onchange="EQ.lim=500;renderEquip()" class="gestor-only" style="display:none"></select>
         <select id="eq-ord" onchange="renderEquip()">
           <option value="valor">Ordem: maior valor</option>
           <option value="semcomprar">Ordem: mais tempo sem comprar</option>
           <option value="antigo">Ordem: há mais tempo no cliente</option>
           <option value="nome">Ordem: nome</option>
         </select>
-        <button class="btn btn-sm btn-ghost" id="eq-tudo" onclick="eqAbrirTodos()">▾ Abrir todos</button>
         <button class="btn btn-sm btn-ghost" onclick="eqRelatorio()">⎙ Relatório PDF</button>
         <button class="btn btn-sm btn-ghost" onclick="exportarEquip()">⤓ Excel</button>
         <button class="btn btn-sm admin-only" onclick="$('eq-arq').click()" style="display:none">⇪ Atualizar pela planilha</button>
@@ -869,7 +879,7 @@ function telLink(t){ var d=String(t||'').replace(/\D/g,''); if(!d) return '';
    Gerentes e diretoria veem tudo; o vendedor, só os clientes dele.
    Leitura sob demanda (página ou ficha): nada fica escutando o banco.
    ==================================================================== */
-var EQ={ docs:null, meta:null, lendo:false, erro:'', filtro:'todos', lim:60, plano:null, ab:{} };
+var EQ={ docs:null, meta:null, lendo:false, erro:'', filtro:'todos', lim:500, plano:null, ab:{} };
 function carregarEquip(forcar){
   if(EQ.lendo || (EQ.docs && !forcar)) return Promise.resolve();
   EQ.lendo=true;
@@ -974,7 +984,7 @@ function renderEquip(){
   st.value=at; sv.value=av;
   var nAl=EQ.docs.filter(eqAlerta).length, nSv=EQ.docs.filter(function(d){ return !d.clienteId; }).length;
   $('eq-filtros').innerHTML=[['todos','Todos'], ['alerta','Sem comprar há +'+CFG.diasAlerta+' dias ('+nAl+')']].concat(U.gestor?[['semvinc','Fora da carteira ('+nSv+')']]:[])
-    .map(function(f){ return '<button class="chip'+(EQ.filtro===f[0]?' on':'')+'" onclick="EQ.filtro=\''+f[0]+'\';EQ.lim=60;renderEquip()">'+f[1]+'</button>'; }).join('');
+    .map(function(f){ return '<button class="chip'+(EQ.filtro===f[0]?' on':'')+'" onclick="EQ.filtro=\''+f[0]+'\';EQ.lim=500;renderEquip()">'+f[1]+'</button>'; }).join('');
   var l=eqLista(), ord=($('eq-ord')||{}).value||'valor';
   var maisAnt=function(d){ return (d.itens||[]).reduce(function(m,it){ return it.d && (!m || it.d<m) ? it.d : m; }, ''); };
   l.sort(function(a,b){
@@ -990,24 +1000,42 @@ function renderEquip(){
     + '<div class="card"><div class="klabel">Valor em comodato</div><div class="kval">'+fmtRS0(tv)+'</div></div>'
     + '<div class="card kpi" onclick="EQ.filtro=\'alerta\';renderEquip()"><div class="klabel">Sem comprar há +'+CFG.diasAlerta+' dias</div><div class="kval" style="color:'+(nAl?'var(--red)':'inherit')+'">'+nAl+'</div><div class="khint">candidatos a recolher</div></div>';
   if(!l.length){ lista.innerHTML='<div class="empty">'+(EQ.docs.length?'Nenhum cliente nesse filtro.':'Nenhum equipamento carregado.')+'</div>'; return; }
-  lista.innerHTML=l.slice(0, EQ.lim).map(function(d){
-    var c=eqCliDe(d), ds=eqDiasSem(d), al=eqAlerta(d), ab=!!EQ.ab[d.id], e=eqErpDe(d);
-    var tipos={}; (d.itens||[]).forEach(function(it){ tipos[it.t||'—']=(tipos[it.t||'—']||0)+(it.q||1); });
-    var resumo=Object.keys(tipos).sort(function(a,b){ return tipos[b]-tipos[a]; }).map(function(t){ return tipos[t]+' '+t.toLowerCase(); }).join(' · ');
-    return '<div class="card eq-cli'+(ab?'':' fech')+'"><div class="eq-cab"><div style="min-width:0;display:flex;align-items:flex-start">'
-      + '<button class="eq-seta'+(ab?' ab':'')+'" title="'+(ab?'Esconder':'Ver')+' os equipamentos" onclick="eqAbrir(\''+esc(d.id)+'\')">▸</button><div style="min-width:0">'
-      + '<div class="eq-nome">'+(c?'<a onclick="verCliente(\''+esc(c.id)+'\')">'+esc(c.nome||d.cliente)+'</a>':esc(d.cliente||'—'))+'</div>'
-      + '<div class="eq-sub">'+esc([d.cidade, 'vendedor: '+eqVendNome(d), d.io?'IO '+d.io:''].filter(Boolean).join(' · '))
-      + ((c||e) ? ' · '+(ds==null?'sem compra registrada':'<span class="'+(al?'eq-alerta':'')+'">última compra há '+ds+' dia'+(ds===1?'':'s')+'</span>')
-           : '')
-      + (!c && U.gestor ? ' · <span class="mini">'+(e?'no ERP como '+esc(e.n||'')+(e.e?' ('+esc(e.e)+')':'')+(e.x?' · cliente antigo':''):'fora da carteira do app')+'</span>' : '')
-      + (U.admin ? ' · <a class="mini" style="cursor:pointer;color:var(--accent,#e0303d);font-weight:700" onclick="eqLigar(\''+esc(d.id)+'\')">'
-           + (c?'trocar cliente':'🔗 ligar a um cliente')+'</a>' : '')+'</div>'
-      + '<div class="eq-tipos">'+esc(resumo)+'</div></div></div>'
-      + '<div class="eq-val">'+fmtRS0(d.valor||0)+'<div class="mini" style="font-weight:500">'+(d.qtd||0)+' '+((d.qtd||0)===1?'item':'itens')+'</div></div></div>'
-      + (ab ? eqItensHtml(d.itens||[]) : '')+'</div>';
-  }).join('') + (l.length>EQ.lim ? '<div style="text-align:center;margin:10px 0 20px"><button class="btn btn-ghost" onclick="EQ.lim+=100;renderEquip()">Mostrar mais ('+(l.length-EQ.lim)+' clientes)</button></div>' : '');
-  var tb=$('eq-tudo'); if(tb) tb.textContent=Object.keys(EQ.ab).length?'▴ Recolher todos':'▾ Abrir todos';
+  /* lista corrida: uma linha por equipamento, com a razão social em todas as linhas */
+  var rows=eqLinhas(l, ($('eq-tipo')||{}).value||'');
+  var corte=rows.slice(0, EQ.lim);
+  lista.innerHTML='<div class="card" style="padding:0;overflow:hidden"><div class="eq-rol"><table class="eq-tab eq-corr"><thead><tr>'
+    + '<th>Loja / endereço</th><th>Vendedor</th><th>Equipamento</th><th>Marca</th><th>Modelo</th><th>Patrimônio</th>'
+    + '<th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th></tr></thead><tbody>'
+    + corte.map(function(r){
+        var d=r.d, c=r.c, it=r.it, nome=esc(r.nome);
+        return '<tr'+(r.ini?' class="ini"':'')+'><td class="eq-loja"><div class="nm">'
+          + (c ? '<a onclick="verCliente(\''+esc(c.id)+'\')">'+nome+'</a>' : nome)
+          + (r.ini ? '<div class="eq-end">'+esc(r.onde)+(r.ds!=null?' · <span class="'+(r.al?'eq-alerta':'')+'">última compra há '+r.ds+' d</span>':'')
+              + (U.admin && !c ? ' · <a style="cursor:pointer;color:var(--accent,#e0303d);font-weight:700" onclick="eqLigar(\''+esc(d.id)+'\')">🔗 ligar</a>' : '')+'</div>' : '')
+          + '</div></td><td>'+esc(r.vend)+'</td><td><b>'+esc(it.t||'—')+'</b></td><td>'+esc(it.ma||'')+'</td>'
+          + '<td>'+esc(it.mo&&it.mo!=='N/D'?it.mo:'')+'</td><td class="eq-pat">'+esc(it.p||'s/ nº')+'</td><td class="r">'+(it.q||1)+'</td>'
+          + '<td>'+(it.d?fmtDia(it.d)+'<div class="mini">'+eqTempo(difDias(it.d, hoje()))+'</div>':'—')+'</td>'
+          + '<td class="mini">'+esc(it.nf||'—')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td></tr>';
+      }).join('')
+    + '</tbody></table></div></div>'
+    + (rows.length>EQ.lim ? '<div style="text-align:center;margin:10px 0 20px"><button class="btn btn-ghost" onclick="EQ.lim+=500;renderEquip()">Mostrar mais ('
+        + (rows.length-EQ.lim).toLocaleString('pt-BR')+' linhas)</button></div>' : '');
+}
+/* linhas da lista corrida (tela e relatório): cliente na ordem da tela, equipamentos por tipo */
+function eqLinhas(l, tipo){
+  var out=[];
+  l.forEach(function(d){
+    var c=eqCliDe(d), e=eqErpDe(d), ds=eqDiasSem(d), al=eqAlerta(d);
+    var nome=(c&&c.nome)||d.cliente||'—';
+    var end=evEndTxt(d.erpId||(c&&c.erpId)||'', c) || (e&&e.e?e.e:'');
+    var cid=d.cidade||(c&&c.cidade)||'';
+    if(cid && end && norm(end).indexOf(evCid(cid))>=0) cid='';      /* a cidade já está no endereço */
+    var onde=[end, cid].filter(Boolean).join(' · '), vend=eqVendNome(d);
+    (d.itens||[]).filter(function(it){ return !tipo || it.t===tipo; }).forEach(function(it, i){
+      out.push({ d:d, c:c, it:it, ini:i===0, nome:nome, onde:onde, vend:vend, ds:ds, al:al });
+    });
+  });
+  return out;
 }
 /* ---------- relatório para imprimir / PDF: lista corrida, na ordem e nos filtros da tela ---------- */
 function eqRelatorio(){
@@ -1025,23 +1053,14 @@ function eqRelatorio(){
     var filtros=[tipo?'equipamento: '+tipo:'', vend?'vendedor: '+vend:'', busca?'busca: “'+busca+'”':'',
                  EQ.filtro==='alerta'?'só sem comprar há +'+CFG.diasAlerta+' dias':'', EQ.filtro==='semvinc'?'só fora da carteira':''].filter(Boolean);
     var tq=0, tv=0, linhas=0, h='';
-    l.forEach(function(d){
-      var c=eqCliDe(d), e=eqErpDe(d), ds=eqDiasSem(d);
-      var nome=(c&&c.nome)||d.cliente||'—';
-      var end=evEndTxt(d.erpId||(c&&c.erpId)||'', c) || (e&&e.e?e.e:'');
-      var cid=d.cidade||(c&&c.cidade)||'';
-      if(cid && end && norm(end).indexOf(evCid(cid))>=0) cid='';      /* a cidade já está no endereço */
-      var itens=(d.itens||[]).filter(function(it){ return !tipo || it.t===tipo; });
-      itens.forEach(function(it, i){
-        tq+=it.q||1; tv+=it.v||0; linhas++;
-        h+='<tr'+(i===0?' class="ini"':'')+'>'
-          + (i===0 ? '<td class="cli">'+esc(nome)+'<div class="end">'+esc([end, cid].filter(Boolean).join(' · '))+'</div></td>'
-                    + '<td>'+esc(eqVendNome(d))+(ds!=null?'<div class="end">última compra há '+ds+' d</div>':'')+'</td>'
-                   : '<td></td><td></td>')
-          + '<td><b>'+esc(it.t||'—')+'</b></td><td>'+esc(it.ma||'')+'</td><td>'+esc(it.mo&&it.mo!=='N/D'?it.mo:'')+'</td>'
-          + '<td class="pat">'+esc(it.p||'s/ nº')+'</td><td class="r">'+(it.q||1)+'</td>'
-          + '<td>'+(it.d?fmtDia(it.d):'—')+'</td><td>'+esc(it.nf||'')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td></tr>';
-      });
+    eqLinhas(l, tipo).forEach(function(r){
+      var it=r.it; tq+=it.q||1; tv+=it.v||0; linhas++;
+      h+='<tr'+(r.ini?' class="ini"':'')+'><td class="cli">'+esc(r.nome)
+        + (r.ini && r.onde?'<div class="end">'+esc(r.onde)+'</div>':'')+'</td>'
+        + '<td>'+esc(r.vend)+(r.ini && r.ds!=null?'<div class="end">última compra há '+r.ds+' d</div>':'')+'</td>'
+        + '<td><b>'+esc(it.t||'—')+'</b></td><td>'+esc(it.ma||'')+'</td><td>'+esc(it.mo&&it.mo!=='N/D'?it.mo:'')+'</td>'
+        + '<td class="pat">'+esc(it.p||'s/ nº')+'</td><td class="r">'+(it.q||1)+'</td>'
+        + '<td>'+(it.d?fmtDia(it.d):'—')+'</td><td>'+esc(it.nf||'')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td></tr>';
     });
     $('eq-print').innerHTML='<h1>Equipamentos em comodato nos clientes</h1>'
       + '<div class="sub">Panificadora Monte Castelo · gerado em '+new Date().toLocaleString('pt-BR')+' por '+esc(U.nome||U.email)
