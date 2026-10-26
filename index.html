@@ -559,6 +559,7 @@ details.mais[open]{padding-bottom:4px}
           <option value="nome">Ordem: nome</option>
         </select>
         <button class="btn btn-sm btn-ghost" id="eq-tudo" onclick="eqAbrirTodos()">▾ Abrir todos</button>
+        <button class="btn btn-sm btn-ghost" onclick="eqRelatorio()">⎙ Relatório PDF</button>
         <button class="btn btn-sm btn-ghost" onclick="exportarEquip()">⤓ Excel</button>
         <button class="btn btn-sm admin-only" onclick="$('eq-arq').click()" style="display:none">⇪ Atualizar pela planilha</button>
         <input type="file" id="eq-arq" accept=".xlsx,.xls" style="display:none" onchange="eqLerArquivo(this)">
@@ -726,6 +727,31 @@ details.mais[open]{padding-bottom:4px}
 
 <div id="modal-host"></div>
 <div class="toast" id="toast"></div>
+<div id="eq-print" aria-hidden="true"></div>
+<style>
+/* Relatório de equipamentos para imprimir / salvar em PDF. Só aparece na
+   impressão chamada pelo botão (body.imp-eq); fora dela fica escondido. */
+#eq-print{display:none}
+@media print{
+  @page{ size:A4 landscape; margin:9mm 8mm }
+  body.imp-eq > *:not(#eq-print){ display:none !important }
+  body.imp-eq{ background:#fff !important }
+  body.imp-eq #eq-print{ display:block !important; color:#111; font:9px/1.3 Arial,Helvetica,sans-serif }
+  #eq-print h1{ font-size:15px; margin:0 0 2px }
+  #eq-print .sub{ font-size:9.5px; color:#555; margin-bottom:8px }
+  #eq-print .tot{ display:flex; gap:22px; font-size:10px; margin:0 0 8px; padding:6px 8px; border:1px solid #ccc; border-radius:4px }
+  #eq-print table{ width:100%; border-collapse:collapse }
+  #eq-print thead{ display:table-header-group }
+  #eq-print th{ text-align:left; font-size:8px; text-transform:uppercase; letter-spacing:.3px; color:#444; border-bottom:1.5px solid #333; padding:4px 4px }
+  #eq-print td{ padding:3px 4px; border-bottom:1px solid #e3e3e3; vertical-align:top }
+  #eq-print tr.ini td{ border-top:1.2px solid #999 }
+  #eq-print tr{ page-break-inside:avoid; break-inside:avoid }
+  #eq-print .r{ text-align:right; white-space:nowrap }
+  #eq-print .cli{ font-weight:700 }
+  #eq-print .end{ color:#555; font-size:8.3px }
+  #eq-print .pat{ font-family:'Courier New',monospace }
+}
+</style>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -982,6 +1008,58 @@ function renderEquip(){
       + (ab ? eqItensHtml(d.itens||[]) : '')+'</div>';
   }).join('') + (l.length>EQ.lim ? '<div style="text-align:center;margin:10px 0 20px"><button class="btn btn-ghost" onclick="EQ.lim+=100;renderEquip()">Mostrar mais ('+(l.length-EQ.lim)+' clientes)</button></div>' : '');
   var tb=$('eq-tudo'); if(tb) tb.textContent=Object.keys(EQ.ab).length?'▴ Recolher todos':'▾ Abrir todos';
+}
+/* ---------- relatório para imprimir / PDF: lista corrida, na ordem e nos filtros da tela ---------- */
+function eqRelatorio(){
+  if(!EQ.docs || !EQ.docs.length){ toast('Nada para imprimir.', true); return; }
+  var monta=function(){
+    var l=eqLista(), ord=($('eq-ord')||{}).value||'valor';
+    var maisAnt=function(d){ return (d.itens||[]).reduce(function(m,it){ return it.d && (!m || it.d<m) ? it.d : m; }, ''); };
+    l.sort(function(a,b){
+      if(ord==='nome') return String(a.cliente).localeCompare(String(b.cliente),'pt-BR');
+      if(ord==='antigo') return String(maisAnt(a)||'9').localeCompare(String(maisAnt(b)||'9'));
+      if(ord==='semcomprar'){ var x=eqDiasSem(a), y=eqDiasSem(b); return (y==null?-1:y)-(x==null?-1:x); }
+      return (b.valor||0)-(a.valor||0);
+    });
+    var tipo=($('eq-tipo')||{}).value||'', vend=($('eq-vend')||{}).value||'', busca=(($('eq-busca')||{}).value||'').trim();
+    var filtros=[tipo?'equipamento: '+tipo:'', vend?'vendedor: '+vend:'', busca?'busca: “'+busca+'”':'',
+                 EQ.filtro==='alerta'?'só sem comprar há +'+CFG.diasAlerta+' dias':'', EQ.filtro==='semvinc'?'só fora da carteira':''].filter(Boolean);
+    var tq=0, tv=0, linhas=0, h='';
+    l.forEach(function(d){
+      var c=eqCliDe(d), e=eqErpDe(d), ds=eqDiasSem(d);
+      var nome=(c&&c.nome)||d.cliente||'—';
+      var end=evEndTxt(d.erpId||(c&&c.erpId)||'', c) || (e&&e.e?e.e:'');
+      var cid=d.cidade||(c&&c.cidade)||'';
+      if(cid && end && norm(end).indexOf(evCid(cid))>=0) cid='';      /* a cidade já está no endereço */
+      var itens=(d.itens||[]).filter(function(it){ return !tipo || it.t===tipo; });
+      itens.forEach(function(it, i){
+        tq+=it.q||1; tv+=it.v||0; linhas++;
+        h+='<tr'+(i===0?' class="ini"':'')+'>'
+          + (i===0 ? '<td class="cli">'+esc(nome)+'<div class="end">'+esc([end, cid].filter(Boolean).join(' · '))+'</div></td>'
+                    + '<td>'+esc(eqVendNome(d))+(ds!=null?'<div class="end">última compra há '+ds+' d</div>':'')+'</td>'
+                   : '<td></td><td></td>')
+          + '<td><b>'+esc(it.t||'—')+'</b></td><td>'+esc(it.ma||'')+'</td><td>'+esc(it.mo&&it.mo!=='N/D'?it.mo:'')+'</td>'
+          + '<td class="pat">'+esc(it.p||'s/ nº')+'</td><td class="r">'+(it.q||1)+'</td>'
+          + '<td>'+(it.d?fmtDia(it.d):'—')+'</td><td>'+esc(it.nf||'')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td></tr>';
+      });
+    });
+    $('eq-print').innerHTML='<h1>Equipamentos em comodato nos clientes</h1>'
+      + '<div class="sub">Panificadora Monte Castelo · gerado em '+new Date().toLocaleString('pt-BR')+' por '+esc(U.nome||U.email)
+      + (EQ.meta&&EQ.meta.importadoEm?' · planilha importada em '+esc(fmtQuando(EQ.meta.importadoEm)):'')
+      + (filtros.length?' · filtros: '+esc(filtros.join(' · ')):' · todos os clientes')+'</div>'
+      + '<div class="tot"><span><b>'+l.length.toLocaleString('pt-BR')+'</b> clientes</span><span><b>'+tq.toLocaleString('pt-BR')+'</b> equipamentos</span>'
+      + '<span>Valor em comodato: <b>'+fmtRS0(tv)+'</b></span></div>'
+      + '<table><thead><tr><th style="width:24%">Loja / endereço</th><th style="width:9%">Vendedor</th><th>Equipamento</th><th>Marca</th><th>Modelo</th>'
+      + '<th>Patrimônio</th><th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th></tr></thead><tbody>'+h+'</tbody></table>';
+    document.body.classList.add('imp-eq');
+    var fim=function(){ document.body.classList.remove('imp-eq'); window.removeEventListener('afterprint', fim); };
+    window.addEventListener('afterprint', fim);
+    if(linhas>3000) toast('Relatório grande ('+linhas.toLocaleString('pt-BR')+' linhas): a janela de impressão pode demorar um pouco.');
+    setTimeout(function(){ window.print(); }, 60);
+  };
+  /* diretoria: espera o endereço completo (com número) para sair no relatório */
+  if(U.admin && !EV.end){ evCarregarEnd(); var n=0, t=setInterval(function(){ if(EV.end || ++n>25){ clearInterval(t); monta(); } }, 200); }
+  else monta();
 }
 function eqAbrir(id){ if(EQ.ab[id]) delete EQ.ab[id]; else EQ.ab[id]=1; renderEquip(); }
 function eqAbrirTodos(){ if(Object.keys(EQ.ab).length) EQ.ab={}; else eqLista().slice(0, EQ.lim).forEach(function(d){ EQ.ab[d.id]=1; }); renderEquip(); }
@@ -4241,7 +4319,7 @@ function gravarFichas(el){
 }
 Object.assign(window, { EQ:EQ, renderEquip:renderEquip, exportarEquip:exportarEquip, eqLerArquivo:eqLerArquivo,
   eqOpcTexto:eqOpcTexto, eqLigar:eqLigar, eqLigarBusca:eqLigarBusca, eqSalvarVinc:eqSalvarVinc,
-  eqAbrir:eqAbrir, eqAbrirTodos:eqAbrirTodos, renderEqVinc:renderEqVinc, evBuscar:evBuscar, EV:EV,
+  eqAbrir:eqAbrir, eqAbrirTodos:eqAbrirTodos, eqRelatorio:eqRelatorio, renderEqVinc:renderEqVinc, evBuscar:evBuscar, EV:EV,
   abrirMetas:abrirMetas, editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome, alternarSemVinc:alternarSemVinc });
 
 /* =====================================================================
