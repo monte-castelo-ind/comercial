@@ -323,6 +323,20 @@ table.ct .ct-uc{white-space:nowrap}
 .vinc b{flex:1;min-width:0}
 .vinc-sub small{display:block;font-size:11.5px;font-weight:400;color:var(--muted)}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
+/* equipamentos em comodato */
+.eq-cli{margin-bottom:12px}
+.eq-cab{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
+.eq-nome{font-weight:800;font-size:14.5px}
+.eq-nome a{color:var(--text);text-decoration:none;border-bottom:1px dotted var(--muted);cursor:pointer}
+.eq-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.eq-val{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.eq-tab{width:100%;border-collapse:collapse;font-size:12.5px}
+.eq-tab th{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);text-align:left;padding:5px 7px;border-bottom:1px solid var(--border);white-space:nowrap}
+.eq-tab td{padding:6px 7px;border-bottom:1px solid var(--border);vertical-align:top}
+.eq-tab tr:last-child td{border-bottom:none}
+.eq-tab .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.eq-pat{font-family:'JetBrains Mono',monospace;font-size:11.5px}
+.eq-alerta{color:var(--red);font-weight:700}
 .chip{background:var(--card-2);border:1px solid var(--border);color:var(--muted);font:600 12.5px 'Archivo',sans-serif;
       padding:7px 13px;border-radius:20px;cursor:pointer}
 .chip.on{background:var(--primary);border-color:var(--primary);color:#fff}
@@ -452,6 +466,7 @@ details.mais[open]{padding-bottom:4px}
     <div class="side-sec lbl">Menu</div>
     <button class="navbtn on com-only" data-p="hoje" onclick="nav('hoje')"><span class="side-ico">◷</span><span class="lbl lab-d">Hoje</span><span class="lab-m">Hoje</span></button>
     <button class="navbtn com-only" data-p="carteira" onclick="nav('carteira')"><span class="side-ico">▤</span><span class="lbl lab-d">Carteira</span><span class="lab-m">Carteira</span></button>
+    <button class="navbtn com-only so-desk" data-p="equip" onclick="nav('equip')"><span class="side-ico">❄</span><span class="lbl lab-d">Equipamentos</span><span class="lab-m">Equip.</span></button>
     <button class="navbtn com-only" data-p="visitas" onclick="nav('visitas')"><span class="side-ico">⌖</span><span class="lbl lab-d">Visitas e contatos</span><span class="lab-m">Visitas</span></button>
     <button class="navbtn com-only" data-p="produtos" onclick="navProd()"><span class="side-ico">▦</span><span class="lbl lab-d">Produtos</span><span class="lab-m">Produtos</span></button>
     <div class="subnav" id="sub-prod">
@@ -507,6 +522,28 @@ details.mais[open]{padding-bottom:4px}
         <div><div class="sect" id="h-alerta-tit">Sem comprar</div><div id="h-alerta"></div></div>
       </div>
       <div class="sect">Solicitações recentes</div><div id="h-sol"></div>
+    </div>
+
+    <!-- EQUIPAMENTOS EM COMODATO -->
+    <div class="page" id="page-equip">
+      <div id="eq-topo"></div>
+      <div class="kpis" id="eq-kpis"></div>
+      <div class="tools">
+        <input type="search" id="eq-busca" placeholder="Buscar cliente, patrimônio, cidade, marca…" oninput="EQ.lim=60;renderEquip()">
+        <select id="eq-tipo" onchange="EQ.lim=60;renderEquip()"></select>
+        <select id="eq-vend" onchange="EQ.lim=60;renderEquip()" class="gestor-only" style="display:none"></select>
+        <select id="eq-ord" onchange="renderEquip()">
+          <option value="valor">Ordem: maior valor</option>
+          <option value="semcomprar">Ordem: mais tempo sem comprar</option>
+          <option value="antigo">Ordem: há mais tempo no cliente</option>
+          <option value="nome">Ordem: nome</option>
+        </select>
+        <button class="btn btn-sm btn-ghost" onclick="exportarEquip()">⤓ Excel</button>
+        <button class="btn btn-sm admin-only" onclick="$('eq-arq').click()" style="display:none">⇪ Atualizar pela planilha</button>
+        <input type="file" id="eq-arq" accept=".xlsx,.xls" style="display:none" onchange="eqLerArquivo(this)">
+      </div>
+      <div class="chips" id="eq-filtros" style="margin-bottom:14px"></div>
+      <div id="eq-lista"></div>
     </div>
 
     <!-- CARTEIRA -->
@@ -758,6 +795,244 @@ function falha(onde){ return function(e){ console.error(onde, e);
 function telLink(t){ var d=String(t||'').replace(/\D/g,''); if(!d) return '';
   var wa=(d.length===10||d.length===11)?'55'+d:d;
   return '<a href="tel:'+d+'" style="color:var(--blue)">'+esc(t)+'</a> · <a href="https://wa.me/'+wa+'" target="_blank" rel="noopener" style="color:var(--green)">WhatsApp</a>'; }
+
+/* ====================================================================
+   EQUIPAMENTOS EM COMODATO NOS CLIENTES
+   Vem da planilha de remessa/retorno da manutenção: linha SEM data de
+   retorno = o equipamento ainda está no cliente. A diretoria importa a
+   planilha aqui (⇪ Atualizar pela planilha); o app guarda só o que está
+   nos clientes, um documento por cliente (comEquipamentos/io_<IO>), já
+   ligado à carteira (clienteId e donoUid), e um _meta com a data.
+   Gerentes e diretoria veem tudo; o vendedor, só os clientes dele.
+   Leitura sob demanda (página ou ficha): nada fica escutando o banco.
+   ==================================================================== */
+var EQ={ docs:null, meta:null, lendo:false, erro:'', filtro:'todos', lim:60, plano:null };
+function carregarEquip(forcar){
+  if(EQ.lendo || (EQ.docs && !forcar)) return Promise.resolve();
+  EQ.lendo=true;
+  var col=collection(db,'comEquipamentos');
+  var q1=U.gestor ? getDocs(query(col, limit(6000))) : getDocs(query(col, where('donoUid','==',U.uid)));
+  var q2=getDoc(doc(db,'comEquipamentos','_meta')).catch(function(){ return null; });
+  return Promise.all([q1, q2]).then(function(r){
+    EQ.docs=r[0].docs.filter(function(x){ return x.id!=='_meta'; }).map(function(x){ return Object.assign({ id:x.id }, x.data()); });
+    EQ.meta=(r[1] && r[1].exists()) ? r[1].data() : null;
+    EQ.lendo=false; EQ.erro=''; if(pagina==='equip') render();
+  }).catch(function(e){
+    console.warn('comEquipamentos:', e); EQ.lendo=false; EQ.docs=[];
+    EQ.erro=(e.code==='permission-denied') ? 'Sem permissão para ler os equipamentos (regra do Firestore publicada?).' : 'Não foi possível ler os equipamentos.';
+    if(pagina==='equip') render();
+  });
+}
+function eqNomes(n){                              /* "62.627.888 FULANO" casa com "FULANO" e vice-versa */
+  n=String(n||'').replace(/\t/g,' ').trim(); if(!n) return [];
+  var sem=n.replace(/^[\d.\/\-\s]{6,}(?=[A-Za-zÀ-ú])/, '');
+  return [normEmp(n), normEmp(sem)].filter(function(x, i, a){ return x && a.indexOf(x)===i; });
+}
+function eqData(v){                               /* data da planilha → AAAA-MM-DD ('' se não for data) */
+  if(v===null || v===undefined || v==='') return '';
+  if(v instanceof Date && !isNaN(v)) return diaLocal(v);
+  if(typeof v==='number' && v>20000 && v<80000){ var d=new Date(Math.round((v-25569)*86400000)); return d.toISOString().slice(0,10); }
+  var m=String(v).trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if(m){ var a=+m[3]; if(a<100) a+=2000; return a+'-'+pad(+m[2])+'-'+pad(+m[1]); }
+  m=String(v).trim().match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[1]+'-'+m[2]+'-'+m[3] : '';
+}
+function eqNum(v){ if(typeof v==='number') return v; var n=numBR(String(v||'').replace(/R\$\s*/,'')); return n==null?0:n; }
+function eqCliDe(d){ return d.clienteId ? clientePorId(d.clienteId) : null; }
+function eqVendNome(d){ var c=eqCliDe(d); return (c && c.donoNome) || d.rep || '—'; }
+function eqDiasSem(d){ var c=eqCliDe(d); return c ? diasSemComprar(c) : null; }
+function eqAlerta(d){ var c=eqCliDe(d); return !!(c && emAlerta(c)); }
+function eqTempo(dias){                          /* 146 dias · 1 ano e 5 meses */
+  if(dias==null) return '';
+  if(dias<365) return dias+' dia'+(dias===1?'':'s');
+  var a=Math.floor(dias/365), m=Math.floor((dias%365)/30.5);
+  return a+' ano'+(a>1?'s':'')+(m?' e '+m+' '+(m>1?'meses':'mês'):'');
+}
+function eqItensHtml(itens){
+  return '<div class="tscroll"><table class="eq-tab"><tr><th>Equipamento</th><th>Marca · modelo</th><th>Patrimônio</th><th class="r">Qtd</th><th>No cliente desde</th><th>NF remessa</th><th class="r">Valor</th></tr>'
+    + itens.map(function(it){
+        var dias=it.d ? difDias(it.d, hoje()) : null;
+        return '<tr><td><b>'+esc(it.t||'—')+'</b></td><td>'+esc([it.ma, (it.mo&&it.mo!=='N/D')?it.mo:''].filter(Boolean).join(' · ')||'—')+'</td>'
+          + '<td class="eq-pat">'+esc(it.p||'s/ nº')+'</td><td class="r">'+(it.q||1)+'</td>'
+          + '<td>'+(it.d?fmtDia(it.d)+' <span class="mini">· '+eqTempo(dias)+'</span>':'—')+'</td>'
+          + '<td class="mini">'+esc(it.nf||'—')+'</td><td class="r">'+(it.v?fmtRS0(it.v):'—')+'</td></tr>';
+      }).join('')+'</table></div>';
+}
+/* ficha do cliente: equipamentos dele (pelo vínculo gravado na importação) */
+function eqFichaPreencher(c){
+  var mostra=function(lista){
+    var el=$('cli-eq'); if(!el) return;
+    if(!lista.length){ el.innerHTML=''; return; }
+    var itens=[], val=0, q=0; lista.forEach(function(d){ (d.itens||[]).forEach(function(it){ itens.push(it); val+=it.v||0; q+=it.q||1; }); });
+    el.innerHTML='<div class="det-sec">Equipamentos em comodato <span class="mini" style="text-transform:none;letter-spacing:0">'
+      + q+' '+(q===1?'item':'itens')+' · '+fmtRS0(val)+(EQ.meta&&EQ.meta.importadoEm?' · planilha de '+fmtQuando(EQ.meta.importadoEm):'')+'</span></div>'
+      + eqItensHtml(itens);
+  };
+  if(EQ.docs){ mostra(EQ.docs.filter(function(d){ return d.clienteId===c.id; })); return; }
+  var col=collection(db,'comEquipamentos');
+  var q=U.gestor ? query(col, where('clienteId','==',c.id)) : query(col, where('clienteId','==',c.id), where('donoUid','==',U.uid));
+  getDocs(q).then(function(r){ mostra(r.docs.map(function(x){ return x.data(); })); })
+    .catch(function(e){ console.warn('equipamentos do cliente:', e); });
+}
+function eqLista(){
+  var q=norm(($('eq-busca')||{}).value||''), tipo=($('eq-tipo')||{}).value||'', vend=($('eq-vend')||{}).value||'';
+  return (EQ.docs||[]).filter(function(d){
+    if(EQ.filtro==='alerta' && !eqAlerta(d)) return false;
+    if(EQ.filtro==='semvinc' && d.clienteId) return false;
+    if(tipo && !(d.itens||[]).some(function(it){ return it.t===tipo; })) return false;
+    if(vend && eqVendNome(d)!==vend) return false;
+    if(q){ var t=norm([d.cliente, d.cidade, d.rep, eqVendNome(d), d.io].concat((d.itens||[]).map(function(it){ return [it.t,it.ma,it.mo,it.p].join(' '); })).join(' '));
+      if(q.split(' ').some(function(p){ return t.indexOf(p)<0; })) return false; }
+    return true;
+  });
+}
+function renderEquip(){
+  var topo=$('eq-topo'), lista=$('eq-lista');
+  if(!EQ.docs){ carregarEquip(); lista.innerHTML='<div class="empty">Lendo os equipamentos…</div>'; return; }
+  var m=EQ.meta;
+  topo.innerHTML=(EQ.erro?'<div class="alert a-err">⚠ '+esc(EQ.erro)+'</div>':'')
+    + (m ? '<div class="mini" style="margin-bottom:12px">Planilha de comodato importada em '+esc(fmtQuando(m.importadoEm))+(m.porNome?' por '+esc(m.porNome):'')
+           + (m.arquivo?' · '+esc(m.arquivo):'')+' · '+(m.linhas||0).toLocaleString('pt-BR')+' linhas lidas, '+(m.itens||0).toLocaleString('pt-BR')+' equipamentos ainda nos clientes.</div>'
+         : '<div class="alert a-info">ⓘ Ainda não há equipamentos carregados.'+(U.admin?' Use “⇪ Atualizar pela planilha” com a planilha de remessa e retorno da manutenção.':' A diretoria carrega pela planilha da manutenção.')+'</div>');
+  /* filtros */
+  var tipos={}, vends={};
+  EQ.docs.forEach(function(d){ (d.itens||[]).forEach(function(it){ if(it.t) tipos[it.t]=(tipos[it.t]||0)+(it.q||1); }); vends[eqVendNome(d)]=1; });
+  var st=$('eq-tipo'), sv=$('eq-vend'), at=st.value, av=sv.value;
+  st.innerHTML='<option value="">Todos os equipamentos</option>'+Object.keys(tipos).sort().map(function(t){ return '<option value="'+esc(t)+'">'+esc(t)+' ('+tipos[t]+')</option>'; }).join('');
+  sv.innerHTML='<option value="">Todos os vendedores</option>'+Object.keys(vends).sort().map(function(v){ return '<option>'+esc(v)+'</option>'; }).join('');
+  st.value=at; sv.value=av;
+  var nAl=EQ.docs.filter(eqAlerta).length, nSv=EQ.docs.filter(function(d){ return !d.clienteId; }).length;
+  $('eq-filtros').innerHTML=[['todos','Todos'], ['alerta','Sem comprar há +'+CFG.diasAlerta+' dias ('+nAl+')']].concat(U.gestor?[['semvinc','Fora da carteira ('+nSv+')']]:[])
+    .map(function(f){ return '<button class="chip'+(EQ.filtro===f[0]?' on':'')+'" onclick="EQ.filtro=\''+f[0]+'\';EQ.lim=60;renderEquip()">'+f[1]+'</button>'; }).join('');
+  var l=eqLista(), ord=($('eq-ord')||{}).value||'valor';
+  var maisAnt=function(d){ return (d.itens||[]).reduce(function(m,it){ return it.d && (!m || it.d<m) ? it.d : m; }, ''); };
+  l.sort(function(a,b){
+    if(ord==='nome') return String(a.cliente).localeCompare(String(b.cliente),'pt-BR');
+    if(ord==='antigo') return String(maisAnt(a)||'9').localeCompare(String(maisAnt(b)||'9'));
+    if(ord==='semcomprar'){ var x=eqDiasSem(a), y=eqDiasSem(b); return (y==null?-1:y)-(x==null?-1:x); }
+    return (b.valor||0)-(a.valor||0);
+  });
+  var tq=0, tv=0; l.forEach(function(d){ tq+=d.qtd||0; tv+=d.valor||0; });
+  $('eq-kpis').innerHTML=
+      '<div class="card"><div class="klabel">Clientes com equipamento</div><div class="kval">'+l.length.toLocaleString('pt-BR')+'</div></div>'
+    + '<div class="card"><div class="klabel">Equipamentos nos clientes</div><div class="kval">'+tq.toLocaleString('pt-BR')+'</div><div class="khint">soma das quantidades</div></div>'
+    + '<div class="card"><div class="klabel">Valor em comodato</div><div class="kval">'+fmtRS0(tv)+'</div></div>'
+    + '<div class="card kpi" onclick="EQ.filtro=\'alerta\';renderEquip()"><div class="klabel">Sem comprar há +'+CFG.diasAlerta+' dias</div><div class="kval" style="color:'+(nAl?'var(--red)':'inherit')+'">'+nAl+'</div><div class="khint">candidatos a recolher</div></div>';
+  if(!l.length){ lista.innerHTML='<div class="empty">'+(EQ.docs.length?'Nenhum cliente nesse filtro.':'Nenhum equipamento carregado.')+'</div>'; return; }
+  lista.innerHTML=l.slice(0, EQ.lim).map(function(d){
+    var c=eqCliDe(d), ds=eqDiasSem(d), al=eqAlerta(d);
+    return '<div class="card eq-cli"><div class="eq-cab"><div style="min-width:0">'
+      + '<div class="eq-nome">'+(c?'<a onclick="verCliente(\''+esc(c.id)+'\')">'+esc(c.nome||d.cliente)+'</a>':esc(d.cliente||'—'))+'</div>'
+      + '<div class="eq-sub">'+esc([d.cidade, 'vendedor: '+eqVendNome(d), d.io?'IO '+d.io:''].filter(Boolean).join(' · '))
+      + (c ? ' · '+(ds==null?'sem compra registrada':'<span class="'+(al?'eq-alerta':'')+'">última compra há '+ds+' dia'+(ds===1?'':'s')+'</span>')
+           : (U.gestor?' · <span class="mini">fora da carteira do app</span>':''))+'</div></div>'
+      + '<div class="eq-val">'+fmtRS0(d.valor||0)+'<div class="mini" style="font-weight:500">'+(d.qtd||0)+' '+((d.qtd||0)===1?'item':'itens')+'</div></div></div>'
+      + eqItensHtml(d.itens||[])+'</div>';
+  }).join('') + (l.length>EQ.lim ? '<div style="text-align:center;margin:10px 0 20px"><button class="btn btn-ghost" onclick="EQ.lim+=100;renderEquip()">Mostrar mais ('+(l.length-EQ.lim)+' clientes)</button></div>' : '');
+}
+function exportarEquip(){
+  if(!EQ.docs || !EQ.docs.length){ toast('Nada para exportar.', true); return; }
+  carregarXLSX().then(function(){
+    var aoa=[['Cliente','Cidade','Vendedor','IO','Última compra (dias)','Equipamento','Marca','Modelo','Patrimônio','Qtd','No cliente desde','NF remessa','Valor (R$)','Fica ou recolhe']];
+    eqLista().forEach(function(d){ var ds=eqDiasSem(d);
+      (d.itens||[]).forEach(function(it){ aoa.push([d.cliente||'', d.cidade||'', eqVendNome(d), d.io||'', ds==null?'':ds, it.t||'', it.ma||'', it.mo||'', it.p||'', it.q||1, it.d?fmtDia(it.d):'', it.nf||'', it.v||0, '']); }); });
+    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:38},{wch:20},{wch:16},{wch:7},{wch:10},{wch:13},{wch:15},{wch:13},{wch:11},{wch:5},{wch:11},{wch:10},{wch:10},{wch:14}];
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Equipamentos');
+    XLSX.writeFile(wb, 'equipamentos-nos-clientes-'+hoje()+'.xlsx');
+  }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
+}
+/* ---------- importação da planilha (diretoria) ---------- */
+function eqLerArquivo(inp){
+  var f=inp.files&&inp.files[0]; inp.value=''; if(!f || !U.admin) return;
+  toast('Lendo '+f.name+'…');
+  carregarXLSX().then(function(){ return f.arrayBuffer(); }).then(function(buf){
+    var wb=XLSX.read(buf, { type:'array', cellDates:true });
+    var ws=wb.Sheets[wb.SheetNames[0]];
+    var rows=XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:true });
+    EQ.plano=eqMontarPlano(rows, f.name); eqMostrarPlano();
+  }).catch(function(e){ console.error(e); toast('Não foi possível ler a planilha: '+(e.message||e), true); });
+}
+function eqMontarPlano(rows, arq){
+  /* cabeçalho: primeira linha (entre as 10 primeiras) com CLIENTE e RETORNO */
+  var hi=-1, H=[];
+  for(var i=0;i<Math.min(rows.length,10);i++){ var h=(rows[i]||[]).map(function(x){ return norm(x); });
+    if(h.indexOf('CLIENTE')>=0 && h.indexOf('RETORNO')>=0){ hi=i; H=h; break; } }
+  if(hi<0) throw new Error('não achei o cabeçalho (colunas CLIENTE e RETORNO).');
+  var col=function(){ for(var k=0;k<arguments.length;k++){ var j=H.indexOf(arguments[k]); if(j>=0) return j; } return -1; };
+  var C={ io:col('IO'), cli:col('CLIENTE'), rep:col('REPRESENTANTE','VENDEDOR'), cid:col('CIDADE'), rem:col('REMESSA'), ret:col('RETORNO'),
+          qtd:col('QTD','QUANTIDADE'), tipo:col('TIPO','EQUIPAMENTO'), marca:col('MARCA'), mod:col('MODELO'), val:col('VALOR'),
+          pat:col('PATRIMONIO'), nfr:col('NF REM','NF REMESSA') };
+  var g=function(r,k){ return C[k]>=0 ? r[C[k]] : ''; };
+  /* índice da carteira pelo nome (com e sem o CNPJ na frente) */
+  var porNome={};
+  clientes.forEach(function(c){ var e=erpDe(c);
+    [c.nome, c.erpNome, e&&e.n, e&&e.nErp].forEach(function(n){ eqNomes(n).forEach(function(k){ if(!porNome[k]) porNome[k]=c; }); }); });
+  var porNomeDono={}; clientes.forEach(function(c){ var n=normEmp(c.donoNome); if(n && c.donoUid && !porNomeDono[n]) porNomeDono[n]=c.donoUid; });
+  var grupos={}, linhas=0, noCli=0, retTexto=0;
+  for(var r=hi+1;r<rows.length;r++){
+    var L=rows[r]||[]; var cli=String(g(L,'cli')||'').replace(/\t/g,' ').replace(/\s+/g,' ').trim(), tipo=String(g(L,'tipo')||'').trim();
+    if(!cli && !tipo) continue;
+    linhas++;
+    var ret=g(L,'ret'), dRet=eqData(ret);
+    if(dRet) continue;                                     /* tem data de retorno: já voltou */
+    if(String(ret||'').trim()) retTexto++;                 /* texto sem data no retorno: conta como no cliente */
+    noCli++;
+    var io=String(g(L,'io')||'').replace(/\.0$/,'').trim();
+    var chave=io ? 'io_'+io.replace(/[^\w-]/g,'') : 'n_'+norm(cli).replace(/ /g,'_').slice(0,120);
+    var G=grupos[chave]||(grupos[chave]={ id:chave, io:io, cliente:cli, cidade:String(g(L,'cid')||'').trim(), rep:String(g(L,'rep')||'').trim(), itens:[] });
+    var pat=String(g(L,'pat')||'').trim(); if(/^S\/?N$/i.test(pat)) pat='';
+    G.itens.push({ t:tipo.toUpperCase(), ma:String(g(L,'marca')||'').trim(), mo:String(g(L,'mod')||'').trim(), p:pat,
+                   q:Math.max(1, Math.round(eqNum(g(L,'qtd'))||1)), v:Math.round(eqNum(g(L,'val'))*100)/100,
+                   d:eqData(g(L,'rem')), nf:String(g(L,'nfr')||'').replace(/\.0$/,'').trim() });
+  }
+  var docs=Object.keys(grupos).map(function(k){
+    var G=grupos[k], c=null;
+    eqNomes(G.cliente).some(function(n){ c=porNome[n]||null; return !!c; });
+    G.clienteId=c?c.id:''; G.donoUid=c?(c.donoUid||''):'';
+    if(!G.donoUid && G.rep){ var u=uidDoRep(G.rep, porNomeDono); if(u && u.indexOf('erp:')!==0) G.donoUid=u; }
+    G.itens.sort(function(a,b){ return String(a.t).localeCompare(String(b.t)) || String(a.p).localeCompare(String(b.p)); });
+    G.qtd=G.itens.reduce(function(t,x){ return t+x.q; },0); G.valor=Math.round(G.itens.reduce(function(t,x){ return t+x.v; },0)*100)/100;
+    return G;
+  });
+  return { arq:arq, linhas:linhas, noCli:noCli, retTexto:retTexto, docs:docs };
+}
+function eqMostrarPlano(){
+  var P=EQ.plano, lig=P.docs.filter(function(d){ return d.clienteId; }), sem=P.docs.filter(function(d){ return !d.clienteId; });
+  var semDono=P.docs.filter(function(d){ return !d.donoUid; }).length;
+  var itens=P.docs.reduce(function(t,d){ return t+d.qtd; },0), val=P.docs.reduce(function(t,d){ return t+d.valor; },0);
+  abrirModal({ titulo:'Atualizar equipamentos pela planilha', sub:esc(P.arq), wide:true,
+    corpo:'<div class="det"><div><span>Linhas lidas</span><b>'+P.linhas.toLocaleString('pt-BR')+'</b></div>'
+      + '<div><span>Ainda no cliente (sem data de retorno)</span><b>'+P.noCli.toLocaleString('pt-BR')+' linhas · '+itens.toLocaleString('pt-BR')+' equipamentos</b></div>'
+      + '<div><span>Clientes</span><b>'+P.docs.length.toLocaleString('pt-BR')+' · '+fmtRS0(val)+'</b></div>'
+      + '<div><span>Ligados à carteira do app</span><b>'+lig.length.toLocaleString('pt-BR')+'</b></div></div>'
+      + (P.retTexto?'<div class="alert a-info">ⓘ '+P.retTexto+' linha(s) têm texto no RETORNO, mas não uma data: contei como ainda no cliente.</div>':'')
+      + (sem.length?'<div class="det-sec">Não achei na carteira pelo nome ('+sem.length+')</div><div class="mini" style="margin-bottom:6px">Aparecem para a diretoria e os gerentes em “Fora da carteira”'
+          +(semDono<sem.length?'; os que têm representante ligado a um vendedor aparecem também para ele':'')+'.</div>'
+          +'<div class="mini" style="max-height:170px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:8px 10px">'
+          + sem.slice(0,300).map(function(d){ return esc(d.cliente)+(d.cidade?' · '+esc(d.cidade):'')+(d.rep?' · '+esc(d.rep):''); }).join('<br>')+(sem.length>300?'<br>…':'')+'</div>':'')
+      + '<div class="alert a-warn" style="margin-top:12px">▲ Substitui os equipamentos carregados antes: cliente que não aparece mais sem data de retorno sai da lista.</div>',
+    botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Gravar '+P.docs.length.toLocaleString('pt-BR')+' clientes', fn:eqGravar }] });
+}
+function eqGravar(el){
+  var P=EQ.plano; if(!P) return;
+  var pare=ocupado(el, 'Gravando…'), col=collection(db,'comEquipamentos'), agora=agoraISO();
+  getDocs(query(col, limit(6000))).then(function(snap){
+    var novos={}; P.docs.forEach(function(d){ novos[d.id]=1; });
+    var ops=[];
+    P.docs.forEach(function(d){ ops.push(['set', d.id, { io:d.io, cliente:d.cliente, cidade:d.cidade, rep:d.rep, clienteId:d.clienteId, donoUid:d.donoUid,
+                                                       itens:d.itens, qtd:d.qtd, valor:d.valor, atualizadoEm:agora }]); });
+    snap.docs.forEach(function(x){ if(x.id!=='_meta' && !novos[x.id]) ops.push(['del', x.id]); });
+    var lotes=[], b=writeBatch(db), n=0;
+    ops.forEach(function(o){ if(o[0]==='set') b.set(doc(db,'comEquipamentos',o[1]), o[2]); else b.delete(doc(db,'comEquipamentos',o[1]));
+      if(++n>=400){ lotes.push(b); b=writeBatch(db); n=0; } });
+    b.set(doc(db,'comEquipamentos','_meta'), { importadoEm:agora, por:U.email, porNome:U.nome, arquivo:P.arq, linhas:P.linhas,
+      clientes:P.docs.length, itens:P.docs.reduce(function(t,d){ return t+d.qtd; },0), valor:Math.round(P.docs.reduce(function(t,d){ return t+d.valor; },0)) });
+    lotes.push(b);
+    var i=0; var prox=function(){ if(i>=lotes.length) return Promise.resolve(); el.innerHTML='Gravando '+(i+1)+'/'+lotes.length+'…'; return lotes[i++].commit().then(prox); };
+    return prox();
+  }).then(function(){
+    fecharModal(); toast('Equipamentos atualizados: '+P.docs.length+' clientes.'); EQ.plano=null; EQ.docs=null; carregarEquip(true);
+  }).catch(function(e){ pare(); falha('gravar os equipamentos')(e); });
+}
 
 /* ---------- modal ---------- */
 var MB=[];
@@ -1027,7 +1302,8 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   importar:['Carteira pelo ERP','A carteira segue o representante cadastrado no ERP'],
   equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
   usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'],
-  produtos:['Produtos','Catálogo e fichas técnicas'] };
+  produtos:['Produtos','Catálogo e fichas técnicas'],
+  equip:['Equipamentos','Equipamentos em comodato que estão nos clientes'] };
 var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };
 function nav(p){
   pagina=p;
@@ -1062,6 +1338,7 @@ function render(){
   else if(pagina==='equipe') renderEquipe();
   else if(pagina==='usuarios') renderUsuarios();
   else if(pagina==='produtos') renderProdutos();
+  else if(pagina==='equip') renderEquip();
   else if(pagina==='importar') renderImpStatus();
   $('frescor').textContent=erpEstado==='ok' ? 'Base do ERP: '+Object.keys(erp).length+' clientes' : (erpEstado==='lendo'?'Lendo a base do ERP…':'');
 }
@@ -1547,7 +1824,7 @@ function verCliente(id){
     var qd=queda(c);
     if(qd) corpo+='<div class="alert a-err">↓ Comprou '+qd.pct+'% menos em '+nomeMes(qd.mes)+' ('+fmtRS(qd.ult)+') do que no mês anterior ('+fmtRS(qd.ant)+').</div>';
   }
-  corpo+=funilFichaHtml(c)+fichaCadHtml(c)+oportunidadesHtml(c)+comprasRecentesHtml(c);
+  corpo+=funilFichaHtml(c)+fichaCadHtml(c)+oportunidadesHtml(c)+comprasRecentesHtml(c)+'<div id="cli-eq"></div>';
   corpo+='<div class="det-sec">Contato</div><div class="det">'
     +'<div><span>Situação</span><b>'+({cliente:'Cliente',prospect:'Prospect',inativo:'Inativo'}[c.situacao]||'Cliente')+'</b></div>'
     +'<div><span>Cidade · rota</span><b>'+esc([c.cidade, c.rota?'rota '+c.rota:''].filter(Boolean).join(' · ')||'—')+'</b></div>'
@@ -1576,6 +1853,7 @@ function verCliente(id){
       { txt:'✉ Solicitação', cls:'btn-ghost', fn:function(){ abrirSolic(null, c.id); } },
       { txt:'⌖ Registrar contato', fn:function(){ abrirVisita(c.id); } }
     ])});
+  eqFichaPreencher(c);
   /* todo o histórico: pela ficha e, se ligado ao ERP, também os contatos
      feitos quando o cliente ainda não estava na carteira */
   var cv=collection(db,'comVisitas'), dono=U.gestor?[]:[where('donoUid','==',U.uid)];
@@ -3739,7 +4017,8 @@ function gravarFichas(el){
     .then(function(){ toast(feitas+' ficha'+(feitas===1?'':'s')+' gravada'+(feitas===1?'':'s')+'.'); fecharModal(); })
     .catch(function(e){ pare(); falha('gravar as fichas ('+feitas+' gravadas)')(e); });
 }
-Object.assign(window, { abrirMetas:abrirMetas, editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome, alternarSemVinc:alternarSemVinc });
+Object.assign(window, { EQ:EQ, renderEquip:renderEquip, exportarEquip:exportarEquip, eqLerArquivo:eqLerArquivo,
+  abrirMetas:abrirMetas, editarMeta:editarMeta, mudarFunil:mudarFunil, verFicha:verFicha, setFichaBusca:setFichaBusca, importarFichas:importarFichas, impFichaNome:impFichaNome, alternarSemVinc:alternarSemVinc });
 
 /* =====================================================================
    CATÁLOGO — vem do PDF oficial, convertido em catalogo.json (mesmo
