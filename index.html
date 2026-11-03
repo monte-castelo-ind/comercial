@@ -296,16 +296,7 @@ table.ct tr.b-blue td:first-child{box-shadow:inset 3px 0 0 var(--blue)}
 table.ct tr.b-muted td{opacity:.6}
 .ct-nome{font-weight:700}
 .ct-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
-/* Remessa Comodato / Manutenção Externa: prioridade e arrastar */
 .cm-dica{margin:-6px 0 10px}
-.cm-pri{display:flex;align-items:center;gap:7px;font-size:15px}
-.cm-alca{cursor:grab;color:var(--muted);font-size:15px;letter-spacing:-2px;padding:2px 4px;border-radius:5px;user-select:none}
-.cm-alca:hover{background:var(--card-2);color:var(--text)}
-table.ct tr.cm-arrastando td{opacity:.35}
-table.ct tr.cm-alvo-c td{box-shadow:inset 0 3px 0 var(--red)}
-table.ct tr.cm-alvo-b td{box-shadow:inset 0 -3px 0 var(--red)}
-.cm-acoes{white-space:nowrap}
-.cm-acoes .pr-x{font-size:14px;margin-left:4px}
 .ct-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
 .ct-tags .tag{font-size:10.5px;padding:1px 7px}
 table.ct .ct-val{text-align:right;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -717,30 +708,10 @@ details.mais[open]{padding-bottom:4px}
 
     <!-- EQUIPAMENTOS: REMESSA COMODATO e MANUTENÇÃO EXTERNA -->
     <div class="page" id="page-cmrem">
-      <div class="tools">
-        <select id="cmrem-st" onchange="render()">
-          <option value="abertas">Em aberto</option>
-          <option value="">Todos</option>
-          <option value="fechadas">Encerrados</option>
-        </select>
-        <input type="search" id="cmrem-q" placeholder="Buscar cliente, equipamento, patrimônio…" oninput="render()">
-        <button class="btn btn-sm btn-novo com-only" onclick="cmNovo('remessa')">+ Nova remessa / retorno</button>
-      </div>
-      <div class="mini cm-dica" id="cmrem-dica"></div>
-      <div id="cmrem-lista"></div>
+      <div id="cmrem-box"></div>
     </div>
     <div class="page" id="page-cmext">
-      <div class="tools">
-        <select id="cmext-st" onchange="render()">
-          <option value="abertas">Em aberto</option>
-          <option value="">Todos</option>
-          <option value="fechadas">Encerrados</option>
-        </select>
-        <input type="search" id="cmext-q" placeholder="Buscar cliente, equipamento, patrimônio…" oninput="render()">
-        <button class="btn btn-sm btn-novo com-only" onclick="cmNovo('externa')">+ Nova manutenção externa</button>
-      </div>
-      <div class="mini cm-dica" id="cmext-dica"></div>
-      <div id="cmext-lista"></div>
+      <div id="cmext-box"></div>
     </div>
 
     <!-- SOLICITAÇÕES -->
@@ -2116,8 +2087,7 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   eqhist:['Histórico dos equipamentos','Todas as remessas e retornos da planilha, e o caminho de cada equipamento'],
   cmrem:['Remessa Comodato','Envio e retorno de equipamentos em comodato (entregar, retirar, trocar) — pedidos à manutenção'],
   cmext:['Manutenção Externa','Conserto dos equipamentos nos clientes — pedidos à manutenção'] };
-var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'],
-  cmrem:['+ Nova remessa / retorno','cmrem'], cmext:['+ Nova manutenção externa','cmext'] };
+var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };   /* Remessa / Manutenção: o botão de novo pedido fica na barra da própria lista */
 function nav(p){
   pagina=p;
   document.querySelectorAll('.navbtn').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-p')===p); });
@@ -3487,138 +3457,51 @@ function cmCancelar(x, el){
 Object.assign(window, { fsCliMudou:fsCliMudou, fsCliNovo:fsCliNovo, cmCat:cmCat, cmItemAdd:cmItemAdd, cmItemTirar:cmItemTirar, cmEqMudou:cmEqMudou, cmVer:cmVer });
 /* =====================================================================
    EQUIPAMENTOS → REMESSA COMODATO e MANUTENÇÃO EXTERNA
-   Os pedidos à manutenção (comodatoSolicitacoes) separados em duas telas:
-   - Remessa Comodato: envio e retorno dos equipamentos (entregar, retirar,
-     trocar) — categoria "remessa";
-   - Manutenção Externa: conserto do equipamento no cliente — "externa".
-   Pedido antigo sem categoria: "consertar" é externa, o resto é remessa.
-   Prioridade: os pedidos em aberto ficam numerados 1, 2, 3… de cima para
-   baixo (campo prioridade). Quem gerencia os pedidos (chave "Gerencia
-   pedidos de equipamento", em Usuários e níveis, e a diretoria) arrasta
-   pela alça ⋮⋮ para mudar a ordem, edita e exclui. Pedido sem número
-   (recém-criado) entra depois dos numerados, do mais antigo ao mais novo.
+   Os pedidos à manutenção (comodatoSolicitacoes) em duas telas. As listas
+   (colunas, ordem, prioridade, arrastar, filtros) vêm de
+   pedidos-equipamento.js, na raiz do hub — o MESMO arquivo que o Manut.
+   Comodato usa: as duas telas ficam sempre iguais nos dois apps. Aqui fica
+   só o que é do Comercial: abrir a folha, editar, excluir, pedido novo e a
+   chave "Gerencia pedidos de equipamento" (Usuários e níveis).
    ===================================================================== */
-var CM_ABERTOS=['autorizacao','aberta','separacao'];
-var CM_PAG={ remessa:'cmrem', externa:'cmext' };
-function cmCatDe(x){ return (x && (x.categoria==='remessa' || x.categoria==='externa')) ? x.categoria : ((x && x.servico==='consertar') ? 'externa' : 'remessa'); }
+var CM_PAG={ remessa:'cmrem', externa:'cmext' }, cmConfig=false;
 function cmPodeGerir(){ return !!(U.admin || U.cmGerencia); }
-function cmOrdem(a,b){
-  var pa=(+a.prioridade>0)?+a.prioridade:1e9, pb=(+b.prioridade>0)?+b.prioridade:1e9;
-  return pa-pb || (+a.criadoEm||0)-(+b.criadoEm||0);
+function cmCatDe(x){ return window.MCPedidos ? MCPedidos.categoria(x) : ((x && x.servico==='consertar') ? 'externa' : 'remessa'); }
+function cmAbertosDe(cat){ return window.MCPedidos ? MCPedidos.abertos(cmLista, cat) : []; }
+function cmConfigurar(){
+  if(cmConfig || !window.MCPedidos) return;
+  cmConfig=true;
+  MCPedidos.configurar({
+    lista:function(){ return cmLista; },
+    podeGerir:cmPodeGerir,
+    eu:function(){ return U.email; },
+    ver:function(id){ cmVer(id); },
+    editar:function(id){ cmEditar(id); },
+    podeEditar:function(x){ return x.status==='aberta' || x.status==='separacao'; },
+    excluir:function(id){ cmExcluir(id); },
+    podeExcluir:function(x){ return x.status!=='autorizacao'; },
+    gravarOrdem:function(up){
+      var lote=writeBatch(db);
+      up.forEach(function(u){ lote.update(doc(db,'comodatoSolicitacoes',u.id), { prioridade:u.prioridade }); });
+      return lote.commit();
+    },
+    novo:function(cat){ cmNovo(cat); },
+    aviso:function(m,e){ toast(m,e); }
+  });
 }
-function cmAbertosDe(cat){ return cmLista.filter(function(x){ return cmCatDe(x)===cat && CM_ABERTOS.indexOf(x.status)>=0; }).sort(cmOrdem); }
 function cmContar(){
+  if(!window.MCPedidos) return;
   ['remessa','externa'].forEach(function(cat){
     var b=$('cnt-'+CM_PAG[cat]); if(!b) return;
-    var n=cmAbertosDe(cat).length; b.hidden=!n; b.textContent=n;
+    var n=MCPedidos.contar(cmLista, cat); b.hidden=!n; b.textContent=n;
   });
 }
 function renderCm(cat){
-  var pg=CM_PAG[cat], box=$(pg+'-lista'); if(!box) return;
-  cmContar();
+  var box=$(CM_PAG[cat]+'-box'); if(!box) return;
+  if(!window.MCPedidos){ box.innerHTML='<div class="empty">Não foi possível carregar as listas (pedidos-equipamento.js). Recarregue a página.</div>'; return; }
+  cmConfigurar(); cmContar();
   if(!(U.comodato || U.cmGerencia)){ box.innerHTML='<div class="empty">Sua conta não tem acesso aos pedidos de equipamento. Peça a chave à diretoria.</div>'; return; }
-  var st=$(pg+'-st').value, q=norm($(pg+'-q').value).split(' ').filter(Boolean), gere=cmPodeGerir();
-  var ab=cmAbertosDe(cat);
-  var fe=cmLista.filter(function(x){ return cmCatDe(x)===cat && CM_ABERTOS.indexOf(x.status)<0; })
-    .sort(function(a,b){ return (+b.atualizadoEm||+b.criadoEm||0)-(+a.atualizadoEm||+a.criadoEm||0); });
-  var pos={}; ab.forEach(function(x,i){ pos[x.id]=i+1; });
-  var l=st==='abertas'?ab:(st==='fechadas'?fe:ab.concat(fe));
-  var filtrando=q.length>0;
-  if(filtrando) l=l.filter(function(x){ var t=norm([x.cliente,x.cidade,cmItensTxt(x),x.patrimonio,x.solicitadoNome,x.obs].join(' ')); return q.every(function(w){ return t.indexOf(w)>=0; }); });
-  $(pg+'-dica').innerHTML=(gere && st!=='fechadas' && ab.length>1)
-    ? (filtrando?'Com a busca ligada não dá para arrastar — limpe a busca para mudar a prioridade.':'Arraste pela alça <b>⋮⋮</b> para mudar a prioridade: o de cima é o nº 1.')
-    : '';
-  if(!l.length){ box.innerHTML='<div class="empty">'+(filtrando?'Nada com essa busca.':(st==='fechadas'?'Nenhum pedido encerrado.':'Nenhum pedido em aberto.'))+'</div>'; return; }
-  var arrasta=gere && !filtrando;
-  box.innerHTML='<div class="tscroll ct-wrap"><table class="tb ct cm-tab"><thead><tr>'
-    +'<th style="width:64px">Prior.</th><th>Data da solicitação</th><th>Data programada</th><th>Cliente</th><th>Equipamento</th>'
-    +'<th style="text-align:right">Qtd</th><th>Patrimônio</th><th>Serviço</th><th>Pedido por</th><th>Situação</th>'+(gere?'<th></th>':'')+'</tr></thead><tbody>'
-    +l.map(function(x){ return cmLinha(x, pos[x.id], cat, arrasta, gere); }).join('')+'</tbody></table></div>';
-}
-function cmLinha(x, n, cat, arrasta, gere){
-  var aberto=CM_ABERTOS.indexOf(x.status)>=0, mut='<span class="ct-mut">—</span>';
-  var sub=function(v){ return v?'<div class="ct-sub">'+esc(v)+'</div>':''; };
-  var its=cmItensDe(x);
-  var eq=its.length>1 ? its.map(function(i){ return '<div><b>'+(i.quantidade||1)+'×</b> '+esc(i.equipamento||'')+(i.modelo?' <span class="ct-mut">· '+esc(i.modelo)+'</span>':'')+'</div>'; }).join('')
-                      : esc(x.equipamento||'')+sub(x.modelo);
-  var ent=mut;
-  if(x.dataProgramada){
-    var dd=difDias(hoje(), String(x.dataProgramada).slice(0,10));
-    var rel=!aberto?'':(dd<0?'atrasada '+(-dd)+' dia'+(dd===-1?'':'s'):(dd===0?'hoje':(dd===1?'amanhã':'em '+dd+' dias')));
-    ent='<b'+(aberto&&dd<0?' class="ct-red"':'')+'>'+cmDataBR(x.dataProgramada)+'</b>'+(rel?'<div class="ct-sub'+(dd<0?' ct-red':'')+'">'+rel+'</div>':'');
-  }
-  var stc=CM_ST[x.status]||'aberta';
-  var borda=stc==='aberta'?'b-amber':(stc==='andamento'?'b-blue':(stc==='recusada'?'b-red':(stc==='cancelada'?'b-muted':'')));
-  var sit=stTag(stc).replace(/>[^<]*</, '>'+esc(CM_ST_NOME[x.status]||x.status)+'<');
-  var d=x.criadoEm?new Date(+x.criadoEm):null;
-  var prio=aberto
-    ? '<div class="cm-pri">'+(arrasta?'<span class="cm-alca" title="Arraste para mudar a prioridade" onmousedown="cmPegar(event)" ontouchstart="cmPegar(event)">⋮⋮</span>':'')+'<b>'+n+'</b></div>'
-    : mut;
-  var por=(x.solicitadoPor===U.email)?'Você':(x.solicitadoNome||x.solicitadoPor||'—');
-  return '<tr class="'+borda+'" data-id="'+esc(x.id)+'" onclick="cmVer(\''+esc(x.id)+'\')"'
-    +(arrasta&&aberto?' draggable="true" ondragstart="cmDragIni(event,\''+cat+'\')" ondragover="cmDragSobre(event)" ondragleave="cmDragSai(event)" ondrop="cmSoltar(event,\''+cat+'\')" ondragend="cmDragFim()"':'')+'>'
-    +'<td class="ct-uc" onclick="event.stopPropagation()">'+prio+'</td>'
-    +'<td class="ct-uc">'+(d?'<b>'+d.toLocaleDateString('pt-BR')+'</b><div class="ct-sub">'+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+'</div>':mut)+'</td>'
-    +'<td class="ct-uc">'+ent+'</td>'
-    +'<td style="max-width:320px"><div class="ct-nome">'+esc(x.cliente||'')+(x.clienteNovo?' <span class="ct-mut">(cliente novo)</span>':'')+'</div>'+sub(x.endereco||x.cidade)+'</td>'
-    +'<td>'+eq+'</td>'
-    +'<td class="ct-val" style="font-weight:600"><b>'+(x.quantidade||1)+'</b></td>'
-    +'<td>'+(x.patrimonio?esc(x.patrimonio):mut)+'</td>'
-    +'<td>'+esc(CM_SERV[x.servico]||x.servico||'')+'</td>'
-    +'<td>'+esc(por)+'</td>'
-    +'<td>'+sit+(x.novo?'<div class="ct-sub">equipamento novo</div>':'')+'</td>'
-    +(gere?'<td class="cm-acoes" onclick="event.stopPropagation()">'
-      +(x.status==='aberta'||x.status==='separacao'?'<button class="pr-x" title="Editar" onclick="cmEditar(\''+esc(x.id)+'\')">✎</button>':'')
-      +(x.status!=='autorizacao'?'<button class="pr-x" title="Excluir" onclick="cmExcluir(\''+esc(x.id)+'\')">🗑</button>':'')+'</td>':'')
-    +'</tr>';
-}
-
-/* ---------- arrastar para mudar a prioridade ---------- */
-var cmPegou=false, cmArr=null;
-function cmPegar(ev){ cmPegou=true; }
-document.addEventListener('mouseup', function(){ setTimeout(function(){ cmPegou=false; }, 0); });
-function cmDragIni(ev, cat){
-  if(!cmPegou){ ev.preventDefault(); return; }               /* só pela alça: clicar na linha abre o pedido */
-  var tr=ev.currentTarget; cmArr={ id:tr.getAttribute('data-id'), cat:cat };
-  try{ ev.dataTransfer.effectAllowed='move'; ev.dataTransfer.setData('text/plain', cmArr.id); }catch(e){}
-  setTimeout(function(){ tr.classList.add('cm-arrastando'); }, 0);
-}
-function cmLimparAlvo(){ document.querySelectorAll('.cm-alvo-c,.cm-alvo-b').forEach(function(t){ t.classList.remove('cm-alvo-c','cm-alvo-b'); }); }
-function cmDragSobre(ev){
-  if(!cmArr) return;
-  ev.preventDefault();
-  var tr=ev.currentTarget, r=tr.getBoundingClientRect(), baixo=ev.clientY>r.top+r.height/2;
-  cmLimparAlvo(); if(tr.getAttribute('data-id')!==cmArr.id) tr.classList.add(baixo?'cm-alvo-b':'cm-alvo-c');
-}
-function cmDragSai(ev){ ev.currentTarget.classList.remove('cm-alvo-c','cm-alvo-b'); }
-function cmDragFim(){ cmLimparAlvo(); document.querySelectorAll('.cm-arrastando').forEach(function(t){ t.classList.remove('cm-arrastando'); }); cmArr=null; cmPegou=false; }
-function cmSoltar(ev, cat){
-  ev.preventDefault();
-  if(!cmArr || cmArr.cat!==cat){ cmDragFim(); return; }
-  var tr=ev.currentTarget, alvo=tr.getAttribute('data-id'), r=tr.getBoundingClientRect(), baixo=ev.clientY>r.top+r.height/2;
-  var ids=cmAbertosDe(cat).map(function(x){ return x.id; }), de=cmArr.id;
-  cmDragFim();
-  if(alvo===de || ids.indexOf(alvo)<0 || ids.indexOf(de)<0) return;
-  ids.splice(ids.indexOf(de),1);
-  ids.splice(ids.indexOf(alvo)+(baixo?1:0), 0, de);
-  cmGravarOrdem(cat, ids);
-}
-/* grava 1, 2, 3… na ordem da lista; só os que mudaram de número */
-function cmGravarOrdem(cat, ids){
-  var lote=writeBatch(db), mud=0, antes={};
-  ids.forEach(function(id,i){
-    var x=cmLista.filter(function(c){ return c.id===id; })[0]; if(!x) return;
-    if(+x.prioridade!==i+1){ antes[id]=x.prioridade; x.prioridade=i+1; lote.update(doc(db,'comodatoSolicitacoes',id), { prioridade:i+1 }); mud++; }
-  });
-  if(!mud) return;
-  render();                                                   /* já mostra a nova ordem; o banco confirma em seguida */
-  lote.commit().then(function(){ toast('Prioridade atualizada.'); })
-    .catch(function(e){
-      Object.keys(antes).forEach(function(id){ var x=cmLista.filter(function(c){ return c.id===id; })[0]; if(x) x.prioridade=antes[id]; });
-      render();
-      if(e.code==='permission-denied') toast('Sem permissão para mudar a prioridade (falta publicar a regra nova, ou a chave "Gerencia pedidos de equipamento").', true);
-      else falha('mudar a prioridade')(e);
-    });
+  MCPedidos.render(box, cat);
 }
 
 /* ---------- novo pedido já na categoria da tela ---------- */
@@ -3639,7 +3522,7 @@ function cmEditar(id){
     +Object.keys(CM_CAT).map(function(k){ return '<button type="button" class="chip" data-v="'+k+'" onclick="cmCat(this)">'+CM_CAT[k].nome+'</button>'; }).join('')+'</div></div>'
     +'<div class="grid2">'
     +'<div class="fld"><label>Cliente *</label><input type="text" id="cme-cli" value="'+esc(x.cliente||'')+'"></div>'
-    +'<div class="fld"><label>Prioridade <span class="mini">(1 = primeiro da lista; '+ab.length+' em aberto)</span></label><input type="number" min="1" max="'+ab.length+'" step="1" id="cme-pri" value="'+pri+'"></div>'
+    +'<div class="fld"><label>Prioridade <span class="mini">(1 = primeiro da lista; '+ab.length+' em aberto)</span></label><input type="number" min="1" max="'+Math.max(1,ab.length)+'" step="1" id="cme-pri" value="'+pri+'"></div>'
     +'</div>'
     +'<div class="fld"><label>Endereço</label><input type="text" id="cme-end" value="'+esc(x.endereco||'')+'"></div>'
     +'<div class="grid2">'
@@ -3656,7 +3539,6 @@ function cmEditar(id){
     +'<div class="mini">Pedido por '+esc(x.solicitadoNome||x.solicitadoPor||'')+(x.criadoEm?' em '+new Date(+x.criadoEm).toLocaleString('pt-BR'):'')+'. A alteração fica no histórico do pedido.</div>';
   abrirModal({ titulo:'Editar pedido de equipamento', sub:esc(x.cliente||''), wide:true, corpo:corpo,
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Salvar', fn:function(el){ cmSalvarEdicao(x, el); } }] });
-  /* itens */
   var box=$('cm-itens'), its=cmItensDe(x);
   its.forEach(function(it,i){
     box.insertAdjacentHTML('beforeend', cmItRow(i, its.length));
@@ -3689,7 +3571,6 @@ function cmSalvarEdicao(x, el){
     categoria:cat, servico:g('cm-serv')||x.servico||'entregar', dataProgramada:g('cm-data'), obs:g('cm-obs'),
     itens:its.length>1?its:deleteField(),
     atualizadoEm:agora, atualizadoPor:U.email, atualizadoNome:U.nome }, cmResumoItens(its));
-  /* o que mudou vai escrito no histórico */
   var mud=[];
   if(cli!==(x.cliente||'')) mud.push('cliente');
   if(cat!==cmCatDe(x)) mud.push('tipo: '+CM_CAT[cat].nome);
@@ -3698,15 +3579,11 @@ function cmSalvarEdicao(x, el){
   if(cmItensTxt(Object.assign({}, up, { itens:its.length>1?its:null }))!==cmItensTxt(x)) mud.push('equipamentos: '+its.map(function(i){ return i.quantidade+'× '+i.equipamento; }).join(' + '));
   if(up.endereco!==(x.endereco||'') || up.cidade!==(x.cidade||'') || up.contato!==(x.contato||'') || up.obs!==(x.obs||'')) mud.push('dados do cliente/observações');
   if(mud.length) up.historico=(x.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome, acao:'editou', txt:mud.join(' · ') }]);
-  /* prioridade: move para a posição pedida (na lista da categoria de destino) */
   var pri=parseInt(g('cme-pri'),10);
   var pare=ocupado(el,'Salvando…');
   updateDoc(doc(db,'comodatoSolicitacoes',x.id), up).then(function(){
-    var ids=cmAbertosDe(cat).map(function(c){ return c.id; }).filter(function(id){ return id!==x.id; });
-    var p=(pri>0)?Math.min(pri, ids.length+1):ids.length+1;
-    ids.splice(p-1, 0, x.id);
     x.categoria=cat;
-    cmGravarOrdem(cat, ids);
+    if(window.MCPedidos) MCPedidos.mover(x.id, cat, pri);
     toast('Pedido atualizado.'); fecharModal();
   }).catch(function(e){ pare();
     if(e.code==='permission-denied') toast('Sem permissão para editar (falta publicar a regra nova, ou a chave "Gerencia pedidos de equipamento").', true);
@@ -3719,10 +3596,10 @@ function cmExcluir(id){
   var x=cmLista.filter(function(c){ return c.id===id; })[0]; if(!x) return;
   if(x.status==='autorizacao'){ toast('Este pedido espera a autorização da diretoria: a diretoria recusa no app de Autorizações.', true); return; }
   if(!confirm('Excluir de vez o pedido de '+cmItensTxt(x)+' para '+(x.cliente||'')+'?\n\nNão dá para desfazer. Se for só desistir do pedido, prefira cancelar.')) return;
+  var cat=cmCatDe(x), resto=cmAbertosDe(cat).filter(function(c){ return c.id!==id; }).map(function(c){ return c.id; });
   deleteDoc(doc(db,'comodatoSolicitacoes',id)).then(function(){
     toast('Pedido excluído.'); fecharModal();
-    /* renumera os que ficaram */
-    var cat=cmCatDe(x); cmGravarOrdem(cat, cmAbertosDe(cat).filter(function(c){ return c.id!==id; }).map(function(c){ return c.id; }));
+    if(window.MCPedidos) MCPedidos.reordenar(cat, resto);       /* renumera os que ficaram */
   }).catch(function(e){
     if(e.code==='permission-denied') toast('Sem permissão para excluir (falta publicar a regra nova, ou a chave "Gerencia pedidos de equipamento").', true);
     else falha('excluir o pedido')(e);
@@ -3738,8 +3615,7 @@ function cmGerMudar(uid, cb){
     toast((u.nome||u.email)+(cb.checked?' agora gerencia':' não gerencia mais')+' os pedidos de equipamento. Vale na próxima vez que abrir o app.');
   }).catch(function(e){ cb.disabled=false; cb.checked=!cb.checked; falha('mudar a chave')(e); });
 }
-Object.assign(window, { cmPegar:cmPegar, cmDragIni:cmDragIni, cmDragSobre:cmDragSobre, cmDragSai:cmDragSai, cmDragFim:cmDragFim, cmSoltar:cmSoltar,
-  cmNovo:cmNovo, cmEditar:cmEditar, cmExcluir:cmExcluir, cmGerMudar:cmGerMudar });
+Object.assign(window, { cmNovo:cmNovo, cmEditar:cmEditar, cmExcluir:cmExcluir, cmGerMudar:cmGerMudar });
 
 
 
@@ -5434,6 +5310,7 @@ function compartilharFicha(f, el){
 }
 </script>
 <script src="https://monte-castelo-ind.github.io/folha-solicitacao.js?v=3"></script>
+<script src="https://monte-castelo-ind.github.io/pedidos-equipamento.js?v=1"></script>
 <script src="https://monte-castelo-ind.github.io/voltar.js"></script>
 </body>
 </html>
