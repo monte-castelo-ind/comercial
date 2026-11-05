@@ -656,6 +656,7 @@ details.mais[open]{padding-bottom:4px}
       <div class="tools">
         <input type="search" id="c-busca" placeholder="Buscar cliente, cidade, rota…" oninput="renderCarteira()">
         <select id="c-vend" onchange="renderCarteira()" class="gestor-only" style="display:none"></select>
+        <select id="c-rota" onchange="renderCarteira()" title="Rota do ERP"></select>
         <select id="c-per" onchange="setPerFat(this.value)" title="Período do faturamento"></select>
         <input type="month" id="c-mes" style="display:none;width:auto" onchange="carregarMesExtra(this.value)">
         <select id="c-ord" onchange="renderCarteira()">
@@ -2204,7 +2205,7 @@ function cartaoCliente(c){
   if(c.fornecedor) tags.push('<span class="tag">Compra de: '+esc(c.fornecedor)+'</span>');
   if(emAlerta(c) || contatoAtrasado(c) || qd) borda=' b-red'; else if(contatoHoje(c)) borda=' b-amber';
   else if(c.situacao==='prospect') borda=' b-blue';
-  var meta=[c.cidade, c.rota?'rota '+c.rota:'', (U.gestor&&c.donoNome)?'carteira de '+c.donoNome:''].filter(Boolean).join(' · ');
+  var meta=[c.cidade, rotaDe(c)?'rota '+rotaDe(c):'', (U.gestor&&c.donoNome)?'carteira de '+c.donoNome:((U.gestor&&!c.donoUid)?'sem vendedor':'')].filter(Boolean).join(' · ');
   var vf=(c.situacao==='prospect')?null:valorPeriodo(c), pf=perAtual();
   var fatHtml=(vf==null||!pf)?'':'<div class="it-fat'+(vf?'':' zero')+'">'+(vf?fmtRS0(vf):'R$ 0')+'<small>'+esc(pf.curto)+'</small></div>';
   return '<div class="it'+borda+(c.situacao==='inativo'?' b-muted':'')+'" onclick="verCliente(\''+c.id+'\')">'
@@ -2275,16 +2276,32 @@ function selVendedor(id, lista){
   var el=$(id); if(!el || !U.gestor) return '';
   var nomes={}; lista.forEach(function(x){ if(x.donoUid) nomes[x.donoUid]=(x.donoNome||x.donoEmail||'?')+(String(x.donoUid).indexOf('erp:')===0?' (sem login)':''); });
   var atual=el.value, ids=Object.keys(nomes).sort(function(a,b){ return String(nomes[a]).localeCompare(String(nomes[b]),'pt-BR'); });
-  var html='<option value="">Todos os vendedores</option>'+ids.map(function(u){ return '<option value="'+u+'">'+esc(nomes[u])+'</option>'; }).join('');
+  var nSem=lista.filter(function(x){ return !x.donoUid && x.situacao!=='inativo'; }).length;
+  var html='<option value="">Todos os vendedores</option>'+(nSem?'<option value="#sem">Sem vendedor ('+nSem+')</option>':'')
+    +ids.map(function(u){ return '<option value="'+u+'">'+esc(nomes[u])+'</option>'; }).join('');
   if(el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html; el.value=atual; }
+  return el.value;
+}
+/* rota do cliente: a gravada na ficha ou, se vazia, a do ERP (relatório de vendas) */
+function rotaDe(c){ var e=erpDe(c); return String(c.rota || (e&&e.r) || '').replace(/\s+/g,' ').trim(); }
+function selRota(lista){
+  var el=$('c-rota'); if(!el) return '';
+  var cont={}, sem=0;
+  lista.forEach(function(c){ if(c.situacao==='inativo') return; var r=rotaDe(c); if(r) cont[r]=(cont[r]||0)+1; else sem++; });
+  var atual=el.value, rs=Object.keys(cont).sort(function(a,b){ return a.localeCompare(b,'pt-BR',{ numeric:true }); });
+  var html='<option value="">Todas as rotas</option>'+(sem?'<option value="#sem">Sem rota ('+sem+')</option>':'')
+    +rs.map(function(r){ return '<option value="'+esc(r)+'">'+esc(r)+' ('+cont[r]+')</option>'; }).join('');
+  if(el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html; el.value=atual; if(el.value!==atual) el.value=''; }
   return el.value;
 }
 function renderCarteira(){
   var vend=selVendedor('c-vend', clientes);
+  var rotaSel=selRota(vend==='#sem' ? clientes.filter(function(c){ return !c.donoUid; }) : (vend ? clientes.filter(function(c){ return c.donoUid===vend; }) : clientes));
   $('c-filtros').innerHTML=FILTROS.map(function(f){ return '<button class="chip'+(filtroCart===f[0]?' on':'')+'" onclick="setFiltroCart(\''+f[0]+'\')">'+f[1]+'</button>'; }).join('');
   var q=norm($('c-busca').value).split(' ').filter(Boolean);
   var l=clientes.filter(function(c){
-    if(vend && c.donoUid!==vend) return false;
+    if(vend==='#sem' ? !!c.donoUid : (vend && c.donoUid!==vend)) return false;
+    if(rotaSel && (rotaSel==='#sem' ? !!rotaDe(c) : rotaDe(c)!==rotaSel)) return false;
     if(filtroCart!=='inativo' && c.situacao==='inativo') return false;
     if(filtroCart==='inativo' && c.situacao!=='inativo') return false;
     if(filtroCart==='agenda' && !(contatoAtrasado(c)||contatoHoje(c))) return false;
@@ -2293,7 +2310,7 @@ function renderCarteira(){
     if(filtroCart==='semctt' && c.proxContato) return false;
     if(filtroCart==='prospect' && c.situacao!=='prospect') return false;
     if(filtroCart==='semerp' && (c.erpId || c.situacao==='prospect')) return false;
-    if(q.length){ var t=norm([c.nome,c.cidade,c.rota,c.contato,c.fornecedor,c.donoNome].join(' ')); if(!q.every(function(x){ return t.indexOf(x)>=0; })) return false; }
+    if(q.length){ var t=norm([c.nome,c.cidade,rotaDe(c),c.contato,c.fornecedor,c.donoNome].join(' ')); if(!q.every(function(x){ return t.indexOf(x)>=0; })) return false; }
     return true;
   });
   /* faturamento do período: no cartão, no total e na ordem */
@@ -2303,7 +2320,8 @@ function renderCarteira(){
   l.sort(function(a,b){
     if(ord!=='nome' && pf){ var x=val[a.id]||0, y=val[b.id]||0; if(x!==y) return ord==='fatd' ? y-x : x-y; }
     return String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'); });
-  var deQuem=U.gestor ? (vend ? 'carteira de '+(($('c-vend').selectedOptions[0]||{}).textContent||'') : 'todas as carteiras') : 'sua carteira';
+  var deQuem=U.gestor ? (vend==='#sem' ? 'clientes sem vendedor' : vend ? 'carteira de '+(($('c-vend').selectedOptions[0]||{}).textContent||'') : 'todas as carteiras') : 'sua carteira';
+  if(rotaSel) deQuem+=' · '+(rotaSel==='#sem' ? 'sem rota' : 'rota '+rotaSel);
   $('psub').textContent=l.length+' cliente'+(l.length===1?'':'s')+(l.length!==clientes.length?' de '+clientes.length:'')+' · '+deQuem;
   /* cartões: faturamento e número de clientes do que está na tela */
   var compraram=l.filter(function(c){ return (val[c.id]||0)>0; }).length;
@@ -2354,8 +2372,8 @@ function linhaCliente(c, vf, colVend){
   return '<tr class="'+borda+'" onclick="verCliente(\''+c.id+'\')">'
     +'<td><div class="ct-nome">'+esc(c.nome||'(sem nome)')+'</div>'+(c.cidade?'<div class="ct-sub">'+esc(c.cidade)+'</div>':'')
       +(tags.length?'<div class="ct-tags">'+tags.join('')+'</div>':'')+'</td>'
-    +'<td>'+(c.rota?esc(c.rota):'<span class="ct-mut">—</span>')+'</td>'
-    +(colVend?'<td>'+(c.donoNome?esc(c.donoNome):'<span class="ct-mut">—</span>')+'</td>':'')
+    +'<td>'+(rotaDe(c)?esc(rotaDe(c)):'<span class="ct-mut">—</span>')+'</td>'
+    +(colVend?'<td>'+(c.donoNome?esc(c.donoNome):'<span class="ct-mut">'+(c.donoUid?'—':'sem vendedor')+'</span>')+'</td>':'')
     +'<td class="ct-uc">'+uc+'</td>'+valHtml+'</tr>';
 }
 function setFiltroCart(f){ filtroCart=f; renderCarteira(); }
@@ -2674,7 +2692,7 @@ function verCliente(id){
     +'<div><span>Cidade · rota</span><b>'+esc([c.cidade, c.rota?'rota '+c.rota:''].filter(Boolean).join(' · ')||'—')+'</b></div>'
     +'<div><span>Pessoa de contato</span><b>'+esc(c.contato||'—')+'</b></div>'
     +'<div><span>Telefone</span><b>'+(c.telefone?telLink(c.telefone):'—')+'</b></div>'
-    +(U.gestor?'<div><span>Carteira de</span><b>'+esc(c.donoNome||'—')+'</b></div>':'')+'</div>';
+    +(U.gestor?'<div><span>Carteira de</span><b>'+esc(c.donoNome||(c.donoUid?'—':'sem vendedor'))+'</b></div>':'')+'</div>';
   corpo+='<div class="det-sec">Hoje compra de</div>';
   var pr=(c.precos||[]).filter(function(p){ return p.p; });
   corpo+='<div class="det"><div><span>Fornecedor atual</span><b>'+esc(c.fornecedor||'—')+'</b></div>'
@@ -3735,9 +3753,11 @@ function impGuardarMapa(){
    pelo faturamento do ERP. O representante é decidido no ERP; o app só lê. */
 var DIAS_ATIVO=30;
 function linhasErpAtivas(){
-  var ult={}, todos={};
+  var ult={}, todos={}, semRep={};
   cmDocs.forEach(function(d){ Object.keys(d.clientes).forEach(function(k){ var c=d.clientes[k]||{}; todos[k]=1;
-    var v=String(c.rep||'').trim(); if(v) ult[k]={ nome:c.nome||k, quem:v }; }); });
+    var v=String(c.rep||'').trim(); if(v) ult[k]={ nome:c.nome||k, quem:v }; else semRep[k]={ nome:c.nome||k, quem:'' }; }); });
+  /* sem representante no ERP: entram na carteira como "sem vendedor" (a diretoria passa para alguém depois) */
+  Object.keys(semRep).forEach(function(k){ if(!ult[k]) ult[k]=semRep[k]; });
   var comCampo=Object.keys(ult);
   var limite=somaDias(hoje(), -DIAS_ATIVO), uPorNome={};
   Object.keys(erp).forEach(function(id){ var e=erp[id]; if(!e.u) return;
@@ -3749,7 +3769,8 @@ function linhasErpAtivas(){
     var c=docAtual&&docAtual.clientes[k];
     return !!(c && (c.fat||0)>0 && diaHoje<=DIAS_ATIVO);
   });
-  return { linhas:ativos.map(function(k){ return [ult[k].nome, ult[k].quem]; }), semCampo:Object.keys(todos).length-comCampo.length, parados:comCampo.length-ativos.length };
+  return { linhas:ativos.map(function(k){ return [ult[k].nome, ult[k].quem]; }), semCampo:0,
+           semVendedor:ativos.filter(function(k){ return !ult[k].quem; }).length, parados:comCampo.length-ativos.length };
 }
 function impDoErp(el){
   if(!U.admin) return;
@@ -3758,7 +3779,7 @@ function impDoErp(el){
   var r=linhasErpAtivas();
   if(!r.linhas.length){ toast('Nenhum cliente com representante comprou nos últimos '+DIAS_ATIVO+' dias.', true); return; }
   IMP={ cab:['Cliente','representante'], linhas:r.linhas, col:{ cli:0, vend:1, cid:-1 }, mapa:{}, usuarios:IMP.usuarios, plano:null, nomeArq:'ERP', fonte:'erp',
-        rotulo:'representante', semCampo:r.semCampo, parados:r.parados, dias:DIAS_ATIVO };
+        rotulo:'representante', semCampo:r.semCampo, semVendedor:r.semVendedor, parados:r.parados, dias:DIAS_ATIVO };
   $('imp-p3').innerHTML=''; $('imp-p4').innerHTML='';
   var pare=ocupado(el,'Lendo…');
   impUsuarios().then(function(){ pare(); impPintarP2(); $('imp-passos').scrollIntoView({ behavior:'smooth', block:'start' }); })
@@ -3780,6 +3801,7 @@ function impPintarP2(){
     ? '<b>Fonte: ERP</b> · '+IMP.linhas.length+' clientes ativos com '+IMP.rotulo+(IMP.dias?' (compraram nos últimos '+IMP.dias+' dias)':' (todo o faturamento de '+cmDocs.map(function(d){ return nomeMes(d.mes); }).join(', ')+')')
       +(IMP.parados?' · '+IMP.parados+' sem compra no período':'')
       +(IMP.semCampo?' · '+IMP.semCampo+' sem '+IMP.rotulo:'')
+      +(IMP.semVendedor?' · '+IMP.semVendedor+' sem '+IMP.rotulo+' no ERP (entram como “sem vendedor”)':'')
       +((IMP.parados||IMP.semCampo)?' — esses ficam como estão':'')
     : '<b>Fonte: planilha</b> '+esc(IMP.nomeArq)+' · '+IMP.linhas.length+' linhas';
   if(IMP.fonte==='erp'){ $('imp-p2').innerHTML=''; impPintarP3(); return; }
@@ -3791,7 +3813,7 @@ function impPintarP2(){
     +'<div class="fld"><label>Cidade (ajuda a achar no ERP)</label>'+op('cid',true)+'</div></div>';
   impPintarP3();
 }
-function impNomeU(u){ return u.nome || u.email || u.uid; }
+function impNomeU(u){ return u.semVendedor ? 'sem vendedor' : (u.nome || u.email || u.uid); }
 function impPintarP3(){
   var box=$('imp-p3');
   if(IMP.col.cli<0 || IMP.col.vend<0){ box.innerHTML=''; return; }
@@ -3849,10 +3871,14 @@ function calcularPlano(semErp){
     if(ids.length>1) ids=ids.slice().sort(function(a,b){ return String(erp[b].u||'').localeCompare(String(erp[a].u||'')); });
     if(ids.length){ it.erpId=ids[0]; if(ids.length>1) it.obs='nome repetido no ERP — ligado ao de compra mais recente'; }
     var u=uPor[IMP.mapa[vend]||''];
+    /* cliente do ERP sem representante: entra como "sem vendedor"; se já tem vendedor no app, fica com ele */
+    var semVend=(!vend && IMP.fonte==='erp');
+    if(semVend) u={ uid:'', nome:'', email:'', semVendedor:true };
     /* carteira só com o nome (sem login): dono provisório "erp:NOME", trocado quando a pessoa ganhar login */
     if(!u && IMP.mapa[vend]==='#nome' && vend) u={ uid:'erp:'+normEmp(vend).replace(/ /g,'_'), nome:vend, email:'', semLogin:true };
     var atual=(it.erpId&&porErp[it.erpId]) || porNome[normEmp(nome)] || null;
     if(!u) it.acao='ignorar', it.obs=(IMP.fonte==='erp'?IMP.rotulo:'vendedor')+' marcado para não importar';
+    else if(atual && semVend && atual.donoUid){ it.cliId=atual.id; it.acao='igual'; it.obs='sem representante no ERP — continua na carteira de '+(atual.donoNome||'quem já tem'); }
     else if(atual){ it.cliId=atual.id; it.acao=(atual.donoUid===u.uid)?'igual':'transferir'; it.de=atual.donoNome||'';
       /* vínculo velho: ligado a um cadastro do ERP de mesmo nome que parou de comprar */
       if(it.erpId && melhorVinculo(atual.erpId, it.erpId)){ it.novoErp=true; if(it.acao==='igual') it.acao='vincular'; it.obs='vínculo com o ERP corrigido (cadastro de compra mais recente)'; }
@@ -3907,7 +3933,7 @@ function gravarPlano(ops, aoAvancar){
       if(k>=lotes.length){ ok(feitos); return; }
       var b=writeBatch(db);
       lotes[k].forEach(function(x){
-        var u=x.u, dono={ donoUid:u.uid, donoNome:impNomeU(u), donoEmail:u.email||'', atualizadoEm:agora, atualizadoPor:U.email };
+        var u=x.u, dono={ donoUid:u.uid, donoNome:u.semVendedor?'':impNomeU(u), donoEmail:u.email||'', atualizadoEm:agora, atualizadoPor:U.email };
         if(x.acao==='transferir' || x.acao==='vincular'){
           var c=clientePorId(x.cliId)||{}, up=x.acao==='transferir'?Object.assign({}, dono):{ atualizadoEm:agora, atualizadoPor:U.email };
           if(x.erpId && (!c.erpId || x.novoErp)){ var e0=erp[x.erpId]||{}; up.erpId=x.erpId; up.erpNome=e0.nErp||e0.n||''; }
