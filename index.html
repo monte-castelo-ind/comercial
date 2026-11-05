@@ -1893,7 +1893,14 @@ function mesAtual(){ return hoje().slice(0,7); }
 function mesAnterior(){ var d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
 function ngTemAcordo(n){ return !!(n.acordo && n.acordo.tipo && n.etapa==='ganha'); }
 function ngVigente(n, mes){ if(!ngTemAcordo(n)) return false; var a=n.acordo; return (!a.inicio || a.inicio<=mes) && (!a.fim || a.fim>=mes); }
-function ngBenTxt(a){ return a.benTipo==='pct' ? String(a.ben).replace('.',',')+'% do faturamento' : fmtRS0(a.ben||0); }
+var NG_UN=['pacotes','caixas','unidades','kg','fardos'];
+function ngQtdTxt(q, un, prod){ return String(q).replace('.',',')+' '+(un||'pacotes')+(prod?' de '+prod:''); }
+function ngBenTxt(a){
+  if(a.benTipo==='qtd') return ngQtdTxt(a.ben||0, a.un, a.prod)+' (produto)';
+  return a.benTipo==='pct' ? String(a.ben).replace('.',',')+'% do faturamento' : fmtRS0(a.ben||0);
+}
+/* valor do benefício para mostrar: R$ ou quantidade de produto */
+function ngBenVal(v, a){ return (a && a.benTipo==='qtd') ? ngQtdTxt(v||0, a.un) : fmtRS0(v||0); }
 function ngAcTxt(a){
   if(!a || !a.tipo) return '';
   return (a.tipo==='meta' ? 'Meta '+fmtRS0(a.meta||0)+'/mês → '+ngBenTxt(a) : 'Fixo todo mês: '+ngBenTxt(a))
@@ -1916,13 +1923,14 @@ function ngCalc(n, mes, fatManual){
   var a=n.acordo||{}, av=(n.avaliacoes||{})[mes]||null;
   var fat=fatManual!=null ? fatManual : (av && av.faturado!=null ? av.faturado : ngFat(n, mes));
   var atingiu=a.tipo==='fixo' ? true : (fat!=null && fat>=(+a.meta||0));
-  var ben=!atingiu ? 0 : (a.benTipo==='pct' ? (fat!=null ? Math.round(fat*(+a.ben||0))/100 : null) : (+a.ben||0));
+  var ben=!atingiu ? 0 : (a.benTipo==='pct' ? (fat!=null ? Math.round(fat*(+a.ben||0))/100 : null) : (+a.ben||0));   /* valor em R$ ou quantidade em produto */
   return { fat:fat, atingiu:atingiu, ben:ben, pct:(a.tipo==='meta' && fat!=null && a.meta>0) ? fat/a.meta : null, av:av };
 }
 function ngStHtml(av){
   if(!av) return '<span class="ng-st pend">a avaliar</span>';
-  return av.status==='pago' ? '<span class="ng-st pago">pago '+fmtRS0(av.beneficio||0)+'</span>'
-       : av.status==='concedido' ? '<span class="ng-st concedido">concedido '+fmtRS0(av.beneficio||0)+'</span>'
+  var v=av.qtd ? ngQtdTxt(av.beneficio||0, av.un) : fmtRS0(av.beneficio||0);
+  return av.status==='pago' ? '<span class="ng-st pago">'+(av.qtd?'enviado ':'pago ')+v+'</span>'
+       : av.status==='concedido' ? '<span class="ng-st concedido">concedido '+v+'</span>'
        : '<span class="ng-st negado">não concedido</span>';
 }
 function ngPodeMexer(n){ return U.gestor || n.donoUid===U.uid; }
@@ -2002,14 +2010,16 @@ function ngAcordosHtml(base){
     + '<button class="'+(ver==='enc'?'on':'')+'" onclick="NG.acVer=\'enc\';renderNegoc()">Encerrados ('+enc.length+')</button></div>';
   var l=(ver==='enc'?enc:vigor).sort(function(a,b){ return String(a.clienteNome).localeCompare(String(b.clienteNome),'pt-BR'); });
   if(!l.length){ lista.innerHTML=seg+'<div class="empty">'+(ver==='enc'?'Nenhum acordo encerrado.':'Nenhum acordo em vigor. Ao marcar uma negociação como ganha (ou criar uma já fechada), preencha o “Acordo com o cliente”.')+'</div>'; return; }
-  var tb=0; l.forEach(function(n){ if(ngVigente(n, m)){ var c=ngCalc(n, m); if(c.ben) tb+=c.ben; } });
-  lista.innerHTML=seg+'<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) '+(ver==='enc'?'encerrado(s) · tocar abre o histórico':'em vigor'+(U.gestor?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios':''))+'</div>'
+  var tb=0, tq={}; l.forEach(function(n){ if(ngVigente(n, m)){ var c=ngCalc(n, m); if(!c.ben) return;
+    if(n.acordo.benTipo==='qtd'){ var u=n.acordo.un||'pacotes'; tq[u]=(tq[u]||0)+c.ben; } else tb+=c.ben; } });
+  var tqTxt=Object.keys(tq).map(function(u){ return tq[u]+' '+u; }).join(', ');
+  lista.innerHTML=seg+'<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) '+(ver==='enc'?'encerrado(s) · tocar abre o histórico':'em vigor'+(U.gestor?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios'+(tqTxt?' + <b>'+tqTxt+'</b> em produto':''):''))+'</div>'
     + '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th>'
     + (U.gestor?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, m), pr=c.pct!=null?Math.min(1,c.pct):null;
         return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(n.clienteNome||'—')+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
           + '<td style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+(U.gestor?'<td>'+esc(n.donoNome||'—')+'</td>':'')
-          + '<td>'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?fmtRS0(c.ben||0)+' <span class="mini">fixo</span>'
+          + '<td>'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?ngBenVal(c.ben, a)+' <span class="mini">fixo</span>'
               : (c.fat==null?'<span class="mini">sem faturamento</span>':fmtRS0(c.fat)+' <span class="mini">de '+fmtRS0(a.meta)+' ('+Math.round(c.pct*100)+'%)</span>'
                  +'<div class="ng-bar"><i class="'+(c.atingiu?'ok':'')+'" style="width:'+Math.round(pr*100)+'%"></i></div>'))+'</td>'
           + '<td>'+(ngVigente(n, ma)?ngStHtml((n.avaliacoes||{})[ma]):'<span class="mini">—</span>')+'</td></tr>'; }).join('')
@@ -2025,13 +2035,18 @@ function ngAvalHtml(base){
   var mes=NG.mesAval;
   var l=base.filter(function(n){ return ngVigente(n, mes); }).sort(function(a,b){ return String(a.clienteNome).localeCompare(String(b.clienteNome),'pt-BR'); });
   var tot={ conceder:0, concedido:0, pago:0, negado:0, pend:0 };
-  l.forEach(function(n){ var c=ngCalc(n, mes), av=c.av;
-    if(!av){ tot.pend++; if(c.ben) tot.conceder+=c.ben; } else if(av.status==='concedido') tot.concedido+=av.beneficio||0; else if(av.status==='pago') tot.pago+=av.beneficio||0; else tot.negado++; });
+  var qt={ conceder:{}, concedido:{}, pago:{} }, soma=function(o, a, v){ var u=a.un||'pacotes'; o[u]=(o[u]||0)+(v||0); };
+  l.forEach(function(n){ var c=ngCalc(n, mes), av=c.av, q=n.acordo.benTipo==='qtd';
+    if(!av){ tot.pend++; if(c.ben){ if(q) soma(qt.conceder, n.acordo, c.ben); else tot.conceder+=c.ben; } }
+    else if(av.status==='concedido'){ if(q) soma(qt.concedido, n.acordo, av.beneficio); else tot.concedido+=av.beneficio||0; }
+    else if(av.status==='pago'){ if(q) soma(qt.pago, n.acordo, av.beneficio); else tot.pago+=av.beneficio||0; }
+    else tot.negado++; });
+  var qx=function(o){ var t=Object.keys(o).filter(function(u){ return o[u]; }).map(function(u){ return o[u]+' '+u; }).join(', '); return t?' + '+t:''; };
   var h='<div class="tools" style="margin-bottom:10px"><select onchange="NG.mesAval=this.value;renderNegoc()">'
     + meses.map(function(m){ return '<option value="'+m+'"'+(m===mes?' selected':'')+'>Avaliar '+nomeMes(m)+(m===mesAtual()?' (mês corrente)':'')+'</option>'; }).join('')+'</select>'
     + '<button class="btn btn-sm btn-ghost" onclick="ngAvalExcel()">⤓ Excel</button></div>'
-    + '<div class="mini" style="margin-bottom:10px">'+l.length+' acordo(s) em '+nomeMes(mes)+' · <b>'+tot.pend+'</b> a avaliar (≈ '+fmtRS0(tot.conceder)+')'
-    + ' · concedido a enviar: <b>'+fmtRS0(tot.concedido)+'</b> · já pago: '+fmtRS0(tot.pago)+' · não concedidos: '+tot.negado
+    + '<div class="mini" style="margin-bottom:10px">'+l.length+' acordo(s) em '+nomeMes(mes)+' · <b>'+tot.pend+'</b> a avaliar (≈ '+fmtRS0(tot.conceder)+qx(qt.conceder)+')'
+    + ' · concedido a enviar: <b>'+fmtRS0(tot.concedido)+qx(qt.concedido)+'</b> · já pago/enviado: '+fmtRS0(tot.pago)+qx(qt.pago)+' · não concedidos: '+tot.negado
     + (mes===mesAtual()?' · <b style="color:var(--amber)">o mês ainda não fechou</b>':'')+'</div>';
   if(!l.length){ lista.innerHTML=h+'<div class="empty">Nenhum acordo em vigor em '+nomeMes(mes)+'.</div>'; return; }
   h+='<div class="card" style="padding:0;overflow:hidden"><div class="tscroll"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th><th>Vendedor</th>'
@@ -2039,11 +2054,12 @@ function ngAvalHtml(base){
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, mes), av=c.av, k=n.id;
         var fatIn='<input class="ng-in" id="ngf-'+k+'" inputmode="decimal" value="'+(c.fat!=null?String(Math.round(c.fat*100)/100).replace('.',','):'')+'" placeholder="informar" '
           + (av?'disabled':'oninput="ngRecalc(\''+k+'\')"')+'>';
-        var benIn='<input class="ng-in" id="ngb-'+k+'" inputmode="decimal" value="'+(av?String(av.beneficio||0).replace('.',','):(c.ben!=null?String(c.ben).replace('.',','):''))+'" '+(av?'disabled':'')+'>';
+        var benIn='<input class="ng-in" id="ngb-'+k+'" inputmode="decimal" value="'+(av?String(av.beneficio||0).replace('.',','):(c.ben!=null?String(c.ben).replace('.',','):''))+'" '+(av?'disabled':'')+'>'
+          + (a.benTipo==='qtd'?'<div class="mini">'+esc((a.un||'pacotes')+(a.prod?' de '+a.prod:''))+'</div>':'');
         var metaTxt=a.tipo==='fixo' ? '<span class="mini">sem condição</span>'
           : fmtRS0(a.meta)+'<div id="ngm-'+k+'">'+(c.pct!=null?'<span class="'+(c.atingiu?'':'ng-venc')+'" style="font-size:11.5px">'+Math.round(c.pct*100)+'% · '+(c.atingiu?'bateu':'não bateu')+'</span>':'<span class="mini">informe o faturado</span>')+'</div>';
         var acoes=!av ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'concedido\',this)">✓ Conceder</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'negado\',this)">✕ Não conceder</button>'
-          : av.status==='concedido' ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'pago\',this)">💸 Marcar pago</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>'
+          : av.status==='concedido' ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'pago\',this)">'+(a.benTipo==='qtd'?'📦 Marcar enviado':'💸 Marcar pago')+'</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>'
           : '<button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>';
         return '<tr><td class="eq-loja"><div class="nm"><a onclick="verNegoc(\''+k+'\')">'+esc(n.clienteNome||'—')+'</a></div><div class="eq-end">'+esc(a.forma||'')+'</div></td>'
           + '<td style="white-space:normal;min-width:180px" class="mini">'+esc(a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a))+'</td><td>'+esc(n.donoNome||'—')+'</td>'
@@ -2068,7 +2084,7 @@ function ngAvaliar(k, st, el){
     else { delete avs[mes]; txt=nomeMes(mes)+': avaliação desfeita'; }
   }else if(st==='pago'){
     avs[mes]=Object.assign({}, atual, { status:'pago', pagoEm:agoraISO(), pagoPor:U.email });
-    txt=nomeMes(mes)+': benefício de '+fmtRS0(atual.beneficio||0)+' pago';
+    txt=nomeMes(mes)+': benefício de '+ngBenVal(atual.beneficio||0, atual.qtd?{ benTipo:'qtd', un:atual.un }:null)+(atual.qtd?' enviado':' pago');
   }else{
     var fat=numBR(($('ngf-'+k)||{}).value||''), ben=numBR(($('ngb-'+k)||{}).value||'');
     var c=ngCalc(n, mes, fat);
@@ -2076,9 +2092,11 @@ function ngAvaliar(k, st, el){
       if(ben==null || ben<0){ toast('Informe o valor do benefício.', true); return; }
       if(n.acordo.tipo==='meta' && !c.atingiu && !confirm('O cliente não bateu a meta em '+nomeMes(mes)+'. Conceder mesmo assim?')) return;
     }
+    var emQtd=n.acordo.benTipo==='qtd';
     avs[mes]={ status:st, faturado:fat, meta:n.acordo.tipo==='meta'?(+n.acordo.meta||0):null, atingiu:c.atingiu, beneficio:st==='concedido'?(ben||0):0,
                por:U.email, nome:U.nome||U.email, em:agoraISO() };
-    txt=nomeMes(mes)+': '+(st==='concedido'?'concedido '+fmtRS0(ben||0):'não concedido')+(fat!=null?' (faturou '+fmtRS0(fat)+')':'');
+    if(emQtd){ avs[mes].qtd=true; avs[mes].un=n.acordo.un||'pacotes'; avs[mes].prod=n.acordo.prod||''; }
+    txt=nomeMes(mes)+': '+(st==='concedido'?'concedido '+ngBenVal(ben||0, n.acordo):'não concedido')+(fat!=null?' (faturou '+fmtRS0(fat)+')':'');
   }
   if(el) el.disabled=true;
   ngGravar(n, { avaliacoes:avs }, 'avaliou', txt).then(function(){ toast(txt+'.'); }).catch(function(e){ if(el) el.disabled=false; falha('gravar a avaliação')(e); });
@@ -2086,12 +2104,13 @@ function ngAvaliar(k, st, el){
 function ngAvalExcel(){
   var mes=NG.mesAval||mesAnterior();
   carregarXLSX().then(function(){
-    var aoa=[['Mês','Cliente','Vendedor','Acordo','Forma','Meta (R$)','Faturado (R$)','Bateu a meta','Benefício (R$)','Situação','Avaliado por','Pago em']];
+    var aoa=[['Mês','Cliente','Vendedor','Acordo','Forma','Meta (R$)','Faturado (R$)','Bateu a meta','Benefício (R$)','Benefício em produto','Situação','Avaliado por','Pago / enviado em']];
     negocs.filter(function(n){ return ngVigente(n, mes); }).forEach(function(n){ var a=n.acordo, c=ngCalc(n, mes), av=c.av;
       aoa.push([nomeMes(mes), n.clienteNome||'', n.donoNome||'', a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a), a.forma||'', a.tipo==='meta'?(+a.meta||0):'',
-        c.fat==null?'':c.fat, a.tipo==='fixo'?'sem condição':(c.atingiu?'sim':'não'), av?(av.beneficio||0):(c.ben||0),
+        c.fat==null?'':c.fat, a.tipo==='fixo'?'sem condição':(c.atingiu?'sim':'não'),
+        a.benTipo==='qtd'?'':(av?(av.beneficio||0):(c.ben||0)), a.benTipo==='qtd'?ngQtdTxt(av?(av.beneficio||0):(c.ben||0), a.un, a.prod):'',
         av?(av.status==='pago'?'pago':av.status==='concedido'?'concedido (a enviar)':'não concedido'):'a avaliar', av?(av.nome||''):'', av&&av.pagoEm?fmtDia(String(av.pagoEm).slice(0,10)):'']); });
-    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:8},{wch:36},{wch:14},{wch:30},{wch:20},{wch:11},{wch:12},{wch:12},{wch:12},{wch:20},{wch:14},{wch:10}];
+    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:8},{wch:36},{wch:14},{wch:30},{wch:20},{wch:11},{wch:12},{wch:12},{wch:12},{wch:26},{wch:20},{wch:14},{wch:10}];
     var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Acordos '+mes);
     XLSX.writeFile(wb, 'acordos-'+mes+'.xlsx');
   }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
@@ -2131,7 +2150,7 @@ function abrirNegoc(id, clienteId){
     + '<div class="fld"><label>Até quando</label><input type="date" id="ng-prazo" value="'+esc(n?n.prazo||'':'')+'"></div></div>'
     + '<div class="det-sec">Acordo com o cliente (benefício mensal)</div>'
     + '<div class="ng-etapas" id="ng-ac">'+[['','Sem acordo'],['meta','Meta com benefício'],['fixo','Valor fixo todo mês']].map(function(o){
-        return '<button type="button" class="ng-et'+(((n&&n.acordo&&n.acordo.tipo)||'')===o[0]?' on':'')+'" data-v="'+o[0]+'" onclick="chipUnicoNg(this);ngAcPintar()">'+o[1]+'</button>'; }).join('')+'</div>'
+        return '<button type="button" class="ng-et'+(((n&&n.acordo&&n.acordo.tipo)||'')===o[0]?' on':'')+'" data-v="'+o[0]+'" onclick="NG.acEd=Object.assign({}, NG.acEd||{}, ngAcRascunho());chipUnicoNg(this);ngAcPintar()">'+o[1]+'</button>'; }).join('')+'</div>'
     + '<div id="ng-ac-campos" style="margin-top:10px"></div>'
     + (n ? '' : '<div class="fld"><label>Etapa</label><div class="ng-etapas" id="ng-et0">'+NG_ETAPAS.concat([['ganha','Já fechada (acordo em vigor)']]).map(function(e,i){ return '<button type="button" class="ng-et'+(i===0?' on':'')+'" data-v="'+e[0]+'" onclick="chipUnicoNg(this)">'+e[1]+'</button>'; }).join('')+'</div></div>')
     + (U.gestor ? '<div class="fld"><label>Vendedor responsável</label><select id="ng-dono">'
@@ -2151,14 +2170,25 @@ function ngAcPintar(){
   var bt=a.benTipo || (t==='meta'?'pct':'valor');
   box.innerHTML=(t==='meta' ? '<div class="fld"><label>Meta de compra por mês (R$) *</label><input type="text" inputmode="decimal" id="ng-ac-meta" placeholder="ex.: 10.000" value="'+(a.meta?String(a.meta).replace('.',','):'')+'"></div>' : '')
     + '<div class="grid2"><div class="fld"><label>Benefício *</label><div class="ng-etapas" id="ng-ac-bt">'
-    + [['pct','% do faturamento'],['valor','Valor em R$']].map(function(o){ return '<button type="button" class="ng-et'+(bt===o[0]?' on':'')+'" data-v="'+o[0]+'" onclick="chipUnicoNg(this)">'+o[1]+'</button>'; }).join('')+'</div></div>'
-    + '<div class="fld"><label>Quanto *</label><input type="text" inputmode="decimal" id="ng-ac-ben" placeholder="ex.: 3 (%) ou 500 (R$)" value="'+(a.ben?String(a.ben).replace('.',','):'')+'"></div></div>'
+    + [['pct','% do faturamento'],['valor','Valor em R$'],['qtd','Quantidade em produto']].map(function(o){ return '<button type="button" class="ng-et'+(bt===o[0]?' on':'')+'" data-v="'+o[0]+'" onclick="chipUnicoNg(this);NG.acEd=Object.assign({}, NG.acEd||{}, ngAcRascunho(), { benTipo:\''+o[0]+'\' });ngAcPintar()">'+o[1]+'</button>'; }).join('')+'</div></div>'
+    + '<div class="fld"><label>'+(bt==='qtd'?'Quantidade por mês *':'Quanto *')+'</label><input type="text" inputmode="decimal" id="ng-ac-ben" placeholder="'+(bt==='qtd'?'ex.: 3':bt==='pct'?'ex.: 3 (%)':'ex.: 500 (R$)')+'" value="'+(a.ben?String(a.ben).replace('.',','):'')+'"></div></div>'
+    + (bt==='qtd' ? '<div class="grid2"><div class="fld"><label>Unidade</label><select id="ng-ac-un">'+NG_UN.map(function(u){ return '<option'+((a.un||'pacotes')===u?' selected':'')+'>'+u+'</option>'; }).join('')+'</select></div>'
+        + '<div class="fld"><label>Produto</label><input type="text" id="ng-ac-prod" list="ng-ac-prods" maxlength="80" placeholder="ex.: pão francês 500 g (opcional)" value="'+esc(a.prod||'')+'">'
+        + '<datalist id="ng-ac-prods">'+((catalogo&&catalogo.produtos)||[]).map(function(p){ return '<option value="'+esc(p.nome)+'">'; }).join('')+'</datalist></div></div>' : '')
     + '<div class="grid2"><div class="fld"><label>Como é concedido</label><select id="ng-ac-forma">'+NG_FORMAS.map(function(f){ return '<option'+(a.forma===f?' selected':'')+'>'+f+'</option>'; }).join('')+'</select></div>'
     + '<div class="fld"><label>Observação do acordo</label><input type="text" id="ng-ac-obs" maxlength="160" value="'+esc(a.obs||'')+'" placeholder="ex.: vale para as 3 lojas"></div></div>'
     + '<div class="grid2"><div class="fld"><label>Vale a partir de *</label><input type="month" id="ng-ac-ini" value="'+esc(a.inicio||mesAtual())+'"></div>'
     + '<div class="fld"><label>Até (deixe vazio se não tem fim)</label><input type="month" id="ng-ac-fim" value="'+esc(a.fim||'')+'"></div></div>'
     + (t==='meta' ? '<div class="mini">Todo mês: se o cliente comprar a meta, ele ganha o benefício. A diretoria confere e concede na aba “Avaliação do mês”.</div>'
                   : '<div class="mini">Todo mês o benefício é devido, sem condição. Aparece na “Avaliação do mês” para conceder e marcar como pago.</div>');
+}
+/* o que já foi digitado no acordo, para não perder ao trocar o tipo de benefício */
+function ngAcRascunho(){
+  var g=function(id){ var e=$(id); return e ? e.value : undefined; }, o={};
+  if(g('ng-ac-meta')!==undefined) o.meta=numBR(g('ng-ac-meta'))||0;
+  if(g('ng-ac-ben')!==undefined) o.ben=numBR(g('ng-ac-ben'))||0;
+  ['forma','obs','ini','fim','un','prod'].forEach(function(k){ var v=g('ng-ac-'+k); if(v!==undefined) o[k==='ini'?'inicio':k]=v; });
+  return o;
 }
 function ngLerAcordo(){
   var t=lerChipsNg('ng-ac'); if(!t) return { ok:true, acordo:null };
@@ -2171,6 +2201,7 @@ function ngLerAcordo(){
   var ant=NG.acEd||{};
   if(fim && fim<ini && !ant.encerradoEm){ toast('O fim do acordo é antes do início.', true); return { ok:false }; }
   var ac={ tipo:t, meta:meta||0, benTipo:bt, ben:ben, forma:($('ng-ac-forma')||{}).value||'', obs:(($('ng-ac-obs')||{}).value||'').trim(), inicio:ini, fim:fim };
+  if(bt==='qtd'){ ac.un=($('ng-ac-un')||{}).value||'pacotes'; ac.prod=(($('ng-ac-prod')||{}).value||'').trim(); }
   /* acordo encerrado que continua com fim: guarda quem encerrou; tirando o fim, volta a valer */
   if(ant.encerradoEm && fim){ ac.encerradoEm=ant.encerradoEm; ac.encerradoPor=ant.encerradoPor||''; ac.encerradoNome=ant.encerradoNome||''; ac.motivoEnc=ant.motivoEnc||''; }
   return { ok:true, acordo:ac };
@@ -2232,7 +2263,7 @@ function verNegoc(id){
         + (Object.keys(n.avaliacoes||{}).length ? '<div class="tscroll" style="margin-top:8px"><table class="eq-tab"><tr><th>Mês</th><th class="r">Faturado</th><th class="r">Benefício</th><th>Situação</th></tr>'
             + Object.keys(n.avaliacoes).sort().reverse().map(function(m){ var av=n.avaliacoes[m];
                 return '<tr><td>'+nomeMes(m)+'</td><td class="r">'+(av.faturado!=null?fmtRS0(av.faturado):'—')+(av.meta?'<div class="mini">meta '+fmtRS0(av.meta)+'</div>':'')+'</td>'
-                  + '<td class="r">'+fmtRS0(av.beneficio||0)+'</td><td>'+ngStHtml(av)+'</td></tr>'; }).join('')+'</table></div>' : '') : '')
+                  + '<td class="r">'+(av.qtd?ngQtdTxt(av.beneficio||0, av.un):fmtRS0(av.beneficio||0))+'</td><td>'+ngStHtml(av)+'</td></tr>'; }).join('')+'</table></div>' : '') : '')
     + '<div class="det-sec">Andamento</div><div class="ng-hist">'
     + (n.historico||[]).slice().reverse().map(function(x){ return '<div class="ng-hi"><b>'+esc(x.nome||x.por||'')+'</b> '+esc(x.acao||'')+(x.txt?': '+esc(x.txt):'')
         + '<span class="mini">'+(x.em?fmtDia(String(x.em).slice(0,10))+' '+String(x.em).slice(11,16):'')+'</span></div>'; }).join('')+'</div>';
@@ -2711,7 +2742,7 @@ function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.tog
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
 Object.assign(window, { ngSeg:ngSeg, renderNegoc:renderNegoc, abrirNegoc:abrirNegoc, verNegoc:verNegoc, ngEtapa:ngEtapa, chipUnicoNg:chipUnicoNg,
-  ngAcPintar:ngAcPintar, ngRecalc:ngRecalc, ngAvaliar:ngAvaliar, ngAvalExcel:ngAvalExcel });
+  ngAcPintar:ngAcPintar, ngAcRascunho:ngAcRascunho, ngRecalc:ngRecalc, ngAvaliar:ngAvaliar, ngAvalExcel:ngAvalExcel });
 
 function badge(){
   var n=sols.filter(function(s){ return respondo(s) && s.status==='aberta'; }).length;
