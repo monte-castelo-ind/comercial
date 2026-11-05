@@ -1897,8 +1897,11 @@ function ngBenTxt(a){ return a.benTipo==='pct' ? String(a.ben).replace('.',',')+
 function ngAcTxt(a){
   if(!a || !a.tipo) return '';
   return (a.tipo==='meta' ? 'Meta '+fmtRS0(a.meta||0)+'/mês → '+ngBenTxt(a) : 'Fixo todo mês: '+ngBenTxt(a))
-    + (a.forma?' · '+a.forma:'') + (a.inicio?' · de '+nomeMes(a.inicio):'') + (a.fim?' a '+nomeMes(a.fim):' (sem fim)');
+    + (a.forma?' · '+a.forma:'') + (a.inicio?' · de '+nomeMes(a.inicio):'') + (a.fim?' a '+nomeMes(a.fim):' (sem fim)')
+    + (a.encerradoEm?' · encerrado em '+fmtDia(String(a.encerradoEm).slice(0,10)):'');
 }
+/* acordo que ainda vale (este mês ou depois) — é o que pode ser encerrado */
+function ngAcordoAtivo(n){ return ngTemAcordo(n) && (!n.acordo.fim || n.acordo.fim>=mesAtual()); }
 /* faturamento do cliente no mês: da carteira (gestor e vendedor) ou, para quem não está na carteira, pelo nome no ERP (gestor) */
 function ngFat(n, mes){
   var c=n.clienteId?clientePorId(n.clienteId):null, f=c?fatCliente(c):null;
@@ -1992,11 +1995,15 @@ function renderNegoc(){
 /* acordos em vigor: o mês corrente andando e o último mês avaliado */
 function ngAcordosHtml(base){
   var lista=$('ng-lista'), m=mesAtual(), ma=mesAnterior();
-  var l=base.filter(function(n){ return ngVigente(n, m) || ngVigente(n, ma); })
-    .sort(function(a,b){ return String(a.clienteNome).localeCompare(String(b.clienteNome),'pt-BR'); });
-  if(!l.length){ lista.innerHTML='<div class="empty">Nenhum acordo em vigor. Ao marcar uma negociação como ganha (ou criar uma já fechada), preencha o “Acordo com o cliente”.</div>'; return; }
-  var tb=0; l.forEach(function(n){ var c=ngCalc(n, m); if(c.ben) tb+=c.ben; });
-  lista.innerHTML='<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) em vigor'+(U.gestor?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios':'')+'</div>'
+  var vigor=base.filter(function(n){ return ngVigente(n, m) || ngVigente(n, ma); });
+  var enc=base.filter(function(n){ return ngTemAcordo(n) && !ngVigente(n, m) && !ngVigente(n, ma); });
+  var ver=NG.acVer||'vigor';
+  var seg='<div class="seg" style="margin-bottom:10px"><button class="'+(ver==='vigor'?'on':'')+'" onclick="NG.acVer=\'vigor\';renderNegoc()">Em vigor ('+vigor.length+')</button>'
+    + '<button class="'+(ver==='enc'?'on':'')+'" onclick="NG.acVer=\'enc\';renderNegoc()">Encerrados ('+enc.length+')</button></div>';
+  var l=(ver==='enc'?enc:vigor).sort(function(a,b){ return String(a.clienteNome).localeCompare(String(b.clienteNome),'pt-BR'); });
+  if(!l.length){ lista.innerHTML=seg+'<div class="empty">'+(ver==='enc'?'Nenhum acordo encerrado.':'Nenhum acordo em vigor. Ao marcar uma negociação como ganha (ou criar uma já fechada), preencha o “Acordo com o cliente”.')+'</div>'; return; }
+  var tb=0; l.forEach(function(n){ if(ngVigente(n, m)){ var c=ngCalc(n, m); if(c.ben) tb+=c.ben; } });
+  lista.innerHTML=seg+'<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) '+(ver==='enc'?'encerrado(s) · tocar abre o histórico':'em vigor'+(U.gestor?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios':''))+'</div>'
     + '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th>'
     + (U.gestor?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, m), pr=c.pct!=null?Math.min(1,c.pct):null;
@@ -2161,8 +2168,12 @@ function ngLerAcordo(){
   var bt=lerChipsNg('ng-ac-bt')||'valor'; if(bt==='pct' && ben>100){ toast('Percentual acima de 100%.', true); return { ok:false }; }
   var ini=($('ng-ac-ini')||{}).value||'', fim=($('ng-ac-fim')||{}).value||'';
   if(!ini){ toast('Informe a partir de quando vale o acordo.', true); return { ok:false }; }
-  if(fim && fim<ini){ toast('O fim do acordo é antes do início.', true); return { ok:false }; }
-  return { ok:true, acordo:{ tipo:t, meta:meta||0, benTipo:bt, ben:ben, forma:($('ng-ac-forma')||{}).value||'', obs:(($('ng-ac-obs')||{}).value||'').trim(), inicio:ini, fim:fim } };
+  var ant=NG.acEd||{};
+  if(fim && fim<ini && !ant.encerradoEm){ toast('O fim do acordo é antes do início.', true); return { ok:false }; }
+  var ac={ tipo:t, meta:meta||0, benTipo:bt, ben:ben, forma:($('ng-ac-forma')||{}).value||'', obs:(($('ng-ac-obs')||{}).value||'').trim(), inicio:ini, fim:fim };
+  /* acordo encerrado que continua com fim: guarda quem encerrou; tirando o fim, volta a valer */
+  if(ant.encerradoEm && fim){ ac.encerradoEm=ant.encerradoEm; ac.encerradoPor=ant.encerradoPor||''; ac.encerradoNome=ant.encerradoNome||''; ac.motivoEnc=ant.motivoEnc||''; }
+  return { ok:true, acordo:ac };
 }
 function chipUnicoNg(b){ b.parentNode.querySelectorAll('.ng-et').forEach(function(x){ x.classList.toggle('on', x===b); }); }
 function salvarNegoc(el){
@@ -2234,8 +2245,12 @@ function verNegoc(id){
       bts.push({ txt:'✓ Ganha', fn:function(){ ngFechar(n.id,'ganha'); } });
     }else{
       bts.push({ txt:'↺ Reabrir', cls:'btn-ghost', fn:function(){ ngReabrir(n.id); } });
+      if(ngAcordoAtivo(n)) bts.push({ txt:'⏹ Encerrar acordo', cls:'btn-ghost', fn:function(){ ngEncerrar(n.id); } });
       if(n.etapa==='ganha') bts.push({ txt:'✎ Editar acordo', fn:function(){ abrirNegoc(n.id); } });
     }
+  }
+  if(U.admin){
+    bts.splice(1, 0, { txt:'🗑 Excluir', cls:'btn-ghost', fn:function(){ ngExcluir(n.id); } });
   }
   abrirModal({ titulo:esc(n.titulo||'Negociação'), sub:esc(n.clienteNome||''), wide:true, corpo:corpo, botoes:bts });
 }
@@ -2280,6 +2295,34 @@ function ngFechar(id, como){
       ngGravar(n, d, perd?'marcou como perdida':'marcou como ganha', perd?NG.motivo+(d.resultado?' — '+d.resultado:''):d.resultado)
         .then(function(){ fecharModal(); toast(perd?'Marcada como perdida.':'Negociação ganha! 🎉'); }).catch(function(e){ pare(); falha('fechar a negociação')(e); });
     } }] });
+}
+/* encerrar um acordo: escolhe o último mês em que ele vale; daí em diante sai dos acordos em vigor
+   e da avaliação do mês. O histórico (meses já avaliados) fica. */
+function ngEncerrar(id){
+  var n=negocs.filter(function(x){ return x.id===id; })[0]; if(!n || !ngTemAcordo(n)) return;
+  var a=n.acordo, ma=mesAnterior(), avMa=(n.avaliacoes||{})[ma];
+  var sug=(a.inicio && a.inicio>ma) ? a.inicio : ma;
+  abrirModal({ titulo:'Encerrar acordo', sub:esc(n.clienteNome||''),
+    corpo:'<div class="det-txt" style="margin-bottom:12px">🤝 '+esc(ngAcTxt(a))+'</div>'
+      + '<div class="fld"><label>Último mês em que o acordo vale *</label><input type="month" id="ng-enc-mes" value="'+sug+'"></div>'
+      + '<div class="mini" style="margin-bottom:10px">Depois desse mês, o acordo sai de “Acordos em vigor” e da “Avaliação do mês”. '
+      + (avMa ? nomeMes(ma)+' já foi avaliado e fica no histórico.' : 'Se '+nomeMes(ma)+' não deve ser avaliado, escolha um mês antes dele.')+'</div>'
+      + '<div class="fld"><label>Motivo</label><input type="text" id="ng-enc-mot" maxlength="160" placeholder="Ex.: substituído pelo acordo de nov/26; cliente parou de comprar"></div>',
+    botoes:[{ txt:'Voltar', cls:'btn-ghost', fn:function(){ verNegoc(id); } }, { txt:'Encerrar acordo', fn:function(el){
+      var fim=($('ng-enc-mes')||{}).value||''; if(!fim){ toast('Escolha o último mês.', true); return; }
+      var mot=(($('ng-enc-mot')||{}).value||'').trim(), agora=agoraISO();
+      var novo=Object.assign({}, a, { fim:fim, encerradoEm:agora, encerradoPor:U.email, encerradoNome:U.nome||U.email, motivoEnc:mot });
+      var pare=ocupado(el);
+      ngGravar(n, { acordo:novo }, 'encerrou o acordo', 'vale até '+nomeMes(fim)+(mot?' — '+mot:''))
+        .then(function(){ toast('Acordo encerrado: vale até '+nomeMes(fim)+'.'); setTimeout(function(){ verNegoc(id); }, 150); })
+        .catch(function(e){ pare(); falha('encerrar o acordo')(e); });
+    } }] });
+}
+/* excluir de vez (só a diretoria) — para lançamento duplicado ou errado */
+function ngExcluir(id){
+  var n=negocs.filter(function(x){ return x.id===id; })[0]; if(!n || !U.admin) return;
+  if(!confirm('Excluir de vez a negociação "'+(n.titulo||'')+'" de '+(n.clienteNome||'')+'?\n\nO histórico dela também some. Para um acordo que só deixou de valer, use “Encerrar acordo”.')) return;
+  deleteDoc(doc(db,'comNegociacoes',id)).then(function(){ fecharModal(); toast('Negociação excluída.'); }).catch(falha('excluir a negociação'));
 }
 function ngReabrir(id){
   var n=negocs.filter(function(x){ return x.id===id; })[0]; if(!n) return;
