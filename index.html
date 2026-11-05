@@ -353,6 +353,27 @@ table.ct .ct-uc{white-space:nowrap}
 .eq-corr td.eq-loja{white-space:normal}
 .eq-rol{max-height:calc(100vh - 250px);overflow:auto}
 .eq-avs{display:flex;gap:4px}
+/* negociações */
+.ng-kan{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+.ng-col{background:var(--card-2);border:1px solid var(--border);border-radius:14px;padding:10px;min-height:120px}
+.ng-colt{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:2px 4px 10px;display:flex;justify-content:space-between}
+.ng-card{padding:11px 13px;margin-bottom:8px;cursor:pointer}
+.ng-card:hover{border-color:var(--muted)}
+.ng-cli{font-weight:800;font-size:13.5px}
+.ng-tit{font-size:13px;margin-top:2px}
+.ng-meta{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.45}
+.ng-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.ng-tags .tag{font-size:10.5px;padding:1px 8px}
+.ng-venc{color:var(--red);font-weight:700}
+.ng-val{font-weight:800;font-variant-numeric:tabular-nums}
+.ng-etapas{display:flex;gap:6px;flex-wrap:wrap}
+.ng-et{background:var(--card-2);border:1px solid var(--border);color:var(--muted);font:700 12px 'Archivo',sans-serif;padding:6px 12px;border-radius:20px;cursor:pointer}
+.ng-et.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.ng-hist{border-left:2px solid var(--border);margin-left:6px;padding-left:12px}
+.ng-hi{font-size:12.5px;margin-bottom:9px}
+.ng-hi .mini{display:block}
+.nbadge{background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:10px;padding:1px 6px;margin-left:auto}
+@media(max-width:900px){ .ng-kan{grid-template-columns:1fr} }
 .eh-tl{position:relative;margin-left:8px;padding-left:18px;border-left:2px solid var(--border)}
 .eh-ev{position:relative;margin-bottom:12px}
 .eh-ev:before{content:'';position:absolute;left:-25px;top:4px;width:11px;height:11px;border-radius:50%;background:var(--card);border:2px solid var(--muted)}
@@ -520,6 +541,7 @@ details.mais[open]{padding-bottom:4px}
     <button class="navbtn on com-only" data-p="hoje" onclick="nav('hoje')"><span class="side-ico">◷</span><span class="lbl lab-d">Hoje</span><span class="lab-m">Hoje</span></button>
     <button class="navbtn com-only" data-p="carteira" onclick="nav('carteira')"><span class="side-ico">▤</span><span class="lbl lab-d">Carteira</span><span class="lab-m">Carteira</span></button>
     <button class="navbtn com-only" data-p="visitas" onclick="nav('visitas')"><span class="side-ico">⌖</span><span class="lbl lab-d">Visitas e contatos</span><span class="lab-m">Visitas</span></button>
+    <button class="navbtn com-only" data-p="negoc" onclick="nav('negoc')"><span class="side-ico">◈</span><span class="lbl lab-d">Negociações</span><span class="lab-m">Negoc.</span><span class="nbadge" id="ng-badge" style="display:none"></span></button>
     <button class="navbtn com-only" data-p="produtos" onclick="navProd()"><span class="side-ico">▦</span><span class="lbl lab-d">Produtos</span><span class="lab-m">Produtos</span></button>
     <div class="subnav" id="sub-prod">
       <button class="navsub" data-a="catalogo" onclick="navProd('catalogo')"><span class="lbl">Catálogo</span></button>
@@ -584,6 +606,28 @@ details.mais[open]{padding-bottom:4px}
         <div><div class="sect" id="h-alerta-tit">Sem comprar</div><div id="h-alerta"></div></div>
       </div>
       <div class="sect">Solicitações recentes</div><div id="h-sol"></div>
+    </div>
+
+    <!-- NEGOCIAÇÕES -->
+    <div class="page" id="page-negoc">
+      <div class="kpis" id="ng-kpis"></div>
+      <div class="tools">
+        <div class="seg" id="ng-seg">
+          <button class="on" data-s="and" onclick="ngSeg('and')">Em andamento</button>
+          <button data-s="ganha" onclick="ngSeg('ganha')">Ganhas</button>
+          <button data-s="perdida" onclick="ngSeg('perdida')">Perdidas</button>
+        </div>
+        <input type="search" id="ng-busca" placeholder="Buscar cliente, assunto, produto…" oninput="renderNegoc()">
+        <select id="ng-vend" onchange="renderNegoc()" class="gestor-only" style="display:none"></select>
+        <select id="ng-tipo" onchange="renderNegoc()"></select>
+        <select id="ng-ord" onchange="renderNegoc()">
+          <option value="prazo">Ordem: próximo passo</option>
+          <option value="valor">Ordem: maior valor</option>
+          <option value="antiga">Ordem: mais antigas</option>
+          <option value="mexida">Ordem: mexidas por último</option>
+        </select>
+      </div>
+      <div id="ng-lista"></div>
     </div>
 
     <!-- EQUIPAMENTOS EM COMODATO -->
@@ -1816,6 +1860,238 @@ function eqGravar(el){
   }).catch(function(e){ pare(); falha('gravar os equipamentos')(e); });
 }
 
+/* ====================================================================
+   NEGOCIAÇÕES — o que está sendo negociado com cada cliente: preço ou
+   condição, cliente novo, equipamento em comodato, volume / mix.
+   Etapas: Aberta → Proposta enviada → Aguardando cliente → Ganha / Perdida.
+   O vendedor cria e vê as dele; gerentes e diretoria veem todas.
+   Coleção comNegociacoes; cada mudança fica no histórico da negociação.
+   ==================================================================== */
+var negocs=[], negocsErro='';
+var NG={ seg:'and', ord:'prazo', ed:null, cli:null, motivo:'' };
+window.NG=NG;                        /* os botões da tela mexem em NG direto */
+var NG_TIPOS={ preco:'Preço / condição', prospect:'Cliente novo', equipamento:'Equipamento', volume:'Volume / mix' };
+var NG_ETAPAS=[['aberta','Aberta'],['proposta','Proposta enviada'],['aguardando','Aguardando cliente']];
+var NG_NOME={ aberta:'Aberta', proposta:'Proposta enviada', aguardando:'Aguardando cliente', ganha:'Ganha', perdida:'Perdida' };
+var NG_MOTIVOS=['Preço','Concorrente','Cliente desistiu','Prazo / logística','Sem resposta','Outro'];
+function ngAndando(n){ return ['aberta','proposta','aguardando'].indexOf(n.etapa||'aberta')>=0; }
+function ngPodeMexer(n){ return U.gestor || n.donoUid===U.uid; }
+function ngSeg(v){ NG.seg=v; document.querySelectorAll('#ng-seg button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-s')===v); }); renderNegoc(); }
+function ngMesAtual(x){ return String(x||'').slice(0,7)===hoje().slice(0,7); }
+function ngCardHtml(n){
+  var h=hoje(), venc=ngAndando(n) && n.prazo && n.prazo<h;
+  return '<div class="card ng-card" onclick="verNegoc(\''+n.id+'\')">'
+    + '<div style="display:flex;justify-content:space-between;gap:8px"><div class="ng-cli">'+esc(n.clienteNome||'—')+(n.clienteNovo?' <span class="mini">· novo</span>':'')+'</div>'
+    + (n.valor?'<div class="ng-val">'+fmtRS0(n.valor)+'<span class="mini">/mês</span></div>':'')+'</div>'
+    + '<div class="ng-tit">'+esc(n.titulo||'')+'</div>'
+    + '<div class="ng-tags">'+(n.tipos||[]).map(function(t){ return '<span class="tag">'+esc(NG_TIPOS[t]||t)+'</span>'; }).join('')
+    + (!ngAndando(n)?'<span class="tag" style="color:'+(n.etapa==='ganha'?'var(--green)':'var(--red)')+'">'+NG_NOME[n.etapa]+'</span>':'')+'</div>'
+    + '<div class="ng-meta">'
+    + (ngAndando(n) ? (n.proxPasso||n.prazo ? '→ '+esc(n.proxPasso||'próximo passo')+(n.prazo?' · <span class="'+(venc?'ng-venc':'')+'">'+(venc?'atrasado desde ':'até ')+fmtDia(n.prazo)+'</span>':'') : '<span class="ng-venc">sem próximo passo definido</span>')
+                    : (n.etapa==='perdida' && n.motivo ? 'motivo: '+esc(n.motivo) : (n.resultado?esc(n.resultado):''))+(n.fechadaEm?' · '+fmtDia(String(n.fechadaEm).slice(0,10)):''))
+    + '<br>'+(U.gestor?esc(n.donoNome||'sem vendedor')+' · ':'')+'aberta há '+difDias(String(n.criadoEm||hoje()).slice(0,10), h)+' dia(s)'
+    + '</div></div>';
+}
+function renderNegoc(){
+  var lista=$('ng-lista'); if(!lista) return;
+  if(negocsErro){ lista.innerHTML='<div class="alert a-err">⚠ '+esc(negocsErro)+'</div>'; return; }
+  var vend=selVendedor('ng-vend', negocs);
+  var st=$('ng-tipo'), at=st.value;
+  st.innerHTML='<option value="">Todos os tipos</option>'+Object.keys(NG_TIPOS).map(function(k){ return '<option value="'+k+'">'+NG_TIPOS[k]+'</option>'; }).join(''); st.value=at;
+  $('ng-ord').value=NG.ord;
+  var q=norm(($('ng-busca')||{}).value||'').split(' ').filter(Boolean), tipo=st.value, h=hoje();
+  var base=negocs.filter(function(n){
+    if(vend && n.donoUid!==vend) return false;
+    if(tipo && (n.tipos||[]).indexOf(tipo)<0) return false;
+    if(q.length){ var t=norm([n.clienteNome, n.cidade, n.titulo, n.detalhes, n.produtos, n.concorrente, n.donoNome, n.proxPasso].join(' ')); if(q.some(function(w){ return t.indexOf(w)<0; })) return false; }
+    return true;
+  });
+  /* indicadores */
+  var and=base.filter(ngAndando), vAnd=and.reduce(function(t,n){ return t+(+n.valor||0); },0);
+  var venc=and.filter(function(n){ return n.prazo && n.prazo<h; }).length, semPasso=and.filter(function(n){ return !n.prazo; }).length;
+  var g90=base.filter(function(n){ return n.etapa==='ganha' && n.fechadaEm && difDias(String(n.fechadaEm).slice(0,10), h)<=90; }).length;
+  var p90=base.filter(function(n){ return n.etapa==='perdida' && n.fechadaEm && difDias(String(n.fechadaEm).slice(0,10), h)<=90; }).length;
+  var gMes=base.filter(function(n){ return n.etapa==='ganha' && ngMesAtual(n.fechadaEm); });
+  $('ng-kpis').innerHTML=
+      '<div class="card"><div class="klabel">Em andamento</div><div class="kval">'+and.length+'</div><div class="khint">'+fmtRS0(vAnd)+'/mês em negociação</div></div>'
+    + '<div class="card kpi" onclick="NG.ord=\'prazo\';ngSeg(\'and\')"><div class="klabel">Próximo passo atrasado</div><div class="kval" style="color:'+(venc?'var(--red)':'inherit')+'">'+venc+'</div><div class="khint">'+(semPasso?semPasso+' sem próximo passo':'todas com próximo passo')+'</div></div>'
+    + '<div class="card kpi" onclick="ngSeg(\'ganha\')"><div class="klabel">Ganhas no mês</div><div class="kval" style="color:var(--green)">'+gMes.length+'</div><div class="khint">'+fmtRS0(gMes.reduce(function(t,n){ return t+(+n.valor||0); },0))+'/mês</div></div>'
+    + '<div class="card"><div class="klabel">Taxa de ganho</div><div class="kval">'+((g90+p90)?Math.round(100*g90/(g90+p90))+'%':'—')+'</div><div class="khint">últimos 90 dias · '+g90+' ganhas, '+p90+' perdidas</div></div>';
+  var b=$('ng-badge'); if(b){ var meus=negocs.filter(function(n){ return ngAndando(n) && n.prazo && n.prazo<h && (!U.gestor || n.donoUid===U.uid); }).length; b.style.display=meus?'':'none'; b.textContent=meus; }
+  var ord=NG.ord=($('ng-ord')||{}).value||NG.ord;
+  var srt=function(a,b){
+    if(ord==='valor') return (+b.valor||0)-(+a.valor||0);
+    if(ord==='antiga') return String(a.criadoEm||'').localeCompare(String(b.criadoEm||''));
+    if(ord==='mexida') return String(b.atualizadoEm||'').localeCompare(String(a.atualizadoEm||''));
+    return String(a.prazo||'9999').localeCompare(String(b.prazo||'9999'));
+  };
+  if(NG.seg==='and'){
+    if(!and.length){ lista.innerHTML='<div class="empty">Nenhuma negociação em andamento'+(q.length||tipo||vend?' nesse filtro':'')+'. Use “+ Nova negociação”.</div>'; return; }
+    lista.innerHTML='<div class="ng-kan">'+NG_ETAPAS.map(function(e){
+      var col=and.filter(function(n){ return (n.etapa||'aberta')===e[0]; }).sort(srt);
+      var v=col.reduce(function(t,n){ return t+(+n.valor||0); },0);
+      return '<div class="ng-col"><div class="ng-colt"><span>'+e[1]+' ('+col.length+')</span><span>'+(v?fmtRS0(v):'')+'</span></div>'
+        + (col.length?col.map(ngCardHtml).join(''):'<div class="mini" style="padding:6px">—</div>')+'</div>';
+    }).join('')+'</div>';
+  }else{
+    var l=base.filter(function(n){ return n.etapa===NG.seg; }).sort(function(a,b){ return String(b.fechadaEm||'').localeCompare(String(a.fechadaEm||'')); });
+    lista.innerHTML=l.length ? l.map(ngCardHtml).join('') : '<div class="empty">Nenhuma negociação '+(NG.seg==='ganha'?'ganha':'perdida')+' ainda.</div>';
+  }
+}
+/* ficha do cliente: negociações dele */
+function ngFichaHtml(c){
+  var l=negocs.filter(function(n){ return n.clienteId===c.id || (c.erpId && n.erpId===c.erpId); })
+    .sort(function(a,b){ return (ngAndando(b)?1:0)-(ngAndando(a)?1:0) || String(b.atualizadoEm||'').localeCompare(String(a.atualizadoEm||'')); });
+  return '<div class="det-sec" style="display:flex;justify-content:space-between;align-items:center">Negociações'
+    + '<button class="btn btn-sm btn-ghost" style="text-transform:none;letter-spacing:0" onclick="abrirNegoc(null,\''+esc(c.id)+'\')">+ Negociação</button></div>'
+    + (l.length ? l.slice(0,6).map(ngCardHtml).join('') : '<div class="mini" style="margin-bottom:10px">Nenhuma negociação com este cliente.</div>');
+}
+/* vendedores que o gestor pode escolher: os donos das carteiras */
+function ngVendedores(){
+  var m={}; clientes.forEach(function(c){ if(c.donoUid && String(c.donoUid).indexOf('erp:')!==0) m[c.donoUid]=c.donoNome||c.donoUid; });
+  m[U.uid]=U.nome||U.email; return m;
+}
+/* ---------- nova / editar ---------- */
+function abrirNegoc(id, clienteId){
+  var n=id ? negocs.filter(function(x){ return x.id===id; })[0] : null;
+  if(n && !ngPodeMexer(n)) return;
+  NG.ed=n;
+  var c=clienteId ? clientePorId(clienteId) : (n && n.clienteId ? clientePorId(n.clienteId) : null);
+  var sel=c ? pkSelDeCliente(c) : (n ? { clienteId:n.clienteId||'', erpId:n.erpId||'', nome:n.clienteNome||'', cidade:n.cidade||'', novo:!!n.clienteNovo } : null);
+  var tipos=n ? (n.tipos||[]) : [];
+  var vs=ngVendedores(), donoAtual=n ? n.donoUid : (c && c.donoUid && vs[c.donoUid] ? c.donoUid : U.uid);
+  var corpo='<div class="fld"><label>Cliente *</label><div id="ng-cli"></div></div>'
+    + '<div class="fld"><label>O que está sendo negociado *</label><div class="chips" id="ng-tipos">'
+    + Object.keys(NG_TIPOS).map(function(k){ return '<button type="button" class="chip'+(tipos.indexOf(k)>=0?' on':'')+'" data-v="'+k+'" onclick="this.classList.toggle(\'on\')">'+NG_TIPOS[k]+'</button>'; }).join('')+'</div></div>'
+    + '<div class="fld"><label>Assunto *</label><input type="text" id="ng-tit" maxlength="120" placeholder="Ex.: Preço do pão francês para a rede" value="'+esc(n?n.titulo:'')+'"></div>'
+    + '<div class="fld"><label>Detalhes</label><textarea id="ng-det" rows="3" placeholder="O que foi pedido, condição proposta, prazo de pagamento…">'+esc(n?n.detalhes||'':'')+'</textarea></div>'
+    + '<div class="grid2"><div class="fld"><label>Valor estimado por mês (R$)</label><input type="text" inputmode="decimal" id="ng-val" placeholder="ex.: 3.500" value="'+(n&&n.valor?String(n.valor).replace('.',','):'')+'"></div>'
+    + '<div class="fld"><label>Concorrente envolvido</label><input type="text" id="ng-conc" list="ng-concs" value="'+esc(n?n.concorrente||'':'')+'"><datalist id="ng-concs">'
+    +   concorrentes.map(function(x){ return '<option value="'+esc(x.nome)+'">'; }).join('')+'</datalist></div></div>'
+    + '<div class="fld"><label>Produtos envolvidos</label><input type="text" id="ng-prod" placeholder="Ex.: pão francês 75 g, pão de queijo 65 g" value="'+esc(n?n.produtos||'':'')+'"></div>'
+    + '<div class="grid2"><div class="fld"><label>Próximo passo</label><input type="text" id="ng-pp" placeholder="Ex.: levar proposta, ligar para o comprador" value="'+esc(n?n.proxPasso||'':'')+'"></div>'
+    + '<div class="fld"><label>Até quando</label><input type="date" id="ng-prazo" value="'+esc(n?n.prazo||'':'')+'"></div></div>'
+    + (n ? '' : '<div class="fld"><label>Etapa</label><div class="ng-etapas" id="ng-et0">'+NG_ETAPAS.map(function(e,i){ return '<button type="button" class="ng-et'+(i===0?' on':'')+'" data-v="'+e[0]+'" onclick="chipUnicoNg(this)">'+e[1]+'</button>'; }).join('')+'</div></div>')
+    + (U.gestor ? '<div class="fld"><label>Vendedor responsável</label><select id="ng-dono">'
+        + Object.keys(vs).sort(function(a,b){ return String(vs[a]).localeCompare(String(vs[b]),'pt-BR'); }).map(function(u){ return '<option value="'+esc(u)+'"'+(u===donoAtual?' selected':'')+'>'+esc(vs[u])+'</option>'; }).join('')+'</select></div>' : '');
+  abrirModal({ titulo:n?'Editar negociação':'Nova negociação', wide:true, corpo:corpo,
+    botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:n?'Salvar':'Criar negociação', fn:salvarNegoc }] });
+  pkMontar('ng-cli', { sel:sel, novo:true, ph:'Nome do cliente (carteira, ERP ou novo)…',
+    onSel:function(x){ var c2=x&&x.clienteId?clientePorId(x.clienteId):null; var sd=$('ng-dono');
+      if(sd && c2 && c2.donoUid && vs[c2.donoUid]) sd.value=c2.donoUid;
+      if(x && x.novo){ var b=document.querySelector('#ng-tipos .chip[data-v="prospect"]'); if(b) b.classList.add('on'); } } });
+}
+function chipUnicoNg(b){ b.parentNode.querySelectorAll('.ng-et').forEach(function(x){ x.classList.toggle('on', x===b); }); }
+function salvarNegoc(el){
+  var n=NG.ed, sel=PK['ng-cli'] && PK['ng-cli'].sel;
+  if(!sel){ toast('Escolha o cliente (ou cadastre como cliente novo).', true); var q=$('ng-cli-q'); if(q) q.focus(); return; }
+  var tipos=lerChips('ng-tipos'); if(!tipos.length){ toast('Marque o que está sendo negociado.', true); return; }
+  var tit=$('ng-tit').value.trim(); if(!tit){ toast('Escreva o assunto.', true); $('ng-tit').focus(); return; }
+  var vt=$('ng-val').value.trim(), val=vt?numBR(vt):0; if(vt && (val==null || val<0)){ toast('Valor inválido.', true); return; }
+  var vs=ngVendedores(), dono=U.gestor && $('ng-dono') ? $('ng-dono').value : (n ? n.donoUid : U.uid);
+  var agora=agoraISO(), c=sel.clienteId?clientePorId(sel.clienteId):null;
+  var d={ clienteId:sel.clienteId||'', erpId:sel.erpId||'', clienteNome:sel.nome||'', cidade:sel.cidade||(c&&c.cidade)||'', clienteNovo:!!sel.novo,
+          tipos:tipos, titulo:tit, detalhes:$('ng-det').value.trim(), valor:val||0, concorrente:$('ng-conc').value.trim(),
+          produtos:$('ng-prod').value.trim(), proxPasso:$('ng-pp').value.trim(), prazo:$('ng-prazo').value||'',
+          donoUid:dono, donoNome:vs[dono]||(n&&n.donoNome)||U.nome||'', atualizadoEm:agora, atualizadoPor:U.email };
+  var pare=ocupado(el), pr;
+  if(n){
+    var mud=[]; if(n.titulo!==d.titulo) mud.push('assunto'); if((+n.valor||0)!==(d.valor||0)) mud.push('valor '+fmtRS0(d.valor||0));
+    if((n.proxPasso||'')!==d.proxPasso || (n.prazo||'')!==d.prazo) mud.push('próximo passo'+(d.prazo?' até '+fmtDia(d.prazo):''));
+    if(n.donoUid!==d.donoUid) mud.push('vendedor: '+d.donoNome);
+    d.historico=(n.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome||U.email, acao:'editou', txt:mud.join(' · ') }]);
+    pr=updateDoc(doc(db,'comNegociacoes',n.id), d);
+  }else{
+    var et=(lerChipsNg('ng-et0')||'aberta');
+    Object.assign(d, { etapa:et, criadoEm:agora, criadoPor:U.email, criadoNome:U.nome||U.email,
+      historico:[{ em:agora, por:U.email, nome:U.nome||U.email, acao:'criou', txt:NG_NOME[et] }] });
+    pr=setDoc(doc(collection(db,'comNegociacoes')), d);
+  }
+  pr.then(function(){ fecharModal(); toast(n?'Negociação salva.':'Negociação criada.'); })
+    .catch(function(e){ pare(); falha('salvar a negociação')(e); });
+}
+function lerChipsNg(id){ var b=document.querySelector('#'+id+' .ng-et.on'); return b?b.getAttribute('data-v'):''; }
+/* ---------- ver uma negociação: etapas, andamento, ganhar / perder ---------- */
+function verNegoc(id){
+  var n=negocs.filter(function(x){ return x.id===id; })[0]; if(!n) return;
+  var pode=ngPodeMexer(n), and=ngAndando(n), h=hoje(), venc=and && n.prazo && n.prazo<h;
+  var c=n.clienteId?clientePorId(n.clienteId):null;
+  var corpo='<div class="ng-tags" style="margin:0 0 10px">'+(n.tipos||[]).map(function(t){ return '<span class="tag">'+esc(NG_TIPOS[t]||t)+'</span>'; }).join('')+'</div>'
+    + '<div class="det">'
+    + '<div><span>Cliente</span><b>'+(c?'<a style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="verCliente(\''+esc(c.id)+'\')">'+esc(n.clienteNome)+'</a>':esc(n.clienteNome||'—'))+(n.clienteNovo?' (novo)':'')+'</b></div>'
+    + '<div><span>Valor estimado</span><b>'+(n.valor?fmtRS0(n.valor)+'/mês':'—')+'</b></div>'
+    + '<div><span>Vendedor</span><b>'+esc(n.donoNome||'—')+'</b></div>'
+    + '<div><span>Aberta em</span><b>'+(n.criadoEm?fmtDia(String(n.criadoEm).slice(0,10)):'—')+'</b></div>'
+    + (n.concorrente?'<div><span>Concorrente</span><b>'+esc(n.concorrente)+'</b></div>':'')
+    + (n.produtos?'<div><span>Produtos</span><b>'+esc(n.produtos)+'</b></div>':'')+'</div>'
+    + (n.detalhes?'<div class="det-sec">Detalhes</div><div class="det-txt">'+esc(n.detalhes).replace(/\n/g,'<br>')+'</div>':'')
+    + '<div class="det-sec">Etapa</div>'
+    + (and ? '<div class="ng-etapas">'+NG_ETAPAS.map(function(e){ return '<button type="button" class="ng-et'+((n.etapa||'aberta')===e[0]?' on':'')+'" '+(pode?'onclick="ngEtapa(\''+n.id+'\',\''+e[0]+'\')"':'disabled')+'>'+e[1]+'</button>'; }).join('')+'</div>'
+           + '<div class="det-sec">Próximo passo</div><div class="det-txt">'+(n.proxPasso||n.prazo ? esc(n.proxPasso||'—')+(n.prazo?' · <span class="'+(venc?'ng-venc':'')+'">'+(venc?'atrasado desde ':'até ')+fmtDia(n.prazo)+'</span>':'') : '<span class="ng-venc">sem próximo passo definido</span>')+'</div>'
+         : '<div class="det-txt"><b style="color:'+(n.etapa==='ganha'?'var(--green)':'var(--red)')+'">'+NG_NOME[n.etapa]+'</b>'+(n.fechadaEm?' em '+fmtDia(String(n.fechadaEm).slice(0,10)):'')
+           + (n.motivo?' · motivo: '+esc(n.motivo):'')+(n.resultado?'<br>'+esc(n.resultado):'')+'</div>')
+    + '<div class="det-sec">Andamento</div><div class="ng-hist">'
+    + (n.historico||[]).slice().reverse().map(function(x){ return '<div class="ng-hi"><b>'+esc(x.nome||x.por||'')+'</b> '+esc(x.acao||'')+(x.txt?': '+esc(x.txt):'')
+        + '<span class="mini">'+(x.em?fmtDia(String(x.em).slice(0,10))+' '+String(x.em).slice(11,16):'')+'</span></div>'; }).join('')+'</div>';
+  var bts=[{ txt:'Fechar', cls:'btn-ghost', fn:fecharModal }];
+  if(pode){
+    if(and){
+      bts.push({ txt:'✕ Perdida', cls:'btn-ghost', fn:function(){ ngFechar(n.id,'perdida'); } });
+      bts.push({ txt:'✎ Editar', cls:'btn-ghost', fn:function(){ abrirNegoc(n.id); } });
+      bts.push({ txt:'+ Andamento', cls:'btn-ghost', fn:function(){ ngAndamento(n.id); } });
+      bts.push({ txt:'✓ Ganha', fn:function(){ ngFechar(n.id,'ganha'); } });
+    }else bts.push({ txt:'↺ Reabrir', cls:'btn-ghost', fn:function(){ ngReabrir(n.id); } });
+  }
+  abrirModal({ titulo:esc(n.titulo||'Negociação'), sub:esc(n.clienteNome||''), wide:true, corpo:corpo, botoes:bts });
+}
+function ngGravar(n, d, acao, txt){
+  var agora=agoraISO();
+  d.atualizadoEm=agora; d.atualizadoPor=U.email;
+  d.historico=(n.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome||U.email, acao:acao, txt:txt||'' }]);
+  return updateDoc(doc(db,'comNegociacoes',n.id), d);
+}
+function ngEtapa(id, et){
+  var n=negocs.filter(function(x){ return x.id===id; })[0]; if(!n || (n.etapa||'aberta')===et) return;
+  ngGravar(n, { etapa:et }, 'mudou para', NG_NOME[et]).then(function(){ toast('Etapa: '+NG_NOME[et]+'.'); setTimeout(function(){ verNegoc(id); }, 150); })
+    .catch(falha('mudar a etapa'));
+}
+function ngAndamento(id){
+  var n=negocs.filter(function(x){ return x.id===id; })[0]; if(!n) return;
+  abrirModal({ titulo:'Registrar andamento', sub:esc(n.clienteNome||''),
+    corpo:'<div class="fld"><label>O que aconteceu *</label><textarea id="ng-and" rows="3" placeholder="Ex.: cliente pediu prazo de 28 dias; vou falar com a diretoria"></textarea></div>'
+      + '<div class="grid2"><div class="fld"><label>Próximo passo</label><input type="text" id="ng-pp2" value="'+esc(n.proxPasso||'')+'"></div>'
+      + '<div class="fld"><label>Até quando</label><input type="date" id="ng-prazo2" value="'+esc(n.prazo||'')+'"></div></div>',
+    botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:function(){ verNegoc(id); } }, { txt:'Registrar', fn:function(el){
+      var t=$('ng-and').value.trim(); if(!t){ toast('Escreva o que aconteceu.', true); return; }
+      var pare=ocupado(el);
+      ngGravar(n, { proxPasso:$('ng-pp2').value.trim(), prazo:$('ng-prazo2').value||'' }, 'registrou', t)
+        .then(function(){ toast('Andamento registrado.'); setTimeout(function(){ verNegoc(id); }, 150); }).catch(function(e){ pare(); falha('registrar o andamento')(e); });
+    } }] });
+}
+function ngFechar(id, como){
+  var n=negocs.filter(function(x){ return x.id===id; })[0]; if(!n) return;
+  NG.motivo='';
+  var perd=como==='perdida';
+  abrirModal({ titulo:perd?'Negociação perdida':'Negociação ganha', sub:esc(n.clienteNome||''),
+    corpo:(perd ? '<div class="fld"><label>Por que perdeu? *</label><div class="chips" id="ng-mot">'
+        + NG_MOTIVOS.map(function(m){ return '<button type="button" class="chip" onclick="NG.motivo=this.textContent;document.querySelectorAll(\'#ng-mot .chip\').forEach(function(b){ b.classList.toggle(\'on\', b.textContent===NG.motivo); })">'+esc(m)+'</button>'; }).join('')+'</div></div>'
+        : '<div class="fld"><label>Valor fechado por mês (R$)</label><input type="text" inputmode="decimal" id="ng-vfim" value="'+(n.valor?String(n.valor).replace('.',','):'')+'"></div>')
+      + '<div class="fld"><label>'+(perd?'Observação':'O que foi fechado')+'</label><input type="text" id="ng-res" maxlength="200" placeholder="'+(perd?'opcional':'Ex.: R$ 6,40 o pacote, entrega 2x por semana')+'"></div>',
+    botoes:[{ txt:'Voltar', cls:'btn-ghost', fn:function(){ verNegoc(id); } }, { txt:perd?'Marcar como perdida':'Marcar como ganha', fn:function(el){
+      if(perd && !NG.motivo){ toast('Escolha o motivo.', true); return; }
+      var d={ etapa:como, fechadaEm:agoraISO(), resultado:$('ng-res').value.trim(), motivo:perd?NG.motivo:'' };
+      if(!perd){ var vt=$('ng-vfim').value.trim(), v=vt?numBR(vt):null; if(v!=null && v>=0) d.valor=v; }
+      var pare=ocupado(el);
+      ngGravar(n, d, perd?'marcou como perdida':'marcou como ganha', perd?NG.motivo+(d.resultado?' — '+d.resultado:''):d.resultado)
+        .then(function(){ fecharModal(); toast(perd?'Marcada como perdida.':'Negociação ganha! 🎉'); }).catch(function(e){ pare(); falha('fechar a negociação')(e); });
+    } }] });
+}
+function ngReabrir(id){
+  var n=negocs.filter(function(x){ return x.id===id; })[0]; if(!n) return;
+  ngGravar(n, { etapa:'aberta', fechadaEm:'', motivo:'', resultado:'' }, 'reabriu', '')
+    .then(function(){ toast('Negociação reaberta.'); setTimeout(function(){ verNegoc(id); }, 150); }).catch(falha('reabrir'));
+}
+
 /* ---------- modal ---------- */
 var MB=[];
 function abrirModal(o){
@@ -1969,6 +2245,11 @@ function ouvir(){
     subs.push(onSnapshot(U.gestor ? query(cv, where('mes','in',m3)) : query(cv, where('donoUid','==',U.uid), where('mes','in',m3)),
       function(s){ delete erros.visitas; visitas=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); render(); },
       erroLeitura('visitas')));
+    /* negociações: o vendedor vê as dele; gerentes e diretoria, todas */
+    var cng=collection(db,'comNegociacoes');
+    subs.push(onSnapshot(U.gestor ? query(cng, limit(3000)) : query(cng, where('donoUid','==',U.uid)),
+      function(s){ negocs=s.docs.map(function(x){ return Object.assign({ id:x.id }, x.data()); }); render(); },
+      function(e){ console.warn('comNegociacoes:', e); negocsErro=(e&&e.code==='permission-denied')?'Sem permissão para ler as negociações (regra do Firestore publicada?).':'Não foi possível ler as negociações.'; render(); }));
     subs.push(onSnapshot(collection(db,'comConcorrentes'),
       function(s){ concorrentes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); })
         .filter(function(c){ return c.ativo!==false; })
@@ -2090,12 +2371,14 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
   usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'],
   produtos:['Produtos','Catálogo e fichas técnicas'],
+  negoc:['Negociações','Negociações em andamento com os clientes'],
   equip:['Equipamentos nos clientes','Equipamentos em comodato que estão nos clientes'],
   eqvinc:['Vincular nomes','De-para: cliente da planilha de equipamentos → cliente da carteira ou do ERP'],
   eqhist:['Histórico dos equipamentos','Todas as remessas e retornos da planilha, e o caminho de cada equipamento'],
   cmrem:['Remessa Comodato','Envio e retorno de equipamentos em comodato (entregar, retirar, trocar) — pedidos à manutenção'],
   cmext:['Manutenção Externa','Conserto dos equipamentos nos clientes — pedidos à manutenção'] };
-var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'] };   /* Remessa / Manutenção: o botão de novo pedido fica na barra da própria lista */
+var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'],
+  negoc:['+ Nova negociação','negoc'] };   /* Remessa / Manutenção: o botão de novo pedido fica na barra da própria lista */
 function nav(p){
   pagina=p;
   document.querySelectorAll('.navbtn').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-p')===p); });
@@ -2109,7 +2392,7 @@ function nav(p){
   render();
   window.scrollTo(0,0);
 }
-function fabAcao(){ var a=(ACAO[pagina]||[])[1]; if(a==='cliente') abrirCliente(); else if(a==='solic') abrirSolic();
+function fabAcao(){ var a=(ACAO[pagina]||[])[1]; if(a==='cliente') abrirCliente(); else if(a==='solic') abrirSolic(); else if(a==='negoc') abrirNegoc();
   else if(a==='cmrem') cmNovo('remessa'); else if(a==='cmext') cmNovo('externa'); else abrirVisita(); }
 
 /* ---------- desenho ---------- */
@@ -2131,6 +2414,7 @@ function render(){
   else if(pagina==='usuarios') renderUsuarios();
   else if(pagina==='produtos') renderProdutos();
   else if(pagina==='equip') renderEquip();
+  else if(pagina==='negoc') renderNegoc();
   else if(pagina==='eqvinc') renderEqVinc();
   else if(pagina==='eqhist') renderEqHist();
   else if(pagina==='cmrem') renderCm('remessa');
@@ -2158,6 +2442,9 @@ function diagnosticos(){
   var atras=ativos.filter(contatoAtrasado).length;
   if(atras) out.push({ sev:'warn', titulo:atras+' contato'+(atras>1?'s':'')+' atrasado'+(atras>1?'s':''),
     sub:'Clientes com a data do próximo contato vencida'+(U.gestor?' (todas as carteiras).':'.'), ir:function(){ filtroCart='agenda'; nav('carteira'); } });
+  var ngV=negocs.filter(function(n){ return ngAndando(n) && n.prazo && n.prazo<h && (!U.gestor || n.donoUid===U.uid); }).length;
+  if(ngV) out.push({ sev:'warn', titulo:ngV+' negociaç'+(ngV>1?'ões':'ão')+' com o próximo passo atrasado',
+    sub:'O prazo combinado passou.', ir:function(){ NG.seg='and'; NG.ord='prazo'; nav('negoc'); } });
   var ordem={bad:0,warn:1,info:2};
   return out.sort(function(a,b){ return ordem[a.sev]-ordem[b.sev]; });
 }
@@ -2182,6 +2469,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
+Object.assign(window, { ngSeg:ngSeg, renderNegoc:renderNegoc, abrirNegoc:abrirNegoc, verNegoc:verNegoc, ngEtapa:ngEtapa, chipUnicoNg:chipUnicoNg });
 
 function badge(){
   var n=sols.filter(function(s){ return respondo(s) && s.status==='aberta'; }).length;
@@ -2708,7 +2996,7 @@ function verCliente(id){
     var qd=queda(c);
     if(qd) corpo+='<div class="alert a-err">↓ Comprou '+qd.pct+'% menos em '+nomeMes(qd.mes)+' ('+fmtRS(qd.ult)+') do que no mês anterior ('+fmtRS(qd.ant)+').</div>';
   }
-  corpo+=funilFichaHtml(c)+fichaCadHtml(c)+oportunidadesHtml(c)+comprasRecentesHtml(c)+'<div id="cli-eq"></div>';
+  corpo+=funilFichaHtml(c)+fichaCadHtml(c)+ngFichaHtml(c)+oportunidadesHtml(c)+comprasRecentesHtml(c)+'<div id="cli-eq"></div>';
   corpo+='<div class="det-sec">Contato</div><div class="det">'
     +'<div><span>Situação</span><b>'+({cliente:'Cliente',prospect:'Prospect',inativo:'Inativo'}[c.situacao]||'Cliente')+'</b></div>'
     +'<div><span>Cidade · rota</span><b>'+esc([c.cidade, c.rota?'rota '+c.rota:''].filter(Boolean).join(' · ')||'—')+'</b></div>'
