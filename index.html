@@ -568,7 +568,7 @@ details.mais[open]{padding-bottom:4px}
     <button class="navbtn" data-p="solic" onclick="nav('solic')"><span class="side-ico">✉</span><span class="lbl lab-d">Solicitações</span><span class="lab-m">Pedidos</span><span class="cnt" id="cntSol" hidden>0</span></button>
     <div class="side-sec lbl admin-only">Ajustes</div>
     <button class="navbtn so-desk admin-only" data-p="importar" onclick="nav('importar')"><span class="side-ico">⇪</span><span class="lbl">Carteira pelo ERP</span></button>
-    <button class="navbtn so-desk admin-only" data-p="usuarios" onclick="nav('usuarios')"><span class="side-ico">☺</span><span class="lbl">Usuários e níveis</span></button>
+    <button class="navbtn so-desk dono-only" data-p="usuarios" onclick="nav('usuarios')"><span class="side-ico">☺</span><span class="lbl">Usuários e níveis</span></button>
     <button class="navbtn so-desk admin-only" data-p="config" onclick="nav('config')"><span class="side-ico">⚙</span><span class="lbl">Configurações</span></button>
     <div class="side-foot">
       <div class="uline">
@@ -2435,12 +2435,16 @@ onAuthStateChanged(auth, async function(u){
   }
   if(d.ativo!==true){ negar('Sua conta ainda não foi liberada. Fale com a diretoria.'); return; }
   U.uid=u.uid; U.email=u.email||''; U.nome=d.nome||U.email.split('@')[0];
-  U.admin=(d.role==='admin');
+  /* U.dono = diretoria do sistema (role admin). U.admin = quem administra o Comercial: a diretoria do
+     sistema ou quem tem a chave comercialAdmin (ex.: diretor executivo) — todas as áreas do app,
+     menos Usuários e níveis e excluir ficha técnica / produto do catálogo, que ficam com o dono. */
+  U.dono=(d.role==='admin');
+  U.admin=U.dono || (d.comercial===true && d.comercialAdmin===true);
   U.comercial=U.admin || d.comercial===true;
   U.gestor=U.admin || (d.comercial===true && d.comercialGestor===true);
   /* chave "Pedir equipamento (comercial)": o pedido de equipamento vai direto
      para o Manut. Comodato (coleção comodatoSolicitacoes) */
-  U.comodato=U.admin || d.comodatoSolicita===true;
+  U.comodato=U.dono || d.comodatoSolicita===true;
   /* chave "Gerencia pedidos de equipamento" (ex.: Jeferson): vê todos os pedidos à
      manutenção, edita, exclui e muda a prioridade (Equipamentos → Remessa / Manutenção) */
   U.cmGerencia=U.admin || d.comodatoGerencia===true;
@@ -2454,8 +2458,9 @@ onAuthStateChanged(auth, async function(u){
   $('auth').style.display='none'; $('app').style.display='block';
   $('uav').textContent=(U.nome[0]||'?').toUpperCase();
   $('unome').textContent=U.nome;
-  $('upapel').textContent=U.admin?'Diretoria · admin':(U.gestor?'Gerente':(U.comercial?'Vendedor':'Responde solicitações'));
+  $('upapel').textContent=U.dono?'Diretoria · admin':U.admin?'Diretoria do Comercial':(U.gestor?'Gerente':(U.comercial?'Vendedor':'Responde solicitações'));
   document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display=U.admin?'':'none'; });
+  document.querySelectorAll('.dono-only').forEach(function(el){ el.style.display=U.dono?'':'none'; });
   document.querySelectorAll('.com-only').forEach(function(el){ el.style.display=U.comercial?'':'none'; });
   document.querySelectorAll('.gestor-only').forEach(function(el){ el.style.display=U.gestor?'':'none'; });
   document.querySelectorAll('.cm-only').forEach(function(el){ el.style.display=(U.comodato||U.cmGerencia)?'':'none'; });
@@ -4916,7 +4921,7 @@ function carregarUsuarios(forcar){
   return usuariosLendo;
 }
 function renderUsuarios(){
-  if(!U.admin) return;
+  if(!U.dono) return;
   var box=$('usu-lista');
   if(!usuariosLista){
     box.innerHTML='<div class="empty">Carregando…</div>';
@@ -5433,7 +5438,7 @@ function verFicha(id){
     if((f[s[0]]||[]).length) corpo+='<div class="det-sec">'+s[1]+'</div><div class="det">'+f[s[0]].map(function(x){ return '<div><span>'+esc(x.k)+'</span><b>'+esc(x.v)+'</b></div>'; }).join('')+'</div>'; });
   /* a ficha sai só em PDF fechado: sem "copiar texto" */
   abrirModal({ titulo:esc(f.nome), sub:'Ficha técnica', wide:true, corpo:corpo,
-    botoes:(U.admin?[{ txt:'🗑 Excluir ficha', cls:'btn-ghost', fn:function(el){ excluirFicha(f, el); } }]:[])
+    botoes:(U.dono?[{ txt:'🗑 Excluir ficha', cls:'btn-ghost', fn:function(el){ excluirFicha(f, el); } }]:[])
       .concat([{ txt:(ehCelular()&&navigator.share)?'⤴ Compartilhar PDF':'⇣ Baixar PDF', fn:function(el){ compartilharFicha(f, el); } }]) });
   pdfFichaPronto[f.id]=null; carregarJsPDF().then(function(){ return gerarPdfFicha(f); }).then(function(b){ pdfFichaPronto[f.id]=b; }).catch(function(){});   /* já deixa pronto */
 }
@@ -5808,7 +5813,7 @@ function verProduto(ordem){
   var bts=[{ txt:'Copiar', cls:'btn-ghost', fn:function(){ (navigator.clipboard?navigator.clipboard.writeText(textoProduto(p)):Promise.reject()).then(function(){ toast('Copiado.'); }).catch(function(){ toast('Não foi possível copiar.', true); }); } }];
   if(navigator.share) bts.push({ txt:'Compartilhar', cls:'btn-ghost', fn:function(){ navigator.share({ title:p.nome, text:textoProduto(p) }).catch(function(){}); } });
   if(f) bts.push({ txt:'Ver ficha técnica', fn:function(){ verFicha(f.id); } });
-  if(U.admin) bts.unshift(produtoOculto(p) ? { txt:'↺ Voltar ao catálogo', cls:'btn-ghost', fn:function(el){ ocultarProduto(p, false, el); } }
+  if(U.dono) bts.unshift(produtoOculto(p) ? { txt:'↺ Voltar ao catálogo', cls:'btn-ghost', fn:function(el){ ocultarProduto(p, false, el); } }
                                           : { txt:'🗑 Remover do catálogo', cls:'btn-ghost', fn:function(el){ ocultarProduto(p, true, el); } });
   abrirModal({ titulo:esc(p.nome), sub:esc(p.linha), corpo:corpo, botoes:bts });
 }
@@ -5823,7 +5828,7 @@ function chaveCat(p){ return norm(p.nome)+'|'+norm(p.pesoUn||''); }
 function produtoOculto(p){ return (CFG.catOcultos||[]).indexOf(chaveCat(p))>=0; }
 function alternarOcultos(){ verOcultos=!verOcultos; renderProdutos(); }
 function ocultarProduto(p, ocultar, el){
-  if(!U.admin) return;
+  if(!U.dono) return;
   if(ocultar && !confirm('Remover "'+p.nome+'" do catálogo do app? Ele some para todos (dá para trazer de volta).')) return;
   var k=chaveCat(p), lista=(CFG.catOcultos||[]).filter(function(x){ return x!==k; });
   if(ocultar) lista.push(k);
@@ -5833,7 +5838,7 @@ function ocultarProduto(p, ocultar, el){
     .catch(function(e){ pare(); falha(ocultar?'remover do catálogo':'voltar ao catálogo')(e); });
 }
 function excluirFicha(f, el){
-  if(!U.admin) return;
+  if(!U.dono) return;
   if(!confirm('Excluir a ficha técnica de "'+f.nome+'"? Não dá para desfazer — para ter de novo, é importar o Word outra vez.')) return;
   var pare=ocupado(el,'Excluindo…');
   deleteDoc(doc(db,'comFichas',f.id)).then(function(){ toast('Ficha excluída.'); fecharModal(); })
