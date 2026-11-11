@@ -107,6 +107,8 @@ html[data-theme="light"] .side:hover:not(.pin){box-shadow:14px 0 40px rgba(20,20
 .navbtn:hover{background:var(--card-2);color:var(--text)}
 .navbtn.on{background:var(--primary);color:#fff;font-weight:600;box-shadow:0 6px 20px var(--prim-sombra)}
 .side:not(.pin):not(:hover) .navbtn{padding:8px 0;justify-content:center;gap:0}
+.side:not(.pin):not(:hover) .navbtn .lbl{display:none}
+.side:not(.pin):not(:hover) .nbadge{position:absolute;top:3px;right:5px;margin:0;font-size:9.5px;padding:0 4px;line-height:15px}
 .side-ico{display:inline-block;width:22px;flex:0 0 22px;text-align:center;font-size:15px}
 .cnt{margin-left:auto;background:var(--amber);color:#1a1400;font-size:10.5px;font-weight:700;min-width:18px;height:18px;
      line-height:18px;border-radius:9px;padding:0 5px;text-align:center}
@@ -284,7 +286,8 @@ table.tb td{padding:6px 7px;border-bottom:1px solid var(--border)}
 table.tb .r{text-align:right}
 .tscroll{overflow:auto;max-height:52vh;border:1px solid var(--border);border-radius:12px}
 /* Carteira em tabela (computador); no celular continua em cartões */
-.ct-wrap{max-height:calc(100vh - 330px);min-height:260px;background:var(--card)}
+.ct-wrap{background:var(--card)}
+.tscroll.ct-wrap{max-height:none;overflow:visible}   /* a página rola; o cabeçalho da tabela acompanha (sticky) */
 table.ct{font-size:13.5px}
 table.ct th{padding:10px 12px;z-index:1}
 table.ct td{padding:10px 12px;vertical-align:top}
@@ -351,7 +354,7 @@ table.ct .ct-uc{white-space:nowrap}
 .eq-loja .nm{max-width:300px;white-space:normal;line-height:1.3}
 .eq-corr td{white-space:nowrap}
 .eq-corr td.eq-loja{white-space:normal}
-.eq-rol{max-height:calc(100vh - 250px);overflow:auto}
+.eq-rol{overflow-x:auto}                    /* sem altura máxima: só a rolagem da página */
 .eq-avs{display:flex;gap:4px}
 /* negociações */
 .ng-kan{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
@@ -1458,7 +1461,7 @@ function ehLinha(pat){
 }
 function ehImportacoesHtml(){
   var h=(EQ.hist||[]).slice().sort(function(a,b){ return String(b.em).localeCompare(String(a.em)); });
-  return h.length ? '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll"><table class="eq-tab eq-corr"><thead><tr><th>Importação</th><th class="r">Clientes</th><th class="r">Equipamentos</th><th class="r">Valor em comodato</th>'
+  return h.length ? '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll" style="max-height:none;border:none"><table class="eq-tab eq-corr"><thead><tr><th>Importação</th><th class="r">Clientes</th><th class="r">Equipamentos</th><th class="r">Valor em comodato</th>'
       +'<th class="r">Entraram</th><th class="r">Saíram (retornaram)</th></tr></thead><tbody>'
       + h.map(function(x){ return '<tr><td>'+esc(fmtQuando(x.em))+'<div class="mini">'+esc(x.porNome||'')+(x.arquivo?' · '+esc(x.arquivo):'')+'</div></td><td class="r">'+(x.clientes||0).toLocaleString('pt-BR')+'</td>'
         +'<td class="r">'+(x.itens||0).toLocaleString('pt-BR')+'</td><td class="r">'+fmtRS0(x.valor||0)+'</td>'
@@ -2014,7 +2017,7 @@ function ngAcordosHtml(base){
     if(n.acordo.benTipo==='qtd'){ var u=n.acordo.un||'pacotes'; tq[u]=(tq[u]||0)+c.ben; } else tb+=c.ben; } });
   var tqTxt=Object.keys(tq).map(function(u){ return tq[u]+' '+u; }).join(', ');
   lista.innerHTML=seg+'<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) '+(ver==='enc'?'encerrado(s) · tocar abre o histórico':'em vigor'+(U.gestor?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios'+(tqTxt?' + <b>'+tqTxt+'</b> em produto':''):''))+'</div>'
-    + '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th>'
+    + '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll" style="max-height:none;border:none"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th>'
     + (U.gestor?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, m), pr=c.pct!=null?Math.min(1,c.pct):null;
         return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(n.clienteNome||'—')+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
@@ -2049,7 +2052,7 @@ function ngAvalHtml(base){
     + ' · concedido a enviar: <b>'+fmtRS0(tot.concedido)+qx(qt.concedido)+'</b> · já pago/enviado: '+fmtRS0(tot.pago)+qx(qt.pago)+' · não concedidos: '+tot.negado
     + (mes===mesAtual()?' · <b style="color:var(--amber)">o mês ainda não fechou</b>':'')+'</div>';
   if(!l.length){ lista.innerHTML=h+'<div class="empty">Nenhum acordo em vigor em '+nomeMes(mes)+'.</div>'; return; }
-  h+='<div class="card" style="padding:0;overflow:hidden"><div class="tscroll"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th><th>Vendedor</th>'
+  h+='<div class="card" style="padding:0;overflow:hidden"><div class="tscroll" style="max-height:none;border:none"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th><th>Vendedor</th>'
     + '<th class="r">Faturado no mês</th><th>Meta</th><th class="r">Benefício</th><th>Situação</th><th></th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, mes), av=c.av, k=n.id;
         var fatIn='<input class="ng-in" id="ngf-'+k+'" inputmode="decimal" value="'+(c.fat!=null?String(Math.round(c.fat*100)/100).replace('.',','):'')+'" placeholder="informar" '
@@ -2920,19 +2923,21 @@ function renderCarteira(){
       +'<div class="khint">'+esc(l.length!==clientes.length?'de '+clientes.length+' · '+deQuem:deQuem)+'</div></div>';
   _ctModo=ctCelular()?'cel':'pc';
   var vazio='<div class="empty">'+(clientes.length?'Nenhum cliente neste filtro.':'Sua carteira está vazia. Ela vem do ERP (clientes em que você é o representante). Cliente novo entra por <b>Registrar contato</b>.')+'</div>';
-  var mais=l.length>400?'<div class="empty">Mostrando 400 de '+l.length+'. Use a busca.</div>':'';
+  var mais=l.length>ctLim?'<div style="text-align:center;margin:12px 0 20px"><button class="btn btn-ghost" onclick="ctLim+=300;renderCarteira()">Mostrar mais ('
+    +(l.length-ctLim).toLocaleString('pt-BR')+' clientes)</button></div>':'';
   if(!l.length){ $('c-lista').innerHTML=vazio; return; }
-  if(_ctModo==='cel'){ $('c-lista').innerHTML=l.slice(0,400).map(cartaoCliente).join('')+mais; return; }
+  if(_ctModo==='cel'){ $('c-lista').innerHTML=l.slice(0,ctLim).map(cartaoCliente).join('')+mais; return; }
   var colVend=!!U.gestor;
   $('c-lista').innerHTML='<div class="tscroll ct-wrap"><table class="tb ct"><thead><tr>'
       +'<th>Cliente</th><th>Rota</th>'+(colVend?'<th>Vendedor</th>':'')+'<th>Última compra</th>'
       +'<th class="ct-val">Valor'+(pf?'<small>'+esc(pf.curto)+'</small>':'')+'</th></tr></thead><tbody>'
-      +l.slice(0,400).map(function(c){ return linhaCliente(c, val[c.id], colVend); }).join('')
+      +l.slice(0,ctLim).map(function(c){ return linhaCliente(c, val[c.id], colVend); }).join('')
       +'</tbody></table></div>'+mais;
 }
 /* Carteira em tabela: uma linha por cliente, clique abre a ficha. No celular
    (até 600px) continua em cartões, que cabem na tela. */
-var _ctModo='';
+var _ctModo='', ctLim=300;
+window.ctLim=ctLim; Object.defineProperty(window, 'ctLim', { get:function(){ return ctLim; }, set:function(v){ ctLim=v; } });
 function ctCelular(){ try{ return window.matchMedia('(max-width:600px)').matches; }catch(e){ return false; } }
 window.addEventListener('resize', function(){
   var m=ctCelular()?'cel':'pc';
@@ -4493,7 +4498,7 @@ function pintarPlano(itens){
     +'<div class="card"><div class="klabel">Já estão certos</div><div class="kval">'+n('igual')+'</div></div>'
     +'<div class="card"><div class="klabel">Ficam de fora</div><div class="kval" style="color:var(--red)">'+n('ignorar')+'</div></div></div>'
     +(semV?'<div class="alert a-warn">⚠ '+semV+' cliente'+(semV>1?'s':'')+' entram sem vínculo com o ERP (nome diferente). Dá para ligar depois, editando cada um.</div>':'')
-    +'<div class="tscroll"><table class="tb"><tr><th>#</th><th>Cliente</th><th>Vendedor</th><th>O que acontece</th><th>Obs.</th></tr>'
+    +'<div class="tscroll" style="max-height:none"><table class="tb"><tr><th>#</th><th>Cliente</th><th>Vendedor</th><th>O que acontece</th><th>Obs.</th></tr>'
     +itens.slice(0,600).map(function(x){ var r=ROT[x.acao];
       return '<tr><td class="mini">'+x.linha+'</td><td>'+esc(x.nome)+(x.erpId?'':'')+'</td><td>'+esc(x.u?impNomeU(x.u):x.vend)+(x.u&&x.u.semLogin?' <span class="mini">(sem login)</span>':'')+'</td>'
         +'<td><span class="st st-'+r[1]+'">'+r[0]+'</span>'+(x.acao==='transferir'&&x.de?' <span class="mini">de '+esc(x.de)+'</span>':'')+'</td><td class="mini">'+esc(x.obs)+'</td></tr>'; }).join('')
