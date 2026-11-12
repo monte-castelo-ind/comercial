@@ -717,6 +717,7 @@ details.mais[open]{padding-bottom:4px}
         <select id="c-vend" onchange="renderCarteira()" class="gestor-only" style="display:none"></select>
         <select id="c-rota" onchange="renderCarteira()" title="Rota do ERP"></select>
         <select id="c-cid" onchange="renderCarteira()" title="Cidade"></select>
+        <select id="c-reg" onchange="renderCarteira()" title="Região (relatório do ERP)" class="gestor-only" style="display:none"></select>
         <select id="c-per" onchange="setPerFat(this.value)" title="Período do faturamento"></select>
         <input type="month" id="c-mes" style="display:none;width:auto" onchange="carregarMesExtra(this.value)">
         <select id="c-ord" onchange="renderCarteira()">
@@ -2879,6 +2880,31 @@ function selCidade(lista){
   if(el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html; el.value=atual; if(el.value!==atual) el.value=''; }
   return el.value;
 }
+/* região do cliente: coluna "regiao" do relatório diário do ERP (o mesmo da Gestão), pelo mês mais recente
+   em que ele aparece. Só para quem lê esse relatório (gerentes e diretoria). */
+var _reg={ docs:null, mapa:{} };
+function regiaoDe(c){
+  if(!U.gestor || !cmDocs.length) return '';
+  if(_reg.docs!==cmDocs){                            /* refaz o índice quando o relatório foi relido */
+    var m={}; cmDocs.forEach(function(d){ var cs=d.clientes||{}; Object.keys(cs).forEach(function(k){ var x=cs[k]||{}, r=String(x.reg||'').replace(/\s+/g,' ').trim().toUpperCase();
+      if(r) eqNomes(x.nome||k).forEach(function(n){ m[n]=r; }); }); });
+    _reg.docs=cmDocs; _reg.mapa=m;
+  }
+  var e=erpDe(c), r='';
+  [c.erpNome, e&&e.nErp, e&&e.n, c.nome].filter(Boolean).some(function(nm){ return eqNomes(nm).some(function(k){ if(_reg.mapa[k]){ r=_reg.mapa[k]; return true; } return false; }); });
+  return r;
+}
+function selRegiao(lista){
+  var el=$('c-reg'); if(!el) return '';
+  if(!U.gestor){ el.style.display='none'; return ''; }
+  var cont={}, sem=0;
+  lista.forEach(function(c){ if(c.situacao==='inativo') return; var r=regiaoDe(c); if(r) cont[r]=(cont[r]||0)+1; else sem++; });
+  var atual=el.value, rs=Object.keys(cont).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
+  var html='<option value="">Todas as regiões</option>'+(sem?'<option value="#sem">Sem região ('+sem+')</option>':'')
+    +rs.map(function(r){ return '<option value="'+esc(r)+'">'+esc(r.charAt(0)+r.slice(1).toLowerCase())+' ('+cont[r]+')</option>'; }).join('');
+  if(el.dataset.h!==html){ el.innerHTML=html; el.dataset.h=html; el.value=atual; if(el.value!==atual) el.value=''; }
+  return el.value;
+}
 function renderCarteira(){
   var vend=selVendedor('c-vend', clientes);
   var baseV=(vend==='#sem' ? clientes.filter(function(c){ return !c.donoUid; }) : (vend ? clientes.filter(function(c){ return c.donoUid===vend; }) : clientes));
@@ -2886,12 +2912,14 @@ function renderCarteira(){
   var rAtual=($('c-rota')||{}).value||'', cAtual=($('c-cid')||{}).value||'';
   var rotaSel=selRota(cAtual ? baseV.filter(function(c){ return cAtual==='#sem' ? !cidadeChave(c) : cidadeChave(c)===cAtual; }) : baseV);
   var cidSel=selCidade(rotaSel ? baseV.filter(function(c){ return rotaSel==='#sem' ? !rotaDe(c) : rotaDe(c)===rotaSel; }) : baseV);
+  var regSel=selRegiao(baseV);
   $('c-filtros').innerHTML=FILTROS.map(function(f){ return '<button class="chip'+(filtroCart===f[0]?' on':'')+'" onclick="setFiltroCart(\''+f[0]+'\')">'+f[1]+'</button>'; }).join('');
   var q=norm($('c-busca').value).split(' ').filter(Boolean);
   var l=clientes.filter(function(c){
     if(vend==='#sem' ? !!c.donoUid : (vend && c.donoUid!==vend)) return false;
     if(rotaSel && (rotaSel==='#sem' ? !!rotaDe(c) : rotaDe(c)!==rotaSel)) return false;
     if(cidSel && (cidSel==='#sem' ? !!cidadeChave(c) : cidadeChave(c)!==cidSel)) return false;
+    if(regSel && (regSel==='#sem' ? !!regiaoDe(c) : regiaoDe(c)!==regSel)) return false;
     if(filtroCart!=='inativo' && c.situacao==='inativo') return false;
     if(filtroCart==='inativo' && c.situacao!=='inativo') return false;
     if(filtroCart==='agenda' && !(contatoAtrasado(c)||contatoHoje(c))) return false;
@@ -2912,6 +2940,7 @@ function renderCarteira(){
     return String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'); });
   var deQuem=U.gestor ? (vend==='#sem' ? 'clientes sem vendedor' : vend ? 'carteira de '+(($('c-vend').selectedOptions[0]||{}).textContent||'') : 'todas as carteiras') : 'sua carteira';
   if(rotaSel) deQuem+=' · '+(rotaSel==='#sem' ? 'sem rota' : 'rota '+rotaSel);
+  if(regSel) deQuem+=' · '+(regSel==='#sem' ? 'sem região' : regSel.charAt(0)+regSel.slice(1).toLowerCase());
   if(cidSel) deQuem+=' · '+(cidSel==='#sem' ? 'sem cidade' : ((($('c-cid').selectedOptions[0]||{}).textContent||'').replace(/\s*\(\d+\)$/,'')));
   $('psub').textContent=l.length+' cliente'+(l.length===1?'':'s')+(l.length!==clientes.length?' de '+clientes.length:'')+' · '+deQuem;
   /* cartões: faturamento e número de clientes do que está na tela */
