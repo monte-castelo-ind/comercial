@@ -523,7 +523,8 @@ details.mais[open]{padding-bottom:4px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 /* TAMANHO DA TELA (padrão dos apps):
    - notebook (até 1400px): menu encolhido (ver pinPadrao), filtros e indicadores mais compactos;
-   - monitor grande (acima de 1800px): conteúdo com largura máxima, para não esticar;
+   - monitor comum, inclusive Full HD (1920): o conteúdo usa a largura toda, sem sobra na direita;
+   - só em tela muito larga (acima de 2400px): largura máxima, centralizada;
    - nunca rolagem de lado na página: o conteúdo encolhe e o texto quebra. */
 main{min-width:0;overflow-x:clip}
 @media (max-width:1400px) and (min-width:901px){
@@ -535,8 +536,8 @@ main{min-width:0;overflow-x:clip}
   .kpis .card{padding:13px 15px}
   .kval{font-size:22px}
 }
-@media (min-width:1800px){
-  main > *{max-width:1680px}
+@media (min-width:2400px){
+  main > *{max-width:2100px;margin-left:auto;margin-right:auto}
 }
 </style>
 <!-- base visual comum dos apps (cores, fonte, aviso ⚠): raiz do hub -->
