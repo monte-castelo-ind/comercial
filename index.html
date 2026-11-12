@@ -521,6 +521,23 @@ details.mais[open]{padding-bottom:4px}
   #mc-voltar-hub{bottom:calc(78px + env(safe-area-inset-bottom,0px))!important}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* TAMANHO DA TELA (padrão dos apps):
+   - notebook (até 1400px): menu encolhido (ver pinPadrao), filtros e indicadores mais compactos;
+   - monitor grande (acima de 1800px): conteúdo com largura máxima, para não esticar;
+   - nunca rolagem de lado na página: o conteúdo encolhe e o texto quebra. */
+main{min-width:0;overflow-x:clip}
+@media (max-width:1400px) and (min-width:901px){
+  main{padding:18px 20px 50px}
+  .tools{gap:7px;margin-bottom:12px}
+  .tools input,.tools select{min-width:118px;font-size:13px}
+  .tools input[type=search]{flex:1 1 180px}
+  .kpis{gap:10px}
+  .kpis .card{padding:13px 15px}
+  .kval{font-size:22px}
+}
+@media (min-width:1800px){
+  main > *{max-width:1680px}
+}
 </style>
 <!-- base visual comum dos apps (cores, fonte, aviso ⚠): raiz do hub -->
 <link rel="stylesheet" href="https://monte-castelo-ind.github.io/mc-base.css?v=1">
@@ -1907,7 +1924,7 @@ function ngBenTxt(a){
 function ngBenVal(v, a){ return (a && a.benTipo==='qtd') ? ngQtdTxt(v||0, a.un) : fmtRS0(v||0); }
 function ngAcTxt(a){
   if(!a || !a.tipo) return '';
-  return (a.tipo==='meta' ? 'Meta '+fmtRS0(a.meta||0)+'/mês → '+ngBenTxt(a) : 'Fixo todo mês: '+ngBenTxt(a))
+  return (a.tipo==='meta' ? (a.meta>0 ? 'Meta '+fmtRS0(a.meta)+'/mês' : 'Meta'+(a.obs?' ('+a.obs+')':' (ver observação)'))+' → '+ngBenTxt(a) : 'Fixo todo mês: '+ngBenTxt(a))
     + (a.forma?' · '+a.forma:'') + (a.inicio?' · de '+nomeMes(a.inicio):'') + (a.fim?' a '+nomeMes(a.fim):' (sem fim)')
     + (a.encerradoEm?' · encerrado em '+fmtDia(String(a.encerradoEm).slice(0,10)):'');
 }
@@ -1926,8 +1943,10 @@ function ngFat(n, mes){
 function ngCalc(n, mes, fatManual){
   var a=n.acordo||{}, av=(n.avaliacoes||{})[mes]||null;
   var fat=fatManual!=null ? fatManual : (av && av.faturado!=null ? av.faturado : ngFat(n, mes));
-  var atingiu=a.tipo==='fixo' ? true : (fat!=null && fat>=(+a.meta||0));
-  var ben=!atingiu ? 0 : (a.benTipo==='pct' ? (fat!=null ? Math.round(fat*(+a.ben||0))/100 : null) : (+a.ben||0));   /* valor em R$ ou quantidade em produto */
+  /* meta sem valor em R$ (benefício em produto): quem avalia confere se bateu */
+  var semMetaRS=a.tipo==='meta' && !(+a.meta>0);
+  var atingiu=a.tipo==='fixo' ? true : semMetaRS ? null : (fat!=null && fat>=(+a.meta||0));
+  var ben=(atingiu===false) ? 0 : (a.benTipo==='pct' ? (fat!=null ? Math.round(fat*(+a.ben||0))/100 : null) : (+a.ben||0));   /* valor em R$ ou quantidade em produto */
   return { fat:fat, atingiu:atingiu, ben:ben, pct:(a.tipo==='meta' && fat!=null && a.meta>0) ? fat/a.meta : null, av:av };
 }
 function ngStHtml(av){
@@ -2024,6 +2043,7 @@ function ngAcordosHtml(base){
         return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(n.clienteNome||'—')+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
           + '<td style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+(U.gestor?'<td>'+esc(n.donoNome||'—')+'</td>':'')
           + '<td>'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?ngBenVal(c.ben, a)+' <span class="mini">fixo</span>'
+              : !(+a.meta>0) ? '<span class="mini">meta em produto · conferir no fim do mês</span>'
               : (c.fat==null?'<span class="mini">sem faturamento</span>':fmtRS0(c.fat)+' <span class="mini">de '+fmtRS0(a.meta)+' ('+Math.round(c.pct*100)+'%)</span>'
                  +'<div class="ng-bar"><i class="'+(c.atingiu?'ok':'')+'" style="width:'+Math.round(pr*100)+'%"></i></div>'))+'</td>'
           + '<td>'+(ngVigente(n, ma)?ngStHtml((n.avaliacoes||{})[ma]):'<span class="mini">—</span>')+'</td></tr>'; }).join('')
@@ -2061,6 +2081,7 @@ function ngAvalHtml(base){
         var benIn='<input class="ng-in" id="ngb-'+k+'" inputmode="decimal" value="'+(av?String(av.beneficio||0).replace('.',','):(c.ben!=null?String(c.ben).replace('.',','):''))+'" '+(av?'disabled':'')+'>'
           + (a.benTipo==='qtd'?'<div class="mini">'+esc((a.un||'pacotes')+(a.prod?' de '+a.prod:''))+'</div>':'');
         var metaTxt=a.tipo==='fixo' ? '<span class="mini">sem condição</span>'
+          : !(+a.meta>0) ? '<span class="mini">'+esc(a.obs||'meta em produto')+'<br>conferir se bateu</span>'
           : fmtRS0(a.meta)+'<div id="ngm-'+k+'">'+(c.pct!=null?'<span class="'+(c.atingiu?'':'ng-venc')+'" style="font-size:11.5px">'+Math.round(c.pct*100)+'% · '+(c.atingiu?'bateu':'não bateu')+'</span>':'<span class="mini">informe o faturado</span>')+'</div>';
         var acoes=!av ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'concedido\',this)">✓ Conceder</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'negado\',this)">✕ Não conceder</button>'
           : av.status==='concedido' ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'pago\',this)">'+(a.benTipo==='qtd'?'📦 Marcar enviado':'💸 Marcar pago')+'</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>'
@@ -2094,7 +2115,7 @@ function ngAvaliar(k, st, el){
     var c=ngCalc(n, mes, fat);
     if(st==='concedido'){
       if(ben==null || ben<0){ toast('Informe o valor do benefício.', true); return; }
-      if(n.acordo.tipo==='meta' && !c.atingiu && !confirm('O cliente não bateu a meta em '+nomeMes(mes)+'. Conceder mesmo assim?')) return;
+      if(n.acordo.tipo==='meta' && c.atingiu===false && !confirm('O cliente não bateu a meta em '+nomeMes(mes)+'. Conceder mesmo assim?')) return;
     }
     var emQtd=n.acordo.benTipo==='qtd';
     avs[mes]={ status:st, faturado:fat, meta:n.acordo.tipo==='meta'?(+n.acordo.meta||0):null, atingiu:c.atingiu, beneficio:st==='concedido'?(ben||0):0,
@@ -2111,7 +2132,7 @@ function ngAvalExcel(){
     var aoa=[['Mês','Cliente','Vendedor','Acordo','Forma','Meta (R$)','Faturado (R$)','Bateu a meta','Benefício (R$)','Benefício em produto','Situação','Avaliado por','Pago / enviado em']];
     negocs.filter(function(n){ return ngVigente(n, mes); }).forEach(function(n){ var a=n.acordo, c=ngCalc(n, mes), av=c.av;
       aoa.push([nomeMes(mes), n.clienteNome||'', n.donoNome||'', a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a), a.forma||'', a.tipo==='meta'?(+a.meta||0):'',
-        c.fat==null?'':c.fat, a.tipo==='fixo'?'sem condição':(c.atingiu?'sim':'não'),
+        c.fat==null?'':c.fat, a.tipo==='fixo'?'sem condição':(c.atingiu===null?'conferir':(c.atingiu?'sim':'não')),
         a.benTipo==='qtd'?'':(av?(av.beneficio||0):(c.ben||0)), a.benTipo==='qtd'?ngQtdTxt(av?(av.beneficio||0):(c.ben||0), a.un, a.prod):'',
         av?(av.status==='pago'?'pago':av.status==='concedido'?'concedido (a enviar)':'não concedido'):'a avaliar', av?(av.nome||''):'', av&&av.pagoEm?fmtDia(String(av.pagoEm).slice(0,10)):'']); });
     var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:8},{wch:36},{wch:14},{wch:30},{wch:20},{wch:11},{wch:12},{wch:12},{wch:12},{wch:26},{wch:20},{wch:14},{wch:10}];
@@ -2172,7 +2193,8 @@ function ngAcPintar(){
   var t=lerChipsNg('ng-ac'), a=NG.acEd||{};
   if(!t){ box.innerHTML='<div class="mini">Sem benefício combinado. Se houver (meta com retorno, ou valor fixo por mês), escolha acima: a avaliação mensal sai na aba “Avaliação do mês”.</div>'; return; }
   var bt=a.benTipo || (t==='meta'?'pct':'valor');
-  box.innerHTML=(t==='meta' ? '<div class="fld"><label>Meta de compra por mês (R$) *</label><input type="text" inputmode="decimal" id="ng-ac-meta" placeholder="ex.: 10.000" value="'+(a.meta?String(a.meta).replace('.',','):'')+'"></div>' : '')
+  box.innerHTML=(t==='meta' && bt==='qtd' ? '<div class="mini" style="margin-bottom:10px">Meta com benefício em produto: escreva a condição na <b>Observação do acordo</b> (ex.: comprar 120 pacotes de pão francês por mês). Na “Avaliação do mês” a diretoria confere se bateu.</div>' : '')
+    + (t==='meta' && bt!=='qtd' ? '<div class="fld"><label>Meta de compra por mês (R$) *</label><input type="text" inputmode="decimal" id="ng-ac-meta" placeholder="ex.: 10.000" value="'+(a.meta?String(a.meta).replace('.',','):'')+'"></div>' : '')
     + '<div class="grid2"><div class="fld"><label>Benefício *</label><div class="ng-etapas" id="ng-ac-bt">'
     + [['pct','% do faturamento'],['valor','Valor em R$'],['qtd','Quantidade em produto']].map(function(o){ return '<button type="button" class="ng-et'+(bt===o[0]?' on':'')+'" data-v="'+o[0]+'" onclick="chipUnicoNg(this);NG.acEd=Object.assign({}, NG.acEd||{}, ngAcRascunho(), { benTipo:\''+o[0]+'\' });ngAcPintar()">'+o[1]+'</button>'; }).join('')+'</div></div>'
     + '<div class="fld"><label>'+(bt==='qtd'?'Quantidade por mês *':'Quanto *')+'</label><input type="text" inputmode="decimal" id="ng-ac-ben" placeholder="'+(bt==='qtd'?'ex.: 3':bt==='pct'?'ex.: 3 (%)':'ex.: 500 (R$)')+'" value="'+(a.ben?String(a.ben).replace('.',','):'')+'"></div></div>'
@@ -2196,8 +2218,9 @@ function ngAcRascunho(){
 }
 function ngLerAcordo(){
   var t=lerChipsNg('ng-ac'); if(!t) return { ok:true, acordo:null };
-  var meta=t==='meta' ? numBR(($('ng-ac-meta')||{}).value||'') : null;
-  if(t==='meta' && !(meta>0)){ toast('Informe a meta de compra por mês.', true); return { ok:false }; }
+  var btL=lerChipsNg('ng-ac-bt')||'valor';
+  var meta=(t==='meta' && btL!=='qtd') ? numBR(($('ng-ac-meta')||{}).value||'') : null;
+  if(t==='meta' && btL!=='qtd' && !(meta>0)){ toast('Informe a meta de compra por mês.', true); return { ok:false }; }
   var ben=numBR(($('ng-ac-ben')||{}).value||''); if(!(ben>0)){ toast('Informe o benefício (quanto).', true); return { ok:false }; }
   var bt=lerChipsNg('ng-ac-bt')||'valor'; if(bt==='pct' && ben>100){ toast('Percentual acima de 100%.', true); return { ok:false }; }
   var ini=($('ng-ac-ini')||{}).value||'', fim=($('ng-ac-fim')||{}).value||'';
@@ -2389,13 +2412,20 @@ function toggleTema(){
   try{ localStorage.setItem('mc_com_modo', claro?'claro':'escuro'); }catch(e){}
   pintarLua();
 }
-function togglePin(on){
+function togglePin(on, auto){
   var s=$('sidebar'); if(typeof on!=='boolean') on=!s.classList.contains('pin');
   s.classList.toggle('pin', on);
   var b=s.querySelector('.pinbtn'); if(b){ b.textContent=on?'⇤':'⇥'; b.title=on?'Menu suspenso (só ícones)':'Fixar menu aberto'; }
-  try{ localStorage.setItem('mc_com_pin', on?'1':'0'); }catch(e){}
+  /* só grava quando a pessoa escolhe no botão; sem escolha, quem decide é o tamanho da tela */
+  if(!auto) try{ localStorage.setItem('mc_com_pin2', on?'1':'0'); }catch(e){}
 }
-(function(){ var on=true; try{ on=(localStorage.getItem('mc_com_pin')!=='0'); }catch(e){} togglePin(on); pintarLua(); })();
+/* tela até 1400px (notebook): menu encolhido, só ícones; tela maior: menu aberto */
+function pinPadrao(){ return window.innerWidth>1400; }
+(function(){ var v=null; try{ v=localStorage.getItem('mc_com_pin2'); }catch(e){}
+  togglePin(v===null ? pinPadrao() : v==='1', true); pintarLua();
+  window.addEventListener('resize', function(){ var w=null; try{ w=localStorage.getItem('mc_com_pin2'); }catch(e){}
+    if(w===null) togglePin(pinPadrao(), true); });
+})();
 /* celular: formulários enxutos, o resto fica em "Mais detalhes" */
 function simples(){ return window.matchMedia && window.matchMedia('(max-width:600px)').matches; }
 function zoom(src){ var z=document.createElement('div'); z.className='zoom'; z.innerHTML='<img src="'+src+'">'; z.onclick=function(){ z.remove(); }; document.body.appendChild(z); }
