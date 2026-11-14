@@ -2355,7 +2355,8 @@ function salvarNegoc(el){
   var d={ clienteId:sel.clienteId||'', erpId:sel.erpId||'', clienteNome:sel.nome||'', cidade:sel.cidade||(c&&c.cidade)||'', clienteNovo:!!sel.novo,
           tipos:tipos, titulo:tit, detalhes:$('ng-det').value.trim(), valor:val||0, concorrente:$('ng-conc').value.trim(),
           produtos:$('ng-prod').value.trim(), proxPasso:$('ng-pp').value.trim(), prazo:$('ng-prazo').value||'',
-          donoUid:dono, donoNome:vs[dono]||(n&&n.donoNome)||U.nome||'', acordo:ac.acordo, atualizadoEm:agora, atualizadoPor:U.email };
+          donoUid:dono, donoNome:vs[dono]||(n&&n.donoNome)||U.nome||'', acordo:ac.acordo, atualizadoEm:agora, atualizadoPor:U.email,
+          vendUid:vendDoCliente({ clienteId:sel.clienteId||'', erpId:sel.erpId||'', nome:sel.nome||'' }) };
   var pare=ocupado(el), pr;
   if(n){
     var mud=[]; if(n.titulo!==d.titulo) mud.push('assunto'); if((+n.valor||0)!==(d.valor||0)) mud.push('valor '+fmtRS0(d.valor||0));
@@ -2638,7 +2639,7 @@ onAuthStateChanged(auth, async function(u){
   document.querySelectorAll('.dono-only').forEach(function(el){ el.style.display=U.dono?'':'none'; });
   document.querySelectorAll('.com-only').forEach(function(el){ el.style.display=U.comercial?'':'none'; });
   document.querySelectorAll('.gestor-only').forEach(function(el){ el.style.display=U.gestor?'':'none'; });
-  document.querySelectorAll('.cm-only').forEach(function(el){ el.style.display=(U.comodato||U.cmGerencia)?'':'none'; });
+  document.querySelectorAll('.cm-only').forEach(function(el){ el.style.display=(U.comodato||U.cmGerencia||U.comercial)?'':'none'; });
   segSol=U.comercial?'minhas':'responder';
   ouvir();
   nav(U.comercial?'hoje':'solic');
@@ -2687,7 +2688,7 @@ function ouvir(){
   if(U.comercial){
     var cc=collection(db,'comClientes');
     subs.push(onSnapshot(U.gestor ? query(cc, limit(3000)) : query(cc, where('donoUid','==',U.uid)),
-      function(s){ delete erros.clientes; clientes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); clientesOk=true; render(); autoResumo(); tentarSyncCarteira(); },
+      function(s){ delete erros.clientes; clientes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); clientesOk=true; _vendIdx=null; render(); autoResumo(); tentarSyncCarteira(); syncDonos(); },
       erroLeitura('clientes')));
     /* visitas dos últimos 3 meses: "mes" com in dispensa índice composto */
     var cv=collection(db,'comVisitas'), m3=mesesAtras(3);
@@ -2696,9 +2697,16 @@ function ouvir(){
       erroLeitura('visitas')));
     /* negociações: o vendedor vê as dele; gerentes e diretoria, todas */
     var cng=collection(db,'comNegociacoes');
-    subs.push(onSnapshot(U.gestor ? query(cng, limit(3000)) : query(cng, where('donoUid','==',U.uid)),
-      function(s){ negocs=s.docs.map(function(x){ return Object.assign({ id:x.id }, x.data()); }); render(); },
-      function(e){ console.warn('comNegociacoes:', e); negocsErro=(e&&e.code==='permission-denied')?'Sem permissão para ler as negociações (regra do Firestore publicada?).':'Não foi possível ler as negociações.'; render(); }));
+    var ngErro=function(e){ console.warn('comNegociacoes:', e); negocsErro=(e&&e.code==='permission-denied')?'Sem permissão para ler as negociações (regra do Firestore publicada?).':'Não foi possível ler as negociações.'; render(); };
+    if(U.gestor){
+      subs.push(onSnapshot(query(cng, limit(3000)), function(s){ negocs=s.docs.map(function(x){ return Object.assign({ id:x.id }, x.data()); }); render(); syncDonos(); }, ngErro));
+    }else{
+      /* vendedor: as que ele abriu e as dos clientes da carteira dele (vendUid), mesmo abertas por outra pessoa */
+      var ngA=[], ngB=[], ngJunta=function(){ var m={}; ngA.concat(ngB).forEach(function(n){ m[n.id]=n; }); negocs=Object.keys(m).map(function(k){ return m[k]; }); render(); };
+      subs.push(onSnapshot(query(cng, where('donoUid','==',U.uid)), function(s){ ngA=s.docs.map(function(x){ return Object.assign({ id:x.id }, x.data()); }); ngJunta(); }, ngErro));
+      subs.push(onSnapshot(query(cng, where('vendUid','==',U.uid)), function(s){ ngB=s.docs.map(function(x){ return Object.assign({ id:x.id }, x.data()); }); ngJunta(); },
+        function(e){ console.warn('comNegociacoes (carteira):', e); }));
+    }
     subs.push(onSnapshot(collection(db,'comConcorrentes'),
       function(s){ concorrentes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); })
         .filter(function(c){ return c.ativo!==false; })
@@ -2709,16 +2717,24 @@ function ouvir(){
                                   : query(collection(db,'comPromocoes'), where('ativa','==',true)),
       function(s){ promos=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); render(); },
       function(e){ console.warn('comPromocoes:', e); }));
-    if(U.comodato || U.cmGerencia){
+    if(U.veSol || U.cmGerencia){
       /* quem vê as solicitações de todos (gerente, chave "Ver as solicitações
-         de todos") vê também todos os pedidos de equipamento à manutenção;
-         os demais, só os que fizeram */
-      var qcm=(U.veSol||U.cmGerencia) ? query(collection(db,'comodatoSolicitacoes'), orderBy('criadoEm','desc'), limit(400))
-                      : query(collection(db,'comodatoSolicitacoes'), where('solicitadoPor','==',U.email));
-      subs.push(onSnapshot(qcm,
+         de todos") vê também todos os pedidos de equipamento à manutenção */
+      subs.push(onSnapshot(query(collection(db,'comodatoSolicitacoes'), orderBy('criadoEm','desc'), limit(400)),
         function(s){ cmLista=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); });
-          solFontes.comodato=cmLista.map(cmParaSol); juntarSols(); cmAtualizarAberto(); },
+          solFontes.comodato=cmLista.map(cmParaSol); juntarSols(); cmAtualizarAberto(); syncDonos(); },
         function(e){ console.warn('comodatoSolicitacoes:', e); }));
+    }else if(U.comercial){
+      /* vendedor: os pedidos que ele fez e os dos clientes da carteira dele (vendUid) */
+      var cmA=[], cmB=[], cmJunta=function(){ var m={}; cmA.concat(cmB).forEach(function(x){ m[x.id]=x; });
+        cmLista=Object.keys(m).map(function(k){ return m[k]; }).sort(function(a,b){ return (b.criadoEm||0)-(a.criadoEm||0); });
+        solFontes.comodato=cmLista.map(cmParaSol); juntarSols(); cmAtualizarAberto(); };
+      if(U.comodato) subs.push(onSnapshot(query(collection(db,'comodatoSolicitacoes'), where('solicitadoPor','==',U.email)),
+        function(s){ cmA=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); cmJunta(); },
+        function(e){ console.warn('comodatoSolicitacoes:', e); }));
+      subs.push(onSnapshot(query(collection(db,'comodatoSolicitacoes'), where('vendUid','==',U.uid)),
+        function(s){ cmB=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); cmJunta(); },
+        function(e){ console.warn('comodatoSolicitacoes (carteira):', e); }));
     }
     var cs=collection(db,'comSolicitacoes');
     subs.push(onSnapshot(query(cs, where('donoUid','==',U.uid)),
@@ -3204,13 +3220,14 @@ function renderCarteira(){
   var colVend=!!U.gestor;
   window._ctRel={ l:l, val:val, pf:pf, deQuem:deQuem, vend:vend, tot:tot, compraram:compraram };
   var vis=l.slice(0,ctLim).map(function(c){ return c.id; }); window._ctVis=vis;
+  var podeSel=!!U.gestor; if(!podeSel) CT_SEL={};
   var nSel=Object.keys(CT_SEL).length, todos=vis.length && vis.every(function(id){ return CT_SEL[id]; });
-  var bulk=nSel ? '<div class="ct-bulk"><b>'+nSel+' cliente'+(nSel===1?'':'s')+' selecionado'+(nSel===1?'':'s')+'</b>'
+  var bulk=(podeSel && nSel) ? '<div class="ct-bulk"><b>'+nSel+' cliente'+(nSel===1?'':'s')+' selecionado'+(nSel===1?'':'s')+'</b>'
       + '<button class="btn btn-sm btn-ghost" onclick="ctBulkContato()">Marcar próximo contato</button>'
       + '<button class="btn btn-sm btn-ghost" onclick="ctBulkExcel()">⤓ Excel dos selecionados</button>'
       + '<button class="btn btn-sm btn-ghost" onclick="CT_SEL={};renderCarteira()">Limpar seleção</button></div>' : '';
   $('c-lista').innerHTML=bulk+'<div class="tscroll ct-wrap"><table class="tb ct"><thead><tr>'
-      +'<th class="ct-chk"><input type="checkbox" aria-label="Selecionar todos"'+(todos?' checked':'')+' onchange="ctSelTodos(this.checked)"></th>'
+      +(podeSel?'<th class="ct-chk"><input type="checkbox" aria-label="Selecionar todos"'+(todos?' checked':'')+' onchange="ctSelTodos(this.checked)"></th>':'')
       +'<th>Cliente</th><th>Rota</th>'+(colVend?'<th>Vendedor</th>':'')+'<th>Última compra</th>'
       +'<th class="ct-val">Valor'+(pf?'<small>'+esc(pf.curto)+'</small>':'')+'</th></tr></thead><tbody>'
       +l.slice(0,ctLim).map(function(c){ return linhaCliente(c, val[c.id], colVend); }).join('')
@@ -3225,6 +3242,62 @@ window.addEventListener('resize', function(){
   var m=ctCelular()?'cel':'pc';
   if(_ctModo && m!==_ctModo && $('c-lista')) renderCarteira();
 });
+/* vendedor dono do cliente na carteira: pelo id da carteira, pelo id do ERP ou pelo nome */
+var _vendIdx=null, _vendIdxN=-1;
+function vendIdx(){
+  if(_vendIdx && _vendIdxN===clientes.length) return _vendIdx;
+  var porErp={}, porNome={};
+  clientes.forEach(function(c){ if(!c.donoUid) return; if(c.erpId) porErp[c.erpId]=c;
+    [c.nome, c.erpNome].forEach(function(n){ eqNomes(n).forEach(function(k){ if(!porNome[k]) porNome[k]=c; }); }); });
+  _vendIdx={ erp:porErp, nome:porNome }; _vendIdxN=clientes.length; return _vendIdx;
+}
+function cliDaCarteira(x){
+  var c=x.clienteId ? clientePorId(x.clienteId) : null; if(c) return c;
+  var ix=vendIdx(); if(x.erpId && ix.erp[x.erpId]) return ix.erp[x.erpId];
+  if(x.clienteId && ix.erp[x.clienteId]) return ix.erp[x.clienteId];
+  var r=null; eqNomes(x.nome||x.cliente||x.clienteNome||'').some(function(k){ r=ix.nome[k]||null; return !!r; }); return r;
+}
+function vendDoCliente(x){ var c=cliDaCarteira(x); return c ? (c.donoUid||'') : ''; }
+/* A diretoria, ao abrir o app, acerta o vendedor gravado nos pedidos de equipamento, nas negociações
+   e nos equipamentos nos clientes: quando um cliente muda de carteira (ou chega um vendedor com login),
+   o que é daquele cliente passa a aparecer para o vendedor certo. Uma vez por sessão para cada lista. */
+var _syncFeito={};
+function syncDonos(){
+  if(!U.admin || !clientesOk || !clientes.length) return;
+  var lotes=[], b=writeBatch(db), n=0, add=function(ref, d){ b.update(ref, d); if(++n>=400){ lotes.push(b); b=writeBatch(db); n=0; } };
+  var conta={ cm:0, ng:0 };
+  if(!_syncFeito.cm && U.dono && cmLista.length){
+    _syncFeito.cm=true;
+    cmLista.forEach(function(x){ var v=vendDoCliente(x); if(v!==(x.vendUid||'')){ add(doc(db,'comodatoSolicitacoes',x.id), { vendUid:v }); conta.cm++; } });
+  }
+  if(!_syncFeito.ng && negocs.length){
+    _syncFeito.ng=true;
+    negocs.forEach(function(x){ var v=vendDoCliente(x); if(v!==(x.vendUid||'')){ add(doc(db,'comNegociacoes',x.id), { vendUid:v }); conta.ng++; } });
+  }
+  if(n) lotes.push(b);
+  var i=0, prox=function(){ if(i>=lotes.length) return Promise.resolve(); return lotes[i++].commit().then(prox); };
+  prox().then(function(){ if(conta.cm||conta.ng) console.info('vendedor acertado: '+conta.cm+' pedido(s) de equipamento, '+conta.ng+' negociação(ões)'); })
+    .catch(function(e){ console.warn('acertar vendedor:', e); });
+  if(!_syncFeito.eq){ _syncFeito.eq=true; syncDonosEquip(); }
+}
+/* equipamentos nos clientes: o dono de cada cliente da planilha segue a carteira atual (e as avaliações junto) */
+function syncDonosEquip(){
+  Promise.all([getDocs(query(collection(db,'comEquipamentos'), limit(6000))), getDocs(query(collection(db,'comEquipAval'), limit(30000)))]).then(function(r){
+    var avPor={}; r[1].docs.forEach(function(x){ var a=x.data(); (avPor[a.docId]=avPor[a.docId]||[]).push({ id:x.id, a:a }); });
+    var ops=[];
+    r[0].docs.forEach(function(x){ if(x.id==='_meta') return; var d=x.data();
+      var c=cliDaCarteira({ clienteId:d.clienteId||'', erpId:d.erpId||'', nome:d.cliente||'' }); if(!c) return;
+      var dono=c.donoUid||'';
+      if(dono!==(d.donoUid||'') || c.id!==(d.clienteId||'')) ops.push(['comEquipamentos', x.id, { donoUid:dono, clienteId:c.id, erpId:c.erpId||d.erpId||'' }]);
+      (avPor[x.id]||[]).forEach(function(v){ if((v.a.donoUid||'')!==dono) ops.push(['comEquipAval', v.id, { donoUid:dono, clienteId:c.id }]); });
+    });
+    if(!ops.length) return;
+    var lotes=[], b=writeBatch(db), n=0;
+    ops.forEach(function(o){ b.update(doc(db,o[0],o[1]), o[2]); if(++n>=400){ lotes.push(b); b=writeBatch(db); n=0; } }); if(n) lotes.push(b);
+    var i=0, prox=function(){ if(i>=lotes.length) return Promise.resolve(); return lotes[i++].commit().then(prox); };
+    return prox().then(function(){ console.info('equipamentos: dono acertado em '+ops.length+' documento(s)'); EQ.docs=null; });
+  }).catch(function(e){ console.warn('acertar dono dos equipamentos:', e); });
+}
 var CT_SEL={};
 /* "CAPAO DA CANOA" → "Capao da Canoa" (para ler ao lado do nome) */
 function cidadeBonita(t){ var mi={ DE:1, DA:1, DO:1, DAS:1, DOS:1, E:1 };
@@ -3309,8 +3382,8 @@ function linhaCliente(c, vf, colVend){
   else uc='<span class="ct-mut">…</span>';
   var valHtml=(vf==null)?'<td class="ct-val zero">—</td>':'<td class="ct-val'+(vf?'':' zero')+'">'+(vf?fmtRS0(vf):'R$ 0')+'</td>';
   return '<tr class="'+borda+(CT_SEL[c.id]?' ct-sel':'')+'" onclick="verCliente(\''+c.id+'\')">'
-    +'<td class="ct-chk" onclick="event.stopPropagation()"><input type="checkbox" aria-label="Selecionar '+esc(c.nome||'')+'"'+(CT_SEL[c.id]?' checked':'')
-      +' onchange="ctSel(\''+c.id+'\', this.checked)"></td>'
+    +(U.gestor?'<td class="ct-chk" onclick="event.stopPropagation()"><input type="checkbox" aria-label="Selecionar '+esc(c.nome||'')+'"'+(CT_SEL[c.id]?' checked':'')
+      +' onchange="ctSel(\''+c.id+'\', this.checked)"></td>':'')
     +'<td><div class="ct-nome">'+esc(c.nome||'(sem nome)')+(cidadeDe(c)?'<span class="ct-cid"> - '+esc(cidadeBonita(cidadeDe(c)))+'</span>':'')+'</div>'
       +(tags.length?'<div class="ct-tags">'+tags.join('')+'</div>':'')+'</td>'
     +'<td>'+(rotaDe(c)?esc(rotaDe(c)):'<span class="ct-mut">—</span>')+'</td>'
@@ -4387,7 +4460,7 @@ function cmSalvar(el){
   var data=g('cm-data');                    /* opcional: a manutenção programa depois */
   var agora=Date.now();
   var d=Object.assign({ cliente:sel.nome, clienteId:sel.erpId||'', endereco:sel.novo?g('cm-endnovo'):cmEndDe(sel),
-    categoria:cat, clienteNovo:!!sel.novo,
+    categoria:cat, clienteNovo:!!sel.novo, vendUid:vendDoCliente({ clienteId:sel.clienteId||'', erpId:sel.erpId||'', nome:sel.nome||'' }),
     cidade:g('cm-cid'), contato:g('cm-ctt'),
     servico:g('cm-serv')||'entregar', dataProgramada:data, obs:g('cm-obs'),
     status:'aberta', solicitadoPor:U.email, solicitadoNome:U.nome, solicitadoUid:U.uid,
@@ -4413,7 +4486,8 @@ function cmSalvar(el){
 function cmComReserva(d, gravar){
   return gravar(d).catch(function(e){
     if(!(e && e.code==='permission-denied')) throw e;
-    var dd=Object.assign({}, d); delete dd.categoria; delete dd.clienteNovo;
+    /* regra antiga, que ainda não aceita os campos novos: vai sem eles */
+    var dd=Object.assign({}, d); delete dd.categoria; delete dd.clienteNovo; delete dd.vendUid;
     dd.obs=['['+CM_CAT[d.categoria].nome+(d.clienteNovo?' · CLIENTE NOVO':'')+']', d.obs].filter(Boolean).join(' ');
     return gravar(dd);
   });
@@ -4523,7 +4597,8 @@ function renderCm(cat){
 /* ---------- novo pedido já na categoria da tela ---------- */
 function cmNovo(cat){
   if(!U.comercial){ toast('Só quem é do comercial abre pedido por aqui.', true); return; }
-  if(!U.comodato){ toast('Sua conta não tem a chave "Pedir equipamento (comercial)".', true); return; }
+  /* sem a chave de pedir direto à manutenção: vira uma solicitação de equipamento (quem responde encaminha) */
+  if(!U.comodato){ abrirSolic('equipamento'); return; }
   abrirSolic('equipamento');
   var b=document.querySelector('#cm-cat .chip[data-v="'+cat+'"]'); if(b) cmCat(b);
 }
@@ -4982,7 +5057,10 @@ function queda(c){
 var resumoRodando=false;
 function autoResumo(){
   if(!U.gestor || !fatErp || !clientesOk || resumoMeta===null || resumoMeta.erro || resumoRodando) return;
-  var t=Date.parse(resumoMeta.atualizadoEm||''); if(t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===4) return;
+  var t=Date.parse(resumoMeta.atualizadoEm||'');
+  /* vendedor com carteira que ainda não tem resumo (ex.: acabou de ganhar login): refaz na hora */
+  var temNovo=clientes.some(function(c){ return c.donoUid && (resumoMeta.uids||[]).indexOf(c.donoUid)<0; });
+  if(!temNovo && t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===5) return;
   gerarResumo(false);
 }
 function gerarResumo(manual, el){
@@ -5006,18 +5084,26 @@ function gerarResumo(manual, el){
   clientes.forEach(function(c){ if(!c.donoUid) return; var s=sugestoesCalc(prodDe(c)); if(s && (s.parou.length||s.falta.length)){ (sug[c.donoUid]=sug[c.donoUid]||{})[c.id]=s; } });
   var uids=Object.keys(por);
   ((resumoMeta&&resumoMeta.uids)||[]).forEach(function(u){ if(uids.indexOf(u)<0){ uids.push(u); por[u]={}; } });   /* carteira que esvaziou */
-  var agora=agoraISO(), b=writeBatch(db);
-  var cortados=0;
-  uids.forEach(function(u){
-    var d={ meses:fatMeses, cli:por[u], m90:m90, c90:prodPor[u]||{}, sug:sug[u]||{},
-            vendido:(vd&&vd.por[u])||{}, atualizadoEm:agora, por:U.email, versao:4 };
-    if(caberNoDoc(d)) cortados++;
-    b.set(doc(db,'comVendResumo',u), d); });
-  if(cortados) console.warn('resumo: '+cortados+' carteira(s) grandes — compras limitadas aos produtos de maior valor');
-  b.set(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:4 });
+  /* um documento por vez: juntos, os resumos de todos passavam do limite de uma gravação
+     (10 MB) e nenhum vendedor recebia o seu — a tela dele ficava "aguardando o resumo de vendas" */
+  var agora=agoraISO(), cortados=0, falhas=[], i=0;
   var pare=el?ocupado(el,'Atualizando…'):function(){};
-  b.commit().then(function(){ resumoRodando=false; pare(); if(manual) toast('Valores atualizados para '+uids.length+' vendedor'+(uids.length===1?'':'es')+'.'); })
-    .catch(function(e){ resumoRodando=false; pare(); if(manual) falha('atualizar os valores dos vendedores')(e); else console.warn('resumo:', e); });
+  var prox=function(){
+    if(i>=uids.length){
+      return setDoc(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:5, falhas:falhas.length });
+    }
+    var u=uids[i++];
+    var d={ meses:fatMeses, cli:por[u], m90:m90, c90:prodPor[u]||{}, sug:sug[u]||{},
+            vendido:(vd&&vd.por[u])||{}, atualizadoEm:agora, por:U.email, versao:5 };
+    if(caberNoDoc(d)) cortados++;
+    return setDoc(doc(db,'comVendResumo',u), d).catch(function(e){ falhas.push(u); console.warn('resumo de '+u+':', e); }).then(prox);
+  };
+  prox().then(function(){
+    resumoRodando=false; pare();
+    if(cortados) console.warn('resumo: '+cortados+' carteira(s) grandes — compras limitadas aos produtos de maior valor');
+    if(falhas.length) toast('O resumo de vendas de '+falhas.length+' vendedor(es) não foi gravado. Tente "Atualizar valores" na Equipe.', true);
+    else if(manual) toast('Valores atualizados para '+uids.length+' vendedor'+(uids.length===1?'':'es')+'.');
+  }).catch(function(e){ resumoRodando=false; pare(); if(manual) falha('atualizar os valores dos vendedores')(e); else console.warn('resumo:', e); });
 }
 
 /* =====================================================================
