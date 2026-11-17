@@ -2804,7 +2804,11 @@ function lerFaturamento(){
       Object.keys(cs).forEach(function(k){ var c=cs[k]||{}; var n=normEmp(c.nome||k); if(!n) return;
         idx[n]=idx[n]||{}; idx[n][fatMeses[i]]=(idx[n][fatMeses[i]]||0)+(c.fat||0); });
     });
-    fatErp=idx; render(); autoResumo(); tentarSyncCarteira();
+    fatErp=idx;
+    /* "assinatura" do faturamento lido: total de cada mês. Mudou (o robô do ERP trouxe número novo)?
+       o resumo dos vendedores é refeito, para a tela deles bater com a da diretoria */
+    fatAss=fatMeses.map(function(m){ var t=0; Object.keys(idx).forEach(function(n){ t+=idx[n][m]||0; }); return m+':'+Math.round(t); }).join('|');
+    render(); autoResumo(); tentarSyncCarteira();
   }).catch(function(e){ console.warn('comercialClienteMes:', e); fatErp=false; render(); });
 }
 
@@ -3208,7 +3212,8 @@ function renderCarteira(){
   var compraram=l.filter(function(c){ return (val[c.id]||0)>0; }).length;
   $('c-kpis').innerHTML=
       '<div class="card kpi fixo"><div class="klabel">Faturamento</div><div class="kval">'+(temVal&&pf?fmtRS0(tot):'—')+'</div>'
-      +'<div class="khint">'+(pf?esc(pf.longo):'aguardando o resumo de vendas')+(temVal&&pf?' · '+compraram+' cliente'+(compraram===1?'':'s')+' compraram':'')+'</div></div>'
+      +'<div class="khint">'+(pf?esc(pf.longo):'aguardando o resumo de vendas')+(temVal&&pf?' · '+compraram+' cliente'+(compraram===1?'':'s')+' compraram':'')
+      +(!U.gestor && fatVend && fatVend.atualizadoEm ? ' · valores de '+esc(fmtQuando(fatVend.atualizadoEm)) : '')+'</div></div>'
     +'<div class="card kpi fixo"><div class="klabel">Clientes</div><div class="kval">'+l.length.toLocaleString('pt-BR')+'</div>'
       +'<div class="khint">'+esc(l.length!==clientes.length?'de '+clientes.length+' · '+deQuem:deQuem)+'</div></div>';
   _ctModo=ctCelular()?'cel':'pc';
@@ -5076,13 +5081,15 @@ function queda(c){
   if(ant>0 && ult<=ant*(1-QUEDA)) return { pct:Math.round((1-ult/ant)*100), mes:ms[ms.length-2], ant:ant, ult:ult };
   return null;
 }
-var resumoRodando=false;
+var resumoRodando=false, fatAss='';
 function autoResumo(){
   if(!U.gestor || !fatErp || !clientesOk || resumoMeta===null || resumoMeta.erro || resumoRodando) return;
   var t=Date.parse(resumoMeta.atualizadoEm||'');
   /* vendedor com carteira que ainda não tem resumo (ex.: acabou de ganhar login): refaz na hora */
   var temNovo=clientes.some(function(c){ return c.donoUid && (resumoMeta.uids||[]).indexOf(c.donoUid)<0; });
-  if(!temNovo && t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===5) return;
+  /* faturamento do ERP mudou desde o último resumo: refaz (antes esperava até 12 horas e a tela do vendedor ficava atrás) */
+  var fatMudou=!!fatAss && resumoMeta.assinatura!==fatAss;
+  if(!temNovo && !fatMudou && t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===5) return;
   gerarResumo(false);
 }
 function gerarResumo(manual, el){
@@ -5112,7 +5119,7 @@ function gerarResumo(manual, el){
   var pare=el?ocupado(el,'Atualizando…'):function(){};
   var prox=function(){
     if(i>=uids.length){
-      return setDoc(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:5, falhas:falhas.length });
+      return setDoc(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:5, falhas:falhas.length, assinatura:fatAss });
     }
     var u=uids[i++];
     var d={ meses:fatMeses, cli:por[u], m90:m90, c90:prodPor[u]||{}, sug:sug[u]||{},
