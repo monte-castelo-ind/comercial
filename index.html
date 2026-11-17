@@ -4869,7 +4869,9 @@ function impMapa(sel){
   var v=sel.getAttribute('data-v'); IMP.mapa[v]=sel.value; IMP.plano=null; $('imp-p4').innerHTML='';
   /* a ligação vale para a sincronização automática: guarda na hora */
   var m={}; m[normEmp(v)]=sel.value; CFG.vendMapa[normEmp(v)]=sel.value;
-  setDoc(doc(db,'comConfig','app'), { vendMapa:m }, { merge:true }).catch(falha('guardar a ligação'));
+  setDoc(doc(db,'comConfig','app'), { vendMapa:m }, { merge:true })
+    .then(function(){ orfaosFeito=false; adotarOrfaos(); })      /* ligou a quem tem login: os clientes parados vão junto */
+    .catch(falha('guardar a ligação'));
 }
 function impConferir(){
   if(erpEstado!=='ok'){ toast('A base do ERP ainda não carregou. Espere alguns segundos.', true); return; }
@@ -4988,8 +4990,28 @@ function registrarSync(ops, modo){
    12 h, a carteira volta a espelhar o representante do ERP. Só roda depois da
    primeira conferência manual (precisa da ligação "representante → pessoa"). */
 var syncRodando=false, syncFeito=false;
+/* Representante que ganhou login: a sincronização pelo ERP só mexe nos clientes ATIVOS (compraram
+   nos últimos 30 dias), então os parados continuavam com o dono provisório "erp:NOME" — e o vendedor
+   aparecia duas vezes ("ANDERSON (sem login)" e o de login). Aqui passa TODOS os clientes do dono
+   provisório para a pessoa ligada a esse representante. Roda toda vez que a diretoria abre o app. */
+var orfaosFeito=false;
+function adotarOrfaos(){
+  if(orfaosFeito || !U.admin || !cfgLido || !clientesOk) return Promise.resolve(0);
+  var mapa=CFG.vendMapa||{}; if(!Object.keys(mapa).length) return Promise.resolve(0);
+  orfaosFeito=true;
+  return carregarUsuarios().then(function(lista){
+    var ok={}; lista.forEach(function(u){ if(u.ativo) ok[u.uid]=u; });
+    var porPseudo={};
+    Object.keys(mapa).forEach(function(k){ var uid=mapa[k]; if(uid && ok[uid]) porPseudo['erp:'+String(k).replace(/ /g,'_')]=ok[uid]; });
+    var ops=clientes.filter(function(c){ return c.donoUid && String(c.donoUid).indexOf('erp:')===0 && porPseudo[c.donoUid]; })
+      .map(function(c){ var u=porPseudo[c.donoUid]; return { acao:'transferir', cliId:c.id, nome:c.nome, de:c.donoNome||'', u:{ uid:u.uid, nome:u.nome, email:u.email } }; });
+    if(!ops.length) return 0;
+    return gravarPlano(ops).then(function(f){ if(f) toast(f+' cliente'+(f>1?'s':'')+' que estava'+(f>1?'m':'')+' no nome de vendedor sem login passa'+(f>1?'ram':'ou')+' para quem já tem login.'); return f; });
+  }).catch(function(e){ console.warn('passar clientes do vendedor sem login:', e); return 0; });
+}
 function tentarSyncCarteira(){
   if(!U.admin || syncRodando || syncFeito || !cfgLido) return;
+  if(clientesOk) adotarOrfaos();
   if(!cmDocs.length || erpEstado!=='ok' || !clientesOk) return;
   if(!Object.keys(CFG.vendMapa||{}).length) return;
   var t=Date.parse((CFG.carteiraSync&&CFG.carteiraSync.em)||'');
