@@ -2684,9 +2684,10 @@ onAuthStateChanged(auth, async function(u){
   U.admin=U.dono || (d.comercial===true && d.comercialAdmin===true);
   U.comercial=U.admin || d.comercial===true;
   U.gestor=U.admin || (d.comercial===true && d.comercialGestor===true);
-  /* chave "Pedir equipamento (comercial)": o pedido de equipamento vai direto
-     para o Manut. Comodato (coleção comodatoSolicitacoes) */
-  U.comodato=U.dono || d.comodatoSolicita===true;
+  /* pedido de equipamento: desde 18/11/2026 TODO o comercial pede direto na lista Remessa Comodato /
+     Manutenção Externa (coleção comodatoSolicitacoes), em vez de abrir uma Solicitação. Quem gerencia
+     (comodatoGerencia, ex.: Jeferson) prioriza, corrige ou exclui na própria lista. */
+  U.comodato=U.dono || d.comodatoSolicita===true || U.comercial;
   /* chave "Gerencia pedidos de equipamento" (ex.: Jeferson): vê todos os pedidos à
      manutenção, edita, exclui e muda a prioridade (Equipamentos → Remessa / Manutenção) */
   U.cmGerencia=U.admin || d.comodatoGerencia===true;
@@ -4683,7 +4684,10 @@ function cmSalvar(el){
     var gravarNovo=function(dd){ var lote=writeBatch(db); lote.set(solRef, dd); lote.set(autRef, cmAutDados(dd, solRef.id, val)); return lote.commit(); };
     pr=cmComReserva(d, gravarNovo);
   } else { var pedRef=doc(collection(db,'comodatoSolicitacoes')); pedId=pedRef.id; pr=cmComReserva(d, function(dd){ return setDoc(pedRef, dd); }); }
-  pr.then(function(){ toast(d.novo?'Pedido enviado. Aguarda a autorização da diretoria.':'Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); else if(pagina==='cmrem'||pagina==='cmext') render(); eqRetiradaEnviada(); solPedidoCriado(pedId, d); })
+  pr.then(function(){ toast(d.novo?'Pedido enviado. Aguarda a autorização da diretoria.':'Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas';
+      /* o pedido mora na lista da manutenção: quem pediu pela tela de Solicitações ou pelo Hoje vai direto para ela */
+      if(pagina==='solic' || pagina==='hoje') nav(d.categoria==='externa'?'cmext':'cmrem'); else if(pagina==='cmrem'||pagina==='cmext') render();
+      eqRetiradaEnviada(); solPedidoCriado(pedId, d); })
     .catch(function(e){ pare(); if(e.code==='permission-denied') toast(d.itens?CM_MSG_VARIOS:'Sem permissão para pedir equipamento à manutenção. Peça a chave na Gestão → Acessos.', true); else falha('enviar o pedido')(e); });
 }
 /* Os campos "categoria" e "clienteNovo" são novos no pedido. Se a regra do
