@@ -533,6 +533,14 @@ details.mais[open]{padding-bottom:4px}
 }
 .modal table thead th,.modal table tr:first-child>th{position:sticky;top:0;z-index:3;background:var(--card);box-shadow:inset 0 -1px 0 var(--border)}
 
+/* acordo com mais de um cliente */
+.ng-extra-l{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.ng-extra-l:empty{display:none}
+.ng-extra{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 11px;border-radius:16px;background:var(--card-2);border:1px solid var(--border);font-size:13px;font-weight:600}
+.ng-extra small{font-weight:500;color:var(--muted)}
+.ng-extra button{width:22px;height:22px;border-radius:50%;border:0;background:transparent;color:var(--muted);font-size:15px;line-height:1;cursor:pointer}
+.ng-extra button:hover{background:var(--border);color:var(--text)}
+
 /* ===== novo visual (nov/2026, referência Maven) ===== */
 .side-ico svg{width:18px;height:18px;display:block;margin:0 auto}
 .acoes-cel button span svg{display:block}
@@ -670,7 +678,7 @@ main{min-width:0;overflow-x:clip}
     <button class="navbtn on com-only" data-p="hoje" onclick="nav('hoje')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></span><span class="lbl lab-d">Hoje</span><span class="lab-m">Hoje</span></button>
     <button class="navbtn com-only" data-p="carteira" onclick="nav('carteira')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span class="lbl lab-d">Carteira</span><span class="lab-m">Carteira</span></button>
     <button class="navbtn com-only" data-p="visitas" onclick="nav('visitas')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg></span><span class="lbl lab-d">Visitas e contatos</span><span class="lab-m">Visitas</span></button>
-    <button class="navbtn com-only" data-p="negoc" onclick="nav('negoc')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span><span class="lbl lab-d">Negociações</span><span class="lab-m">Negoc.</span><span class="nbadge" id="ng-badge" style="display:none"></span></button>
+    <button class="navbtn com-only" data-p="negoc" onclick="navMenu('negoc')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span><span class="lbl lab-d">Negociações</span><span class="lab-m">Negoc.</span><span class="nbadge" id="ng-badge" style="display:none"></span></button>
     <button class="navbtn com-only" data-p="produtos" onclick="navProd()"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl lab-d">Produtos</span><span class="lab-m">Produtos</span></button>
     <div class="subnav" id="sub-prod">
       <button class="navsub" data-a="catalogo" onclick="navProd('catalogo')"><span class="lbl">Catálogo</span></button>
@@ -684,7 +692,7 @@ main{min-width:0;overflow-x:clip}
     <button class="navbtn so-desk cm-only" data-p="cmrem" onclick="nav('cmrem')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h11v10H3zM14 9h4l3 3v4h-7M7.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM17.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg></span><span class="lbl">Remessa Comodato</span><span class="cnt" id="cnt-cmrem" hidden>0</span></button>
     <button class="navbtn so-desk cm-only" data-p="cmext" onclick="nav('cmext')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4a5 5 0 0 0-4.6 6.9L4 17.3V20h2.7l6.4-6.4A5 5 0 0 0 20 9l-3 1-2-2 1-3z"/></svg></span><span class="lbl">Manutenção Externa</span><span class="cnt" id="cnt-cmext" hidden>0</span></button>
     <div class="side-sec lbl">Pedidos</div>
-    <button class="navbtn" data-p="solic" onclick="nav('solic')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM3 7l9 6 9-6"/></svg></span><span class="lbl lab-d">Solicitações</span><span class="lab-m">Pedidos</span><span class="cnt" id="cntSol" hidden>0</span></button>
+    <button class="navbtn" data-p="solic" onclick="navMenu('solic')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM3 7l9 6 9-6"/></svg></span><span class="lbl lab-d">Solicitações</span><span class="lab-m">Pedidos</span><span class="cnt" id="cntSol" hidden>0</span></button>
     <div class="side-sec lbl admin-only">Ajustes</div>
     <button class="navbtn so-desk admin-only" data-p="importar" onclick="nav('importar')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></span><span class="lbl">Carteira pelo ERP</span></button>
     <button class="navbtn so-desk dono-only" data-p="usuarios" onclick="nav('usuarios')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 3 18.5V20M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM16 11l2 2 4-4"/></svg></span><span class="lbl">Usuários e níveis</span></button>
@@ -2040,13 +2048,22 @@ function ngAcTxt(a){
 /* acordo que ainda vale (este mês ou depois) — é o que pode ser encerrado */
 function ngAcordoAtivo(n){ return ngTemAcordo(n) && (!n.acordo.fim || n.acordo.fim>=mesAtual()); }
 /* faturamento do cliente no mês: da carteira (gestor e vendedor) ou, para quem não está na carteira, pelo nome no ERP (gestor) */
-function ngFat(n, mes){
-  var c=n.clienteId?clientePorId(n.clienteId):null, f=c?fatCliente(c):null;
-  if(!f && U.gestor && fatErp){ var e=n.erpId?erp[n.erpId]:null;
-    [n.clienteNome, e&&e.n, e&&e.nErp].filter(Boolean).some(function(nm){ return eqNomes(nm).some(function(k){ if(fatErp[k]){ f=fatErp[k]; return true; } return false; }); }); }
+/* clientes da negociação: o principal e os outros do mesmo acordo (rede com várias lojas) */
+function ngClientes(n){
+  return [{ clienteId:n.clienteId||'', erpId:n.erpId||'', nome:n.clienteNome||'' }].concat(n.clientesExtra||[]);
+}
+function ngNomeCurto(n){ var x=(n.clientesExtra||[]).length; return (n.clienteNome||'—')+(x?' + '+x+' cliente'+(x>1?'s':''):''); }
+function ngFat1(x, mes){
+  var c=x.clienteId?clientePorId(x.clienteId):null, f=c?fatCliente(c):null;
+  if(!f && U.gestor && fatErp){ var e=x.erpId?erp[x.erpId]:null;
+    [x.nome, e&&e.n, e&&e.nErp].filter(Boolean).some(function(nm){ return eqNomes(nm).some(function(k){ if(fatErp[k]){ f=fatErp[k]; return true; } return false; }); }); }
   if(!f) return null;
   if(f[mes]==null && fatMeses.indexOf(mes)<0) return null;    /* mês fora do que foi lido: não dá para dizer */
   return f[mes]||0;
+}
+function ngFat(n, mes){
+  var t=null; ngClientes(n).forEach(function(x){ var v=ngFat1(x, mes); if(v!=null) t=(t||0)+v; });
+  return t;
 }
 /* cálculo do mês: atingiu a meta? quanto de benefício? */
 function ngCalc(n, mes, fatManual){
@@ -2071,7 +2088,7 @@ function ngMesAtual(x){ return String(x||'').slice(0,7)===hoje().slice(0,7); }
 function ngCardHtml(n){
   var h=hoje(), venc=ngAndando(n) && n.prazo && n.prazo<h;
   return '<div class="card ng-card" onclick="verNegoc(\''+n.id+'\')">'
-    + '<div style="display:flex;justify-content:space-between;gap:8px"><div class="ng-cli">'+esc(n.clienteNome||'—')+(n.clienteNovo?' <span class="mini">· novo</span>':'')+'</div>'
+    + '<div style="display:flex;justify-content:space-between;gap:8px"><div class="ng-cli">'+esc(ngNomeCurto(n))+(n.clienteNovo?' <span class="mini">· novo</span>':'')+'</div>'
     + (n.valor?'<div class="ng-val">'+fmtRS0(n.valor)+'<span class="mini">/mês</span></div>':'')+'</div>'
     + '<div class="ng-tit">'+esc(n.titulo||'')+'</div>'
     + '<div class="ng-tags">'+(n.tipos||[]).map(function(t){ return '<span class="tag">'+esc(NG_TIPOS[t]||t)+'</span>'; }).join('')
@@ -2095,7 +2112,7 @@ function renderNegoc(){
   var base=negocs.filter(function(n){
     if(vend && n.donoUid!==vend) return false;
     if(tipo && (n.tipos||[]).indexOf(tipo)<0) return false;
-    if(q.length){ var t=norm([n.clienteNome, n.cidade, n.titulo, n.detalhes, n.produtos, n.concorrente, n.donoNome, n.proxPasso].join(' ')); if(q.some(function(w){ return t.indexOf(w)<0; })) return false; }
+    if(q.length){ var t=norm([n.clienteNome, (n.clientesExtra||[]).map(function(x){ return x.nome; }).join(' '), n.cidade, n.titulo, n.detalhes, n.produtos, n.concorrente, n.donoNome, n.proxPasso].join(' ')); if(q.some(function(w){ return t.indexOf(w)<0; })) return false; }
     return true;
   });
   /* indicadores */
@@ -2149,7 +2166,7 @@ function ngAcordosHtml(base){
     + '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll" style="max-height:none;border:none"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th>'
     + (U.gestor?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, m), pr=c.pct!=null?Math.min(1,c.pct):null;
-        return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(n.clienteNome||'—')+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
+        return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(ngNomeCurto(n))+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
           + '<td style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+(U.gestor?'<td>'+esc(n.donoNome||'—')+'</td>':'')
           + '<td>'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?ngBenVal(c.ben, a)+' <span class="mini">fixo</span>'
               : !(+a.meta>0) ? '<span class="mini">meta em produto · conferir no fim do mês</span>'
@@ -2195,7 +2212,7 @@ function ngAvalHtml(base){
         var acoes=!av ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'concedido\',this)">✓ Conceder</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'negado\',this)">✕ Não conceder</button>'
           : av.status==='concedido' ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'pago\',this)">'+(a.benTipo==='qtd'?'📦 Marcar enviado':'💸 Marcar pago')+'</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>'
           : '<button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>';
-        return '<tr><td class="eq-loja"><div class="nm"><a onclick="verNegoc(\''+k+'\')">'+esc(n.clienteNome||'—')+'</a></div><div class="eq-end">'+esc(a.forma||'')+'</div></td>'
+        return '<tr><td class="eq-loja"><div class="nm"><a onclick="verNegoc(\''+k+'\')">'+esc(ngNomeCurto(n))+'</a></div><div class="eq-end">'+esc(a.forma||'')+'</div></td>'
           + '<td style="white-space:normal;min-width:180px" class="mini">'+esc(a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a))+'</td><td>'+esc(n.donoNome||'—')+'</td>'
           + '<td class="r">'+fatIn+'</td><td>'+metaTxt+'</td><td class="r">'+benIn+'</td><td>'+ngStHtml(av)
           + (av&&av.nome?'<div class="mini">'+esc(av.nome.split(' ')[0])+' · '+fmtDia(String(av.em||'').slice(0,10))+'</div>':'')+'</td><td style="white-space:nowrap">'+acoes+'</td></tr>'; }).join('')
@@ -2240,7 +2257,7 @@ function ngAvalExcel(){
   carregarXLSX().then(function(){
     var aoa=[['Mês','Cliente','Vendedor','Acordo','Forma','Meta (R$)','Faturado (R$)','Bateu a meta','Benefício (R$)','Benefício em produto','Situação','Avaliado por','Pago / enviado em']];
     negocs.filter(function(n){ return ngVigente(n, mes); }).forEach(function(n){ var a=n.acordo, c=ngCalc(n, mes), av=c.av;
-      aoa.push([nomeMes(mes), n.clienteNome||'', n.donoNome||'', a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a), a.forma||'', a.tipo==='meta'?(+a.meta||0):'',
+      aoa.push([nomeMes(mes), ngClientes(n).map(function(x){ return x.nome; }).join(' + '), n.donoNome||'', a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a), a.forma||'', a.tipo==='meta'?(+a.meta||0):'',
         c.fat==null?'':c.fat, a.tipo==='fixo'?'sem condição':(c.atingiu===null?'conferir':(c.atingiu?'sim':'não')),
         a.benTipo==='qtd'?'':(av?(av.beneficio||0):(c.ben||0)), a.benTipo==='qtd'?ngQtdTxt(av?(av.beneficio||0):(c.ben||0), a.un, a.prod):'',
         av?(av.status==='pago'?'pago':av.status==='concedido'?'concedido (a enviar)':'não concedido'):'a avaliar', av?(av.nome||''):'', av&&av.pagoEm?fmtDia(String(av.pagoEm).slice(0,10)):'']); });
@@ -2251,7 +2268,7 @@ function ngAvalExcel(){
 }
 /* ficha do cliente: negociações dele */
 function ngFichaHtml(c){
-  var l=negocs.filter(function(n){ return n.clienteId===c.id || (c.erpId && n.erpId===c.erpId); })
+  var l=negocs.filter(function(n){ return ngClientes(n).some(function(x){ return x.clienteId===c.id || (c.erpId && x.erpId===c.erpId); }); })
     .sort(function(a,b){ return (ngAndando(b)?1:0)-(ngAndando(a)?1:0) || String(b.atualizadoEm||'').localeCompare(String(a.atualizadoEm||'')); });
   return '<div class="det-sec" style="display:flex;justify-content:space-between;align-items:center">Negociações'
     + '<button class="btn btn-sm btn-ghost" style="text-transform:none;letter-spacing:0" onclick="abrirNegoc(null,\''+esc(c.id)+'\')">+ Negociação</button></div>'
@@ -2271,7 +2288,10 @@ function abrirNegoc(id, clienteId){
   var sel=c ? pkSelDeCliente(c) : (n ? { clienteId:n.clienteId||'', erpId:n.erpId||'', nome:n.clienteNome||'', cidade:n.cidade||'', novo:!!n.clienteNovo } : null);
   var tipos=n ? (n.tipos||[]) : [];
   var vs=ngVendedores(), donoAtual=n ? n.donoUid : (c && c.donoUid && vs[c.donoUid] ? c.donoUid : U.uid);
+  NG.extra=n ? (n.clientesExtra||[]).slice() : [];
   var corpo='<div class="fld"><label>Cliente *</label><div id="ng-cli"></div></div>'
+    + '<div class="fld"><label>Outros clientes no mesmo acordo <span class="mini">(ex.: as outras lojas da rede — o faturado do mês soma todos)</span></label>'
+    +   '<div id="ng-extra-l" class="ng-extra-l"></div><div id="ng-cli2"></div></div>'
     + '<div class="fld"><label>O que está sendo negociado *</label><div class="chips" id="ng-tipos">'
     + Object.keys(NG_TIPOS).map(function(k){ return '<button type="button" class="chip'+(tipos.indexOf(k)>=0?' on':'')+'" data-v="'+k+'" onclick="this.classList.toggle(\'on\')">'+NG_TIPOS[k]+'</button>'; }).join('')+'</div></div>'
     + '<div class="fld"><label>Assunto *</label><input type="text" id="ng-tit" maxlength="120" placeholder="Ex.: Preço do pão francês para a rede" value="'+esc(n?n.titulo:'')+'"></div>'
@@ -2292,6 +2312,14 @@ function abrirNegoc(id, clienteId){
   abrirModal({ titulo:n?'Editar negociação':'Nova negociação', wide:true, corpo:corpo,
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:n?'Salvar':'Criar negociação', fn:salvarNegoc }] });
   NG.acEd=(n&&n.acordo)||null; ngAcPintar();
+  ngExtraPintar();
+  pkMontar('ng-cli2', { sel:null, novo:false, ph:'+ Adicionar outro cliente ao acordo…',
+    onSel:function(x){ if(!x) return;
+      var ja=ngClientes({ clienteId:(PK['ng-cli'].sel||{}).clienteId, erpId:(PK['ng-cli'].sel||{}).erpId, clienteNome:(PK['ng-cli'].sel||{}).nome, clientesExtra:NG.extra })
+        .some(function(y){ return (x.clienteId && y.clienteId===x.clienteId) || (x.erpId && y.erpId===x.erpId) || norm(y.nome)===norm(x.nome); });
+      if(ja) toast('Esse cliente já está no acordo.');
+      else NG.extra.push({ clienteId:x.clienteId||'', erpId:x.erpId||'', nome:x.nome||'', cidade:x.cidade||'' });
+      PK['ng-cli2'].sel=null; pkPintar('ng-cli2'); ngExtraPintar(); } });
   pkMontar('ng-cli', { sel:sel, novo:true, ph:'Nome do cliente (carteira, ERP ou novo)…',
     onSel:function(x){ var c2=x&&x.clienteId?clientePorId(x.clienteId):null; var sd=$('ng-dono');
       if(sd && c2 && c2.donoUid && vs[c2.donoUid]) sd.value=c2.donoUid;
@@ -2343,6 +2371,11 @@ function ngLerAcordo(){
   return { ok:true, acordo:ac };
 }
 function chipUnicoNg(b){ b.parentNode.querySelectorAll('.ng-et').forEach(function(x){ x.classList.toggle('on', x===b); }); }
+function ngExtraPintar(){
+  var box=$('ng-extra-l'); if(!box) return;
+  box.innerHTML=(NG.extra||[]).map(function(x, i){ return '<span class="ng-extra">'+esc(x.nome)+(x.cidade?' <small>· '+esc(x.cidade)+'</small>':'')
+    + '<button type="button" aria-label="Tirar '+esc(x.nome)+' do acordo" onclick="NG.extra.splice('+i+',1);ngExtraPintar()">×</button></span>'; }).join('');
+}
 function salvarNegoc(el){
   var n=NG.ed, sel=PK['ng-cli'] && PK['ng-cli'].sel;
   if(!sel){ toast('Escolha o cliente (ou cadastre como cliente novo).', true); var q=$('ng-cli-q'); if(q) q.focus(); return; }
@@ -2355,6 +2388,7 @@ function salvarNegoc(el){
   var d={ clienteId:sel.clienteId||'', erpId:sel.erpId||'', clienteNome:sel.nome||'', cidade:sel.cidade||(c&&c.cidade)||'', clienteNovo:!!sel.novo,
           tipos:tipos, titulo:tit, detalhes:$('ng-det').value.trim(), valor:val||0, concorrente:$('ng-conc').value.trim(),
           produtos:$('ng-prod').value.trim(), proxPasso:$('ng-pp').value.trim(), prazo:$('ng-prazo').value||'',
+          clientesExtra:(NG.extra||[]).slice(),
           donoUid:dono, donoNome:vs[dono]||(n&&n.donoNome)||U.nome||'', acordo:ac.acordo, atualizadoEm:agora, atualizadoPor:U.email,
           vendUid:vendDoCliente({ clienteId:sel.clienteId||'', erpId:sel.erpId||'', nome:sel.nome||'' }) };
   var pare=ocupado(el), pr;
@@ -2362,6 +2396,8 @@ function salvarNegoc(el){
     var mud=[]; if(n.titulo!==d.titulo) mud.push('assunto'); if((+n.valor||0)!==(d.valor||0)) mud.push('valor '+fmtRS0(d.valor||0));
     if((n.proxPasso||'')!==d.proxPasso || (n.prazo||'')!==d.prazo) mud.push('próximo passo'+(d.prazo?' até '+fmtDia(d.prazo):''));
     if(n.donoUid!==d.donoUid) mud.push('vendedor: '+d.donoNome);
+    var exA=(n.clientesExtra||[]).map(function(x){ return x.nome; }).join(', '), exB=d.clientesExtra.map(function(x){ return x.nome; }).join(', ');
+    if(exA!==exB) mud.push(exB ? 'outros clientes: '+exB : 'outros clientes retirados');
     if(JSON.stringify(n.acordo||null)!==JSON.stringify(d.acordo||null)) mud.push(d.acordo?'acordo: '+ngAcTxt(d.acordo):'acordo retirado');
     d.historico=(n.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome||U.email, acao:'editou', txt:mud.join(' · ') }]);
     pr=updateDoc(doc(db,'comNegociacoes',n.id), d);
@@ -2384,6 +2420,8 @@ function verNegoc(id){
   var corpo='<div class="ng-tags" style="margin:0 0 10px">'+(n.tipos||[]).map(function(t){ return '<span class="tag">'+esc(NG_TIPOS[t]||t)+'</span>'; }).join('')+'</div>'
     + '<div class="det">'
     + '<div><span>Cliente</span><b>'+(c?'<a style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="verCliente(\''+esc(c.id)+'\')">'+esc(n.clienteNome)+'</a>':esc(n.clienteNome||'—'))+(n.clienteNovo?' (novo)':'')+'</b></div>'
+    + ((n.clientesExtra||[]).length ? '<div><span>Outros clientes do acordo</span><b>'+(n.clientesExtra||[]).map(function(x){ var cx=x.clienteId?clientePorId(x.clienteId):null;
+        return cx ? '<a style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="verCliente(\''+esc(cx.id)+'\')">'+esc(x.nome)+'</a>' : esc(x.nome); }).join(', ')+'</b></div>' : '')
     + '<div><span>Valor estimado</span><b>'+(n.valor?fmtRS0(n.valor)+'/mês':'—')+'</b></div>'
     + '<div><span>Vendedor</span><b>'+esc(n.donoNome||'—')+'</b></div>'
     + '<div><span>Aberta em</span><b>'+(n.criadoEm?fmtDia(String(n.criadoEm).slice(0,10)):'—')+'</b></div>'
@@ -2514,7 +2552,7 @@ function buscaPintar(){
   var ok=function(t){ return q.every(function(w){ return t.indexOf(w)>=0; }); };
   var ini=function(n){ var p=String(n||'').replace(/[^A-Za-zÀ-ú ]/g,' ').split(' ').filter(function(w){ return w.length>2; }); return ((p[0]||'?')[0]+((p[1]||'')[0]||'')).toUpperCase(); };
   var cl=clientes.filter(function(c){ return ok(norm([c.nome,c.erpNome,c.cidade,rotaDe(c),c.donoNome].join(' '))); }).slice(0,8);
-  var ng=(negocs||[]).filter(function(n){ return ok(norm([n.clienteNome,n.titulo,n.produtos].join(' '))); }).slice(0,5);
+  var ng=(negocs||[]).filter(function(n){ return ok(norm([n.clienteNome,(n.clientesExtra||[]).map(function(x){ return x.nome; }).join(' '),n.titulo,n.produtos].join(' '))); }).slice(0,5);
   var pr=((catalogo&&catalogo.produtos)||[]).filter(function(p){ return ok(norm([p.nome,p.linha,p.codigo].join(' '))); }).slice(0,6);
   var h='';
   if(cl.length) h+='<div class="bg-sec">Clientes</div>'+cl.map(function(c){ return '<button class="bg-it" onclick="fecharModal();verCliente(\''+c.id+'\')"><span class="bg-av">'+esc(ini(c.nome))+'</span>'
@@ -2849,6 +2887,13 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   cmext:['Manutenção Externa','Conserto dos equipamentos nos clientes — pedidos à manutenção'] };
 var ACAO={ hoje:['+ Registrar contato','visita'], carteira:['+ Registrar contato','visita'], visitas:['+ Registrar contato','visita'], solic:['+ Nova solicitação','solic'],
   negoc:['+ Nova negociação','negoc'] };   /* Remessa / Manutenção: o botão de novo pedido fica na barra da própria lista */
+/* pelo menu: Solicitações já abre em "Todas" (para quem vê as de todos) e Negociações já em "Acordos".
+   Os atalhos (cartões do Hoje, avisos) continuam abrindo no filtro deles. */
+function navMenu(p){
+  if(p==='solic' && U.veSol) segSol='todas';
+  if(p==='negoc') NG.seg='acordos';
+  nav(p);
+}
 function nav(p){
   pagina=p;
   document.querySelectorAll('.navbtn').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-p')===p); });
@@ -2942,7 +2987,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
-Object.assign(window, { editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
+Object.assign(window, { navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
