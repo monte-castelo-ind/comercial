@@ -2774,6 +2774,7 @@ function juntarSols(){
   Object.keys(solFontes).forEach(function(k){ (solFontes[k]||[]).forEach(function(s){ m[s.id]=s; }); });
   sols=Object.keys(m).map(function(k){ return m[k]; })
     .sort(function(a,b){ return String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')); });
+  syncSolManut();
   render();
 }
 /* base de clientes do ERP (robô, uma vez por dia): nome, cidade, rota, última compra */
@@ -2941,7 +2942,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
-Object.assign(window, { abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
+Object.assign(window, { editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
@@ -4184,6 +4185,7 @@ function verVisita(id){
 var fs=null;
 function abrirSolic(tipo, clienteId){
   if(!U.comercial) return;
+  SOL_PEND=null;                       /* pedido novo comum: não está ligado a uma solicitação de vendedor */
   fs={ tipo:tipo||'' };
   var corpo='<label>O que você precisa? *</label><div class="tipos-sol" id="fs-tipos">'
     +TIPO_IDS.map(function(t){ return '<button type="button" class="tipo-sol'+(fs.tipo===t?' on':'')+'" onclick="fsTipo(\''+t+'\')">'+TIPOS[t].ico+' '+TIPOS[t].nome+'<small>'+TIPOS[t].dica+'</small></button>'; }).join('')+'</div>'
@@ -4255,19 +4257,30 @@ function verSolic(id){
     +'<div><span>Pedido por</span><b>'+esc(s.donoNome||s.donoEmail||'—')+'</b></div>'
     +'<div><span>Cliente</span><b>'+esc([s.clienteNome, s.clienteCidade].filter(Boolean).join(' · ')||'—')+'</b></div>';
   (t.campos||[]).forEach(function(c){ var v=(s.campos||{})[c[0]]; if(v) corpo+='<div><span>'+esc(c[1])+'</span><b>'+esc(v)+'</b></div>'; });
-  if(s.ordemId) corpo+='<div><span>OS no Campo</span><b id="sv-os">lendo…</b></div>';
+  if(s.ordemId && s.ordemApp==='comodato'){ var pd=cmLista.filter(function(x){ return x.id===s.ordemId; })[0];
+    corpo+='<div><span>Pedido à manutenção</span><b>'+(pd ? esc((CM_CAT[cmCatDe?cmCatDe(pd):pd.categoria]||{}).nome||'Pedido')+' · '+esc(solStManut(pd.status))
+      +' <a style="cursor:pointer;text-decoration:underline" onclick="fecharModal();cmVer(\''+pd.id+'\')">abrir</a>' : 'enviado')+'</b></div>'; }
+  else if(s.ordemId) corpo+='<div><span>OS no Campo</span><b id="sv-os">lendo…</b></div>';
+  if(s.editadoEm) corpo+='<div><span>Editada</span><b>'+esc(fmtQuando(s.editadoEm))+(s.editadoNome?' por '+esc(s.editadoNome):'')+'</b></div>';
   corpo+='</div>';
   if(s.descricao) corpo+='<div class="det-txt">'+esc(s.descricao)+'</div>';
   corpo+='<div class="det-sec">Andamento</div><div class="hist">'
     +(s.historico||[]).map(function(h){ var x=ST[h.st]; return '<div class="hist-it'+(x?' h-'+x[1]:'')+'"><small>'+fmtQuando(h.em)+' · '+esc(h.nome||h.por||'')+(x&&h.st?' · '+x[0]:'')+'</small><div>'+esc(h.txt||'')+'</div></div>'; }).join('')+'</div>';
-  if(resp || (dono && aberta)) corpo+='<div class="fld"><label>'+(resp?'Resposta / comentário':'Acrescentar informação')+'</label><textarea id="sv-txt"></textarea></div>';
+  var podeReabrir=respondo(s) && !aberta && s.status!=='cancelada';
+  if(resp || (dono && aberta) || podeReabrir) corpo+='<div class="fld"><label>'+(resp?'Resposta / comentário':podeReabrir?'Por que reabrir? (fica no andamento)':'Acrescentar informação')+'</label><textarea id="sv-txt"></textarea></div>';
   var bts=[];
+  var equipManut=(s.tipo==='equipamento');
   if(resp){
-    if(s.tipo==='equipamento' && !s.ordemId) bts.push({ txt:'🛠 Abrir OS no Campo', cls:'btn-ghost', fn:function(){ abrirOS(s.id); } });
+    if(U.gestor) bts.push({ txt:'✎ Editar', cls:'btn-ghost', fn:function(){ editarSolic(s.id); } });
     if(s.status==='aberta') bts.push({ txt:'Em andamento', cls:'btn-ghost', fn:function(el){ responder(s,'andamento',el); } });
     bts.push({ txt:'Só comentar', cls:'btn-ghost', fn:function(el){ responder(s,null,el); } });
     if(t.fim.indexOf('recusada')>=0) bts.push({ txt:'✕ Recusar', cls:'btn-red', fn:function(el){ responder(s,'recusada',el); } });
-    bts.push({ txt:t.fim[0]==='aprovada'?'✓ Aprovar':'✓ Concluir', fn:function(el){ responder(s,t.fim[0],el); } });
+    /* equipamento: quem responde aprova e reemite para a manutenção; a conclusão vem sozinha quando a manutenção
+       dá o serviço por feito (entregue). Concluir à mão só depois de enviado. */
+    if(equipManut && !(s.ordemId && s.ordemApp==='comodato')) bts.push({ txt:'✓ Aprovar e enviar à manutenção', fn:function(){ solEnviarManut(s); } });
+    else bts.push({ txt:t.fim[0]==='aprovada'?'✓ Aprovar':'✓ Concluir', fn:function(el){ responder(s,t.fim[0],el); } });
+  } else if(podeReabrir){
+    bts.push({ txt:'↺ Reabrir', fn:function(el){ reabrirSolic(s,el); } });
   } else if(dono && aberta){
     bts.push({ txt:'Cancelar solicitação', cls:'btn-ghost', fn:function(el){ cancelarSolic(s,el); } });
     bts.push({ txt:'Enviar informação', fn:function(el){ comentarDono(s,el); } });
@@ -4288,6 +4301,112 @@ function responder(s, st, el){
   updateDoc(doc(db,'comSolicitacoes',s.id), up)
     .then(function(){ toast('Resposta registrada.'); fecharModal(); })
     .catch(function(e){ pare(); falha('responder')(e); });
+}
+/* reabrir uma solicitação concluída ou recusada (quem responde aquele tipo): volta para "aberta", com o motivo */
+function reabrirSolic(s, el){
+  var txt=($('sv-txt')&&$('sv-txt').value.trim())||'';
+  if(!txt){ toast('Diga por que está reabrindo — fica no andamento.', true); var t=$('sv-txt'); if(t) t.focus(); return; }
+  var agora=agoraISO(), pare=ocupado(el);
+  updateDoc(doc(db,'comSolicitacoes',s.id), { status:'aberta', atualizadoEm:agora, respondidoPor:U.email, respondidoNome:U.nome, respondidoEm:agora,
+      historico:(s.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome, st:'aberta', txt:'Reaberta: '+txt }]) })
+    .then(function(){ toast('Solicitação reaberta.'); fecharModal(); })
+    .catch(function(e){ pare(); falha('reabrir')(e); });
+}
+/* gerente edita a solicitação aberta: o que mudou fica no andamento */
+function editarSolic(id){
+  var s=solPorId(id); if(!s || !U.gestor || !ABERTAS.includes(s.status)) return;
+  var t=TIPOS[s.tipo]||{ campos:[] };
+  var corpo='<div class="fld"><label>Cliente</label><div id="se-cli"></div></div>'
+    + '<div class="fld"><label>Assunto *</label><input type="text" id="se-tit" value="'+esc(s.titulo||'')+'"></div>'
+    + (t.campos||[]).map(function(c){ return '<div class="fld"><label>'+esc(c[1])+'</label><input type="text" data-k="'+c[0]+'" class="se-campo" value="'+esc((s.campos||{})[c[0]]||'')+'"></div>'; }).join('')
+    + '<div class="fld"><label>Detalhes</label><textarea id="se-desc" rows="3">'+esc(s.descricao||'')+'</textarea></div>'
+    + '<div class="mini">Tudo o que for alterado fica registrado no andamento, com o que era antes.</div>';
+  abrirModal({ titulo:'Editar solicitação', sub:esc((s.donoNome||'')+' · aberta em '+fmtQuando(s.criadoEm)), wide:true, corpo:corpo,
+    botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:function(){ verSolic(id); } }, { txt:'Salvar', fn:function(el){ salvarEdicaoSolic(id, el); } }] });
+  pkMontar('se-cli', { sel:s.clienteNome?{ clienteId:s.clienteId||'', erpId:s.clienteErpId||'', nome:s.clienteNome, cidade:s.clienteCidade||'', novo:!!s.clienteNovo }:null, novo:true });
+}
+function salvarEdicaoSolic(id, el){
+  var s=solPorId(id); if(!s) return;
+  var tit=$('se-tit').value.trim(); if(!tit){ toast('Escreva o assunto.', true); return; }
+  var sel=PK['se-cli'] && PK['se-cli'].sel;
+  var campos={}; document.querySelectorAll('.se-campo').forEach(function(i){ var v=i.value.trim(); if(v) campos[i.getAttribute('data-k')]=v; });
+  var desc=$('se-desc').value.trim(), t=TIPOS[s.tipo]||{ campos:[] }, mud=[];
+  var antes=function(a, b, rot){ a=a||''; b=b||''; if(a!==b) mud.push(rot+': “'+(a||'—')+'” → “'+(b||'—')+'”'); };
+  antes(s.titulo, tit, 'Assunto');
+  (t.campos||[]).forEach(function(c){ antes((s.campos||{})[c[0]], campos[c[0]], c[1]); });
+  antes(s.descricao, desc, 'Detalhes');
+  var novoCli=sel ? sel.nome : '';
+  antes(s.clienteNome, novoCli, 'Cliente');
+  if(!mud.length){ toast('Nada mudou.'); verSolic(id); return; }
+  var agora=agoraISO();
+  var up={ titulo:tit, descricao:desc, campos:campos,
+           clienteId:sel?sel.clienteId||'':'', clienteErpId:sel?sel.erpId||'':'', clienteNome:novoCli, clienteCidade:sel?sel.cidade||'':'', clienteNovo:!!(sel&&sel.novo),
+           editadoPor:U.email, editadoNome:U.nome, editadoEm:agora, atualizadoEm:agora,
+           historico:(s.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome, st:'', txt:'Editou — '+mud.join('; ') }]) };
+  var pare=ocupado(el);
+  updateDoc(doc(db,'comSolicitacoes',id), up).then(function(){ toast('Solicitação editada.'); fecharModal(); })
+    .catch(function(e){ pare(); if(e.code==='permission-denied') toast('A regra do banco ainda não permite editar (publique as regras novas).', true); else falha('editar a solicitação')(e); });
+}
+/* ---------- equipamento: aprovar e reemitir para a manutenção ---------- */
+var SOL_PEND=null;
+function solStManut(st){ return ({ aberta:'aguardando a manutenção', separacao:'em separação', entregue:'serviço feito', cancelada:'cancelado pela manutenção',
+                                   autorizacao:'aguardando a diretoria', recusada:'recusado pela diretoria' })[st] || st || ''; }
+function solEnviarManut(s){
+  if(!U.comodato){ toast('Para enviar à manutenção, sua conta precisa da chave "Pedir equipamento (comercial)".', true); return; }
+  var c=s.clienteId ? clientePorId(s.clienteId) : null;
+  abrirSolic('equipamento', c?c.id:null);
+  SOL_PEND={ id:s.id };                /* depois do abrirSolic, que limpa */
+  setTimeout(function(){
+    if(!c && s.clienteNome && PK['fs-cli']){ PK['fs-cli'].sel={ clienteId:'', erpId:s.clienteErpId||'', nome:s.clienteNome, cidade:s.clienteCidade||'', novo:!!s.clienteNovo };
+      pkPintar('fs-cli'); if(PK['fs-cli'].onSel) PK['fs-cli'].onSel(PK['fs-cli'].sel); }
+    var txt=norm([(s.campos||{}).servico, s.titulo, s.descricao].join(' '));
+    var serv=/CONSERT|ARRUM|REPAR|MANUTEN|QUEBR|DEFEIT/.test(txt)?'consertar':/TROC/.test(txt)?'trocar':/RETIR|RECOLH/.test(txt)?'retirar':'entregar';
+    var cat=serv==='consertar'?'externa':'remessa';
+    var bt=document.querySelector('#cm-cat .chip[data-v="'+cat+'"]'); if(bt) cmCat(bt);
+    var sv=$('cm-serv'); if(sv) sv.value=serv;
+    var eqTxt=norm((s.campos||{}).equipamento||'')+' '+txt;
+    var opc=CM_TIPOS.filter(function(x){ return eqTxt.indexOf(norm(x))>=0; })[0];
+    var lin=document.querySelector('#cm-itens .cm-it'), n=lin&&lin.getAttribute('data-i');
+    if(n!=null){
+      var se=$('cm-eq-'+n); if(se){ se.value=opc||'__outro'; cmEqMudou(n); }
+      if(!opc && $('cm-outro-'+n)) $('cm-outro-'+n).value=(s.campos||{}).equipamento||'';
+      var mq=txt.match(/\b(\d{1,2})\b/); if($('cm-qtd-'+n)) $('cm-qtd-'+n).value=mq?mq[1]:1;
+    }
+    if($('cm-obs')) $('cm-obs').value=[s.descricao, (s.campos||{}).servico, 'Pedido do vendedor '+(s.donoNome||'')+' em '+fmtQuando(s.criadoEm)].filter(Boolean).join(' — ');
+    toast('Confira os dados (equipamento, serviço, data) e envie para a manutenção.');
+  }, 80);
+}
+function solPedidoCriado(pedId, d){
+  var P=SOL_PEND; SOL_PEND=null; if(!P || !pedId) return;
+  var s=solPorId(P.id); if(!s) return;
+  var agora=agoraISO(), cat=(CM_CAT[d.categoria]||{}).nome||'manutenção';
+  updateDoc(doc(db,'comSolicitacoes',s.id), { status:'andamento', ordemId:pedId, ordemApp:'comodato', atualizadoEm:agora,
+      respondidoPor:U.email, respondidoNome:U.nome, respondidoEm:agora,
+      historico:(s.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome, st:'andamento', txt:'Aprovado e enviado à manutenção ('+cat+')' }]) })
+    .then(function(){ toast('Solicitação do vendedor ligada ao pedido da manutenção.'); })
+    .catch(falha('ligar a solicitação ao pedido da manutenção'));
+}
+/* quando a manutenção dá o serviço por feito (entregue), a solicitação do vendedor conclui sozinha;
+   se a manutenção cancelar, volta para "aberta" para quem responde rever. Roda para quem responde equipamento. */
+var _solSyncFeito={};
+function syncSolManut(){
+  if(meusTipos.indexOf('equipamento')<0 || !cmLista.length) return;
+  var porId={}; cmLista.forEach(function(x){ porId[x.id]=x; });
+  sols.forEach(function(s){
+    if(s._cm || s.tipo!=='equipamento' || s.ordemApp!=='comodato' || !s.ordemId || !ABERTAS.includes(s.status)) return;
+    var pd=porId[s.ordemId]; if(!pd) return;
+    var st=null, txt='';
+    if(pd.status==='entregue'){ var qd=pd.entregueEm||pd.atualizadoEm; if(typeof qd==='number') qd=new Date(qd).toISOString();
+      st='concluida'; txt='Serviço realizado pela manutenção'+(qd?' ('+fmtQuando(qd)+')':''); }
+    else if(pd.status==='cancelada' || pd.status==='recusada'){ st='aberta'; txt='O pedido à manutenção foi '+(pd.status==='cancelada'?'cancelado':'recusado pela diretoria')+' — rever'; }
+    if(!st || (st==='aberta' && s.status==='aberta' && !s.ordemId)) return;
+    var chave=s.id+'>'+st+'>'+s.ordemId; if(_solSyncFeito[chave]) return; _solSyncFeito[chave]=1;   /* uma vez por sessão */
+    var agora=agoraISO(), up={ status:st, atualizadoEm:agora, respondidoPor:U.email, respondidoNome:U.nome, respondidoEm:agora,
+      historico:(s.historico||[]).concat([{ em:agora, por:U.email, nome:U.nome, st:st, txt:txt }]) };
+    if(st==='concluida') up.resposta=txt; else { up.ordemId=''; up.ordemApp=''; }
+    s.status=st; if(st!=='concluida'){ s.ordemId=''; }
+    updateDoc(doc(db,'comSolicitacoes',s.id), up).catch(function(e){ console.warn('concluir solicitação pela manutenção:', e); });
+  });
 }
 function comentarDono(s, el){
   var txt=($('sv-txt')&&$('sv-txt').value.trim())||'';
@@ -4471,18 +4590,18 @@ function cmSalvar(el){
     status:'aberta', solicitadoPor:U.email, solicitadoNome:U.nome, solicitadoUid:U.uid,
     criadoEm:agora, atualizadoEm:agora, historico:[{ em:agora, por:U.email, nome:U.nome, acao:'pediu' }] }, cmResumoItens(its));
   if(its.length>1) d.itens=its;
-  var pare=ocupado(el,'Enviando…'), pr;
+  var pare=ocupado(el,'Enviando…'), pr, pedId='';
   if($('cm-novo') && $('cm-novo').checked){
     /* equipamento NOVO: o pedido e a autorização nascem juntos (um lote só);
        a manutenção só vê para separar depois que a diretoria assina */
-    var solRef=doc(collection(db,'comodatoSolicitacoes')), autRef=doc(collection(db,'assinaturas'));
+    var solRef=doc(collection(db,'comodatoSolicitacoes')), autRef=doc(collection(db,'assinaturas')); pedId=solRef.id;
     var val=numBR(g('cm-val'))||0;
     d.status='autorizacao'; d.novo=true; d.autorizacaoId=autRef.id; if(val>0) d.valorEstimado=val;
     d.historico=[{ em:agora, por:U.email, nome:U.nome, acao:'pediu equipamento novo (vai para a autorização da diretoria)' }];
     var gravarNovo=function(dd){ var lote=writeBatch(db); lote.set(solRef, dd); lote.set(autRef, cmAutDados(dd, solRef.id, val)); return lote.commit(); };
     pr=cmComReserva(d, gravarNovo);
-  } else pr=cmComReserva(d, function(dd){ return setDoc(doc(collection(db,'comodatoSolicitacoes')), dd); });
-  pr.then(function(){ toast(d.novo?'Pedido enviado. Aguarda a autorização da diretoria.':'Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); else if(pagina==='cmrem'||pagina==='cmext') render(); eqRetiradaEnviada(); })
+  } else { var pedRef=doc(collection(db,'comodatoSolicitacoes')); pedId=pedRef.id; pr=cmComReserva(d, function(dd){ return setDoc(pedRef, dd); }); }
+  pr.then(function(){ toast(d.novo?'Pedido enviado. Aguarda a autorização da diretoria.':'Pedido enviado para a manutenção.'); fecharModal(); segSol='minhas'; if(pagina==='solic') renderSolic(); else if(pagina==='cmrem'||pagina==='cmext') render(); eqRetiradaEnviada(); solPedidoCriado(pedId, d); })
     .catch(function(e){ pare(); if(e.code==='permission-denied') toast(d.itens?CM_MSG_VARIOS:'Sem permissão para pedir equipamento à manutenção. Peça a chave na Gestão → Acessos.', true); else falha('enviar o pedido')(e); });
 }
 /* Os campos "categoria" e "clienteNovo" são novos no pedido. Se a regra do
