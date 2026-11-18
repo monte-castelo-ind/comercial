@@ -674,7 +674,8 @@ tr.ct-sel td{background:color-mix(in srgb,var(--primary) 7%,transparent)}
   #ng-lista table.eq-tab tr{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 14px;margin-bottom:10px}
   #ng-lista table.eq-tab td{border:none!important;padding:3px 0!important;text-align:left!important;white-space:normal!important;min-width:0!important}
   #ng-lista table.eq-tab tbody{display:grid;grid-template-columns:1fr;gap:0}
-  #ng-lista table.eq-tab tr{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}
+  #ng-lista table.eq-tab tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:14px}
+  #ng-lista table.eq-tab td{min-width:0!important;overflow-wrap:anywhere;word-break:break-word}
   #ng-lista table.eq-tab td.eq-loja,#ng-lista table.eq-tab td[data-l="Acordo"],#ng-lista table.eq-tab td:last-child:not([data-l]){grid-column:1 / -1}
   #ng-lista table.eq-tab td[data-l]::before{content:attr(data-l);display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;margin-bottom:1px}
   #ng-lista table.eq-tab td:last-child:not([data-l]){padding-top:8px!important;display:flex;flex-wrap:wrap;gap:6px}
@@ -2083,6 +2084,8 @@ function ngAndando(n){ return ['aberta','proposta','aguardando'].indexOf(n.etapa
 var NG_FORMAS=['Bonificação em produto','Desconto no boleto','Depósito / Pix','Outro'];
 function mesAtual(){ return hoje().slice(0,7); }
 function mesAnterior(){ var d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
+/* nome de quem é dono da negociação: quando ficou gravado o e-mail, mostra só a parte antes do @ */
+function nomeVend(x){ x=String(x||'').trim(); if(!x) return '—'; return x.indexOf('@')>0 ? x.split('@')[0] : x; }
 function mesAntesDe(ym){ var p=String(ym||'').split('-'), y=+p[0], m=+p[1]; if(!y||!m) return mesAnterior(); m--; if(m<1){ m=12; y--; } return y+'-'+pad(m); }
 function ngTemAcordo(n){ return !!(n.acordo && n.acordo.tipo && n.etapa==='ganha'); }
 function ngVigente(n, mes){ if(!ngTemAcordo(n)) return false; var a=n.acordo; return (!a.inicio || a.inicio<=mes) && (!a.fim || a.fim>=mes); }
@@ -2230,7 +2233,7 @@ function ngAcordosHtml(base){
     + ((U.gestor||U.ngTodas)?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, m), pr=c.pct!=null?Math.min(1,c.pct):null;
         return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(ngNomeCurto(n))+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
-          + '<td data-l="Acordo" style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+((U.gestor||U.ngTodas)?'<td data-l="Vendedor">'+esc(n.donoNome||'—')+'</td>':'')
+          + '<td data-l="Acordo" style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+((U.gestor||U.ngTodas)?'<td data-l="Vendedor">'+esc(nomeVend(n.donoNome))+'</td>':'')
           + '<td data-l="'+nomeMes(m)+' (até hoje)">'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?ngBenVal(c.ben, a)+' <span class="mini">fixo</span>'
               : !(+a.meta>0) ? '<span class="mini">meta em produto · conferir no fim do mês</span>'
               : (c.fat==null?'<span class="mini">sem faturamento</span>':fmtRS0(c.fat)+' <span class="mini">de '+fmtRS0(a.meta)+' ('+Math.round(c.pct*100)+'%)</span>'
@@ -2281,7 +2284,7 @@ function ngAvalHtml(base){
           : av.status==='concedido' ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'pago\',this)">'+(a.benTipo==='qtd'?'📦 Marcar enviado':'💸 Marcar pago')+'</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>'
           : '<button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>';
         return '<tr><td class="eq-loja"><div class="nm"><a onclick="verNegoc(\''+k+'\')">'+esc(ngNomeCurto(n))+'</a></div><div class="eq-end">'+esc(a.forma||'')+'</div></td>'
-          + '<td data-l="Acordo" style="white-space:normal;min-width:180px" class="mini">'+esc(a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a))+'</td><td data-l="Vendedor">'+esc(n.donoNome||'—')+'</td>'
+          + '<td data-l="Acordo" style="white-space:normal;min-width:180px" class="mini">'+esc(a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a))+'</td><td data-l="Vendedor">'+esc(nomeVend(n.donoNome))+'</td>'
           + '<td data-l="Faturado no mês" class="r">'+fatIn+'</td><td data-l="Meta">'+metaTxt+'</td><td data-l="Benefício" class="r">'+benIn+'</td><td data-l="Situação">'+ngStHtml(av)
           + (av&&av.nome?'<div class="mini">'+esc(av.nome.split(' ')[0])+' · '+fmtDia(String(av.em||'').slice(0,10))+'</div>':'')
           + (av&&av.status==='pago'&&av.pagoEm?'<div class="mini">pago: '+esc(String(av.pagoNome||av.pagoPor||'').split(/[ @]/)[0])+' · '+fmtDia(String(av.pagoEm).slice(0,10))+'</div>':'')
