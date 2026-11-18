@@ -4269,7 +4269,8 @@ var fs=null;
 function abrirSolic(tipo, clienteId){
   if(!U.comercial) return;
   SOL_PEND=null;                       /* pedido novo comum: não está ligado a uma solicitação de vendedor */
-  fs={ tipo:tipo||'' };
+  /* sem tipo escolhido, já abre em "Equipamento / manutenção" (o pedido mais comum); dá para trocar no topo */
+  fs={ tipo:tipo||'equipamento' };
   var corpo='<label>O que você precisa? *</label><div class="tipos-sol" id="fs-tipos">'
     +TIPO_IDS.map(function(t){ return '<button type="button" class="tipo-sol'+(fs.tipo===t?' on':'')+'" onclick="fsTipo(\''+t+'\')">'+TIPOS[t].ico+' '+TIPOS[t].nome+'<small>'+TIPOS[t].dica+'</small></button>'; }).join('')+'</div>'
     +'<div class="fld"><label id="fs-cli-lab">Cliente</label><div id="fs-cli"></div>'
