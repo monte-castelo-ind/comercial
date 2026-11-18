@@ -2029,6 +2029,7 @@ function ngAndando(n){ return ['aberta','proposta','aguardando'].indexOf(n.etapa
 var NG_FORMAS=['Bonificação em produto','Desconto no boleto','Depósito / Pix','Outro'];
 function mesAtual(){ return hoje().slice(0,7); }
 function mesAnterior(){ var d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); return d.getFullYear()+'-'+pad(d.getMonth()+1); }
+function mesAntesDe(ym){ var p=String(ym||'').split('-'), y=+p[0], m=+p[1]; if(!y||!m) return mesAnterior(); m--; if(m<1){ m=12; y--; } return y+'-'+pad(m); }
 function ngTemAcordo(n){ return !!(n.acordo && n.acordo.tipo && n.etapa==='ganha'); }
 function ngVigente(n, mes){ if(!ngTemAcordo(n)) return false; var a=n.acordo; return (!a.inicio || a.inicio<=mes) && (!a.fim || a.fim>=mes); }
 var NG_UN=['pacotes','caixas','unidades','kg','fardos'];
@@ -2042,11 +2043,11 @@ function ngBenVal(v, a){ return (a && a.benTipo==='qtd') ? ngQtdTxt(v||0, a.un) 
 function ngAcTxt(a){
   if(!a || !a.tipo) return '';
   return (a.tipo==='meta' ? (a.meta>0 ? 'Meta '+fmtRS0(a.meta)+'/mês' : 'Meta'+(a.obs?' ('+a.obs+')':' (ver observação)'))+' → '+ngBenTxt(a) : 'Fixo todo mês: '+ngBenTxt(a))
-    + (a.forma?' · '+a.forma:'') + (a.inicio?' · de '+nomeMes(a.inicio):'') + (a.fim?' a '+nomeMes(a.fim):' (sem fim)')
+    + (a.forma?' · '+a.forma:'') + (a.semVigencia ? ' · não valeu nenhum mês' : (a.inicio?' · de '+nomeMes(a.inicio):'') + (a.fim?' a '+nomeMes(a.fim):' (sem fim)'))
     + (a.encerradoEm?' · encerrado em '+fmtDia(String(a.encerradoEm).slice(0,10)):'');
 }
 /* acordo que ainda vale (este mês ou depois) — é o que pode ser encerrado */
-function ngAcordoAtivo(n){ return ngTemAcordo(n) && (!n.acordo.fim || n.acordo.fim>=mesAtual()); }
+function ngAcordoAtivo(n){ return ngTemAcordo(n) && !n.acordo.encerradoEm && (!n.acordo.fim || n.acordo.fim>=mesAtual()); }
 /* faturamento do cliente no mês: da carteira (gestor e vendedor) ou, para quem não está na carteira, pelo nome no ERP (gestor) */
 /* clientes da negociação: o principal e os outros do mesmo acordo (rede com várias lojas) */
 function ngClientes(n){
@@ -2159,8 +2160,9 @@ function renderNegoc(){
 /* acordos em vigor: o mês corrente andando e o último mês avaliado */
 function ngAcordosHtml(base){
   var lista=$('ng-lista'), m=mesAtual(), ma=mesAnterior();
-  var vigor=base.filter(function(n){ return ngVigente(n, m) || ngVigente(n, ma); });
-  var enc=base.filter(function(n){ return ngTemAcordo(n) && !ngVigente(n, m) && !ngVigente(n, ma); });
+  var encerrado=function(n){ return !!(n.acordo && n.acordo.encerradoEm); };
+  var vigor=base.filter(function(n){ return !encerrado(n) && (ngVigente(n, m) || ngVigente(n, ma)); });
+  var enc=base.filter(function(n){ return ngTemAcordo(n) && (encerrado(n) || (!ngVigente(n, m) && !ngVigente(n, ma))); });
   var ver=NG.acVer||'vigor';
   var seg='<div class="seg" style="margin-bottom:10px"><button class="'+(ver==='vigor'?'on':'')+'" onclick="NG.acVer=\'vigor\';renderNegoc()">Em vigor ('+vigor.length+')</button>'
     + '<button class="'+(ver==='enc'?'on':'')+'" onclick="NG.acVer=\'enc\';renderNegoc()">Encerrados ('+enc.length+')</button></div>';
@@ -2531,17 +2533,23 @@ function ngEncerrar(id){
   var sug=(a.inicio && a.inicio>ma) ? a.inicio : ma;
   abrirModal({ titulo:'Encerrar acordo', sub:esc(n.clienteNome||''),
     corpo:'<div class="det-txt" style="margin-bottom:12px">🤝 '+esc(ngAcTxt(a))+'</div>'
+      + '<label class="chk" style="margin-bottom:10px"><input type="checkbox" id="ng-enc-nada" onchange="var i=document.getElementById(\'ng-enc-mes\'); i.disabled=this.checked;">'
+      + ' Não vale nenhum mês (lançado por engano ou substituído por outro acordo)</label>'
       + '<div class="fld"><label>Último mês em que o acordo vale *</label><input type="month" id="ng-enc-mes" value="'+sug+'"></div>'
-      + '<div class="mini" style="margin-bottom:10px">Depois desse mês, o acordo sai de “Acordos em vigor” e da “Avaliação do mês”. '
+      + '<div class="mini" style="margin-bottom:10px">O acordo sai de “Em vigor” <b>na hora</b> e vai para “Encerrados”. Os meses até o último escolhido '
+      + 'ainda aparecem na “Avaliação do mês” para conceder. '
       + (avMa ? nomeMes(ma)+' já foi avaliado e fica no histórico.' : 'Se '+nomeMes(ma)+' não deve ser avaliado, escolha um mês antes dele.')+'</div>'
       + '<div class="fld"><label>Motivo</label><input type="text" id="ng-enc-mot" maxlength="160" placeholder="Ex.: substituído pelo acordo de nov/26; cliente parou de comprar"></div>',
     botoes:[{ txt:'Voltar', cls:'btn-ghost', fn:function(){ verNegoc(id); } }, { txt:'Encerrar acordo', fn:function(el){
-      var fim=($('ng-enc-mes')||{}).value||''; if(!fim){ toast('Escolha o último mês.', true); return; }
+      var nada=!!(($('ng-enc-nada')||{}).checked);
+      var fim=nada ? mesAntesDe(a.inicio||mesAtual()) : (($('ng-enc-mes')||{}).value||'');
+      if(!fim){ toast('Escolha o último mês.', true); return; }
       var mot=(($('ng-enc-mot')||{}).value||'').trim(), agora=agoraISO();
       var novo=Object.assign({}, a, { fim:fim, encerradoEm:agora, encerradoPor:U.email, encerradoNome:U.nome||U.email, motivoEnc:mot });
       var pare=ocupado(el);
-      ngGravar(n, { acordo:novo }, 'encerrou o acordo', 'vale até '+nomeMes(fim)+(mot?' — '+mot:''))
-        .then(function(){ toast('Acordo encerrado: vale até '+nomeMes(fim)+'.'); setTimeout(function(){ verNegoc(id); }, 150); })
+      if(nada) novo.semVigencia=true;
+      ngGravar(n, { acordo:novo }, 'encerrou o acordo', (nada?'não vale nenhum mês':'vale até '+nomeMes(fim))+(mot?' — '+mot:''))
+        .then(function(){ toast(nada?'Acordo encerrado: não vale nenhum mês.':'Acordo encerrado: vale até '+nomeMes(fim)+'. Foi para “Encerrados”.'); setTimeout(function(){ verNegoc(id); }, 150); })
         .catch(function(e){ pare(); falha('encerrar o acordo')(e); });
     } }] });
 }
