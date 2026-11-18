@@ -761,7 +761,7 @@ main{min-width:0;overflow-x:clip}
         <div class="seg" id="ng-seg">
           <button class="on" data-s="and" onclick="ngSeg('and')">Em andamento</button>
           <button data-s="acordos" onclick="ngSeg('acordos')">Acordos</button>
-          <button data-s="aval" class="gestor-only" style="display:none" onclick="ngSeg('aval')">Avaliação do mês</button>
+          <button data-s="aval" class="gestor-only ngtodas-vis" style="display:none" onclick="ngSeg('aval')">Avaliação do mês</button>
           <button data-s="ganha" onclick="ngSeg('ganha')">Ganhas</button>
           <button data-s="perdida" onclick="ngSeg('perdida')">Perdidas</button>
         </div>
@@ -2108,6 +2108,7 @@ function ngCardHtml(n){
 }
 function renderNegoc(){
   var lista=$('ng-lista'); if(!lista) return;
+  document.querySelectorAll('.ngtodas-vis').forEach(function(b){ if(U.gestor||U.ngTodas) b.style.display=''; });
   if(negocsErro){ lista.innerHTML='<div class="alert a-err">⚠ '+esc(negocsErro)+'</div>'; return; }
   var sv=$('ng-vend'); if(sv) sv.style.display=(U.gestor||U.ngTodas)?'':'none';
   var vend=selVendedor('ng-vend', negocs, U.ngTodas);
@@ -2184,7 +2185,8 @@ function ngAcordosHtml(base){
 /* avaliação do mês (diretoria e gerentes): faturado × meta, benefício, conceder / não conceder / pago */
 function ngAvalHtml(base){
   var lista=$('ng-lista');
-  if(!U.gestor){ lista.innerHTML='<div class="empty">A avaliação é da diretoria e dos gerentes.</div>'; return; }
+  if(!U.gestor && !U.ngTodas){ lista.innerHTML='<div class="empty">A avaliação é da diretoria e dos gerentes.</div>'; return; }
+  var soPaga=!U.gestor;       /* analista (Acordos de todos): vê tudo, só marca pago / desfaz o pago */
   var meses=[]; for(var i=1;i<=6;i++){ var d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-i); meses.push(d.getFullYear()+'-'+pad(d.getMonth()+1)); }
   meses.unshift(mesAtual());
   if(!NG.mesAval) NG.mesAval=mesAnterior();
@@ -2209,19 +2211,25 @@ function ngAvalHtml(base){
     + '<th class="r">Faturado no mês</th><th>Meta</th><th class="r">Benefício</th><th>Situação</th><th></th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, mes), av=c.av, k=n.id;
         var fatIn='<input class="ng-in" id="ngf-'+k+'" inputmode="decimal" value="'+(c.fat!=null?String(Math.round(c.fat*100)/100).replace('.',','):'')+'" placeholder="informar" '
-          + (av?'disabled':'oninput="ngRecalc(\''+k+'\')"')+'>';
-        var benIn='<input class="ng-in" id="ngb-'+k+'" inputmode="decimal" value="'+(av?String(av.beneficio||0).replace('.',','):(c.ben!=null?String(c.ben).replace('.',','):''))+'" '+(av?'disabled':'')+'>'
+          + ((av||soPaga)?'disabled':'oninput="ngRecalc(\''+k+'\')"')+'>';
+        var benIn='<input class="ng-in" id="ngb-'+k+'" inputmode="decimal" value="'+(av?String(av.beneficio||0).replace('.',','):(c.ben!=null?String(c.ben).replace('.',','):''))+'" '+((av||soPaga)?'disabled':'')+'>'
           + (a.benTipo==='qtd'?'<div class="mini">'+esc((a.un||'pacotes')+(a.prod?' de '+a.prod:''))+'</div>':'');
         var metaTxt=a.tipo==='fixo' ? '<span class="mini">sem condição</span>'
           : !(+a.meta>0) ? '<span class="mini">'+esc(a.obs||'meta em produto')+'<br>conferir se bateu</span>'
           : fmtRS0(a.meta)+'<div id="ngm-'+k+'">'+(c.pct!=null?'<span class="'+(c.atingiu?'':'ng-venc')+'" style="font-size:11.5px">'+Math.round(c.pct*100)+'% · '+(c.atingiu?'bateu':'não bateu')+'</span>':'<span class="mini">informe o faturado</span>')+'</div>';
-        var acoes=!av ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'concedido\',this)">✓ Conceder</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'negado\',this)">✕ Não conceder</button>'
+        var acoes=soPaga ? (!av ? '<span class="mini">aguarda a diretoria</span>'
+            : av.status==='concedido' ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'pago\',this)">'+(a.benTipo==='qtd'?'📦 Marcar enviado':'💸 Marcar pago')+'</button>'
+            : av.status==='pago' ? '<button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">não foi pago</button>'
+            : '<span class="mini">não concedido</span>')
+          : !av ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'concedido\',this)">✓ Conceder</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'negado\',this)">✕ Não conceder</button>'
           : av.status==='concedido' ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'pago\',this)">'+(a.benTipo==='qtd'?'📦 Marcar enviado':'💸 Marcar pago')+'</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>'
           : '<button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>';
         return '<tr><td class="eq-loja"><div class="nm"><a onclick="verNegoc(\''+k+'\')">'+esc(ngNomeCurto(n))+'</a></div><div class="eq-end">'+esc(a.forma||'')+'</div></td>'
           + '<td style="white-space:normal;min-width:180px" class="mini">'+esc(a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a))+'</td><td>'+esc(n.donoNome||'—')+'</td>'
           + '<td class="r">'+fatIn+'</td><td>'+metaTxt+'</td><td class="r">'+benIn+'</td><td>'+ngStHtml(av)
-          + (av&&av.nome?'<div class="mini">'+esc(av.nome.split(' ')[0])+' · '+fmtDia(String(av.em||'').slice(0,10))+'</div>':'')+'</td><td style="white-space:nowrap">'+acoes+'</td></tr>'; }).join('')
+          + (av&&av.nome?'<div class="mini">'+esc(av.nome.split(' ')[0])+' · '+fmtDia(String(av.em||'').slice(0,10))+'</div>':'')
+          + (av&&av.status==='pago'&&av.pagoEm?'<div class="mini">pago: '+esc(String(av.pagoNome||av.pagoPor||'').split(/[ @]/)[0])+' · '+fmtDia(String(av.pagoEm).slice(0,10))+'</div>':'')
+          + '</td><td style="white-space:nowrap">'+acoes+'</td></tr>'; }).join('')
     + '</tbody></table></div></div>'
     + '<div class="mini" style="margin-top:8px">O faturado vem do ERP (pelo nome do cliente); dá para corrigir antes de conceder — por exemplo, numa rede com várias lojas. Depois de concedido, o valor fica gravado no histórico do acordo.</div>';
   lista.innerHTML=h;
@@ -2233,14 +2241,17 @@ function ngRecalc(k){
   var mm=$('ngm-'+k); if(mm && n.acordo.tipo==='meta') mm.innerHTML=c.pct!=null?'<span class="'+(c.atingiu?'':'ng-venc')+'" style="font-size:11.5px">'+Math.round(c.pct*100)+'% · '+(c.atingiu?'bateu':'não bateu')+'</span>':'<span class="mini">informe o faturado</span>';
 }
 function ngAvaliar(k, st, el){
-  var n=negocs.filter(function(x){ return x.id===k; })[0]; if(!n || !U.gestor) return;
+  var n=negocs.filter(function(x){ return x.id===k; })[0]; if(!n) return;
   var mes=NG.mesAval, avs=Object.assign({}, n.avaliacoes||{}), atual=avs[mes]||null, txt='';
+  /* analista (Acordos de todos): só marca pago ou volta o pago para concedido */
+  var soPaga=!U.gestor;
+  if(soPaga && !(U.ngTodas && atual && ((st==='pago' && atual.status==='concedido') || (st==='desfazer' && atual.status==='pago')))) return;
   if(st==='desfazer'){
-    if(!confirm('Desfazer a avaliação de '+nomeMes(mes)+' para '+(n.clienteNome||'')+'?')) return;
-    if(atual && atual.status==='pago'){ atual=Object.assign({}, atual, { status:'concedido', pagoEm:'', pagoPor:'' }); avs[mes]=atual; txt=nomeMes(mes)+': voltou para concedido (não pago)'; }
+    if(!confirm(soPaga ? 'Marcar que o benefício de '+nomeMes(mes)+' para '+(n.clienteNome||'')+' NÃO foi pago?' : 'Desfazer a avaliação de '+nomeMes(mes)+' para '+(n.clienteNome||'')+'?')) return;
+    if(atual && atual.status==='pago'){ atual=Object.assign({}, atual, { status:'concedido', pagoEm:'', pagoPor:'', pagoNome:'' }); avs[mes]=atual; txt=nomeMes(mes)+': voltou para concedido (não pago)'; }
     else { delete avs[mes]; txt=nomeMes(mes)+': avaliação desfeita'; }
   }else if(st==='pago'){
-    avs[mes]=Object.assign({}, atual, { status:'pago', pagoEm:agoraISO(), pagoPor:U.email });
+    avs[mes]=Object.assign({}, atual, { status:'pago', pagoEm:agoraISO(), pagoPor:U.email, pagoNome:U.nome||U.email });
     txt=nomeMes(mes)+': benefício de '+ngBenVal(atual.beneficio||0, atual.qtd?{ benTipo:'qtd', un:atual.un }:null)+(atual.qtd?' enviado':' pago');
   }else{
     var fat=numBR(($('ngf-'+k)||{}).value||''), ben=numBR(($('ngb-'+k)||{}).value||'');
@@ -2256,7 +2267,9 @@ function ngAvaliar(k, st, el){
     txt=nomeMes(mes)+': '+(st==='concedido'?'concedido '+ngBenVal(ben||0, n.acordo):'não concedido')+(fat!=null?' (faturou '+fmtRS0(fat)+')':'');
   }
   if(el) el.disabled=true;
-  ngGravar(n, { avaliacoes:avs }, 'avaliou', txt).then(function(){ toast(txt+'.'); }).catch(function(e){ if(el) el.disabled=false; falha('gravar a avaliação')(e); });
+  /* pagoMes: diz à regra do banco qual mês mudou (quem só marca pago mexe só nele) */
+  ngGravar(n, { avaliacoes:avs, pagoMes:mes }, (st==='pago'||(st==='desfazer'&&soPaga))?'pagamento':'avaliou', txt).then(function(){ toast(txt+'.'); })
+    .catch(function(e){ if(el) el.disabled=false; if(e.code==='permission-denied' && soPaga) toast('Sem permissão para marcar pago (publique a regra nova).', true); else falha('gravar a avaliação')(e); });
 }
 function ngAvalExcel(){
   var mes=NG.mesAval||mesAnterior();
@@ -2973,6 +2986,10 @@ function diagnosticos(){
   if(U.gestor){ var mAv=mesAnterior(), ngA=negocs.filter(function(n){ return ngVigente(n, mAv) && !(n.avaliacoes||{})[mAv]; }).length;
     if(ngA) out.push({ sev:'warn', titulo:ngA+' acordo'+(ngA>1?'s':'')+' para avaliar em '+nomeMes(mAv),
       sub:'Conferir se bateu a meta e conceder o benefício.', ir:function(){ NG.seg='aval'; NG.mesAval=mAv; nav('negoc'); setTimeout(function(){ ngSeg('aval'); }, 30); } }); }
+  if(U.ngTodas){ var aPagar=0, mPg=null;
+    [mesAnterior(), mesAtual()].forEach(function(mm){ negocs.forEach(function(n){ var av=(n.avaliacoes||{})[mm]; if(av && av.status==='concedido'){ aPagar++; if(!mPg) mPg=mm; } }); });
+    if(aPagar) out.push({ sev:'info', titulo:aPagar+' benefício'+(aPagar>1?'s':'')+' concedido'+(aPagar>1?'s':'')+' para pagar',
+      sub:'Concedidos pela diretoria e ainda não marcados como pagos.', ir:function(){ NG.seg='aval'; NG.mesAval=mPg; nav('negoc'); setTimeout(function(){ ngSeg('aval'); }, 30); } }); }
   if(ngV) out.push({ sev:'warn', titulo:ngV+' negociaç'+(ngV>1?'ões':'ão')+' com o próximo passo atrasado',
     sub:'O prazo combinado passou.', ir:function(){ NG.seg='and'; NG.ord='prazo'; nav('negoc'); } });
   var ordem={bad:0,warn:1,info:2};
