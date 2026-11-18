@@ -2053,16 +2053,21 @@ function ngClientes(n){
   return [{ clienteId:n.clienteId||'', erpId:n.erpId||'', nome:n.clienteNome||'' }].concat(n.clientesExtra||[]);
 }
 function ngNomeCurto(n){ var x=(n.clientesExtra||[]).length; return (n.clienteNome||'—')+(x?' + '+x+' cliente'+(x>1?'s':''):''); }
-function ngFat1(x, mes){
+function ngFatFonte(x){
   var c=x.clienteId?clientePorId(x.clienteId):null, f=c?fatCliente(c):null;
   if(!f && U.gestor && fatErp){ var e=x.erpId?erp[x.erpId]:null;
     [x.nome, e&&e.n, e&&e.nErp].filter(Boolean).some(function(nm){ return eqNomes(nm).some(function(k){ if(fatErp[k]){ f=fatErp[k]; return true; } return false; }); }); }
-  if(!f) return null;
-  if(f[mes]==null && fatMeses.indexOf(mes)<0) return null;    /* mês fora do que foi lido: não dá para dizer */
-  return f[mes]||0;
+  return f||null;
 }
+/* soma o mês de todos os clientes do acordo. O faturamento do ERP chega por razão social: lojas com a
+   MESMA razão social já vêm somadas numa fonte só — cada fonte entra uma vez, para não contar em dobro */
 function ngFat(n, mes){
-  var t=null; ngClientes(n).forEach(function(x){ var v=ngFat1(x, mes); if(v!=null) t=(t||0)+v; });
+  var t=null, vistos=[];
+  ngClientes(n).forEach(function(x){
+    var f=ngFatFonte(x); if(!f || vistos.indexOf(f)>=0) return; vistos.push(f);
+    if(f[mes]==null && fatMeses.indexOf(mes)<0) return;      /* mês fora do que foi lido: não dá para dizer */
+    t=(t||0)+(f[mes]||0);
+  });
   return t;
 }
 /* cálculo do mês: atingiu a meta? quanto de benefício? */
@@ -2316,9 +2321,10 @@ function abrirNegoc(id, clienteId){
   pkMontar('ng-cli2', { sel:null, novo:false, ph:'+ Adicionar outro cliente ao acordo…',
     onSel:function(x){ if(!x) return;
       var ja=ngClientes({ clienteId:(PK['ng-cli'].sel||{}).clienteId, erpId:(PK['ng-cli'].sel||{}).erpId, clienteNome:(PK['ng-cli'].sel||{}).nome, clientesExtra:NG.extra })
-        .some(function(y){ return (x.clienteId && y.clienteId===x.clienteId) || (x.erpId && y.erpId===x.erpId) || norm(y.nome)===norm(x.nome); });
+        .some(function(y){ return (x.clienteId && y.clienteId===x.clienteId) || (x.erpId && y.erpId===x.erpId)
+                                  || (!x.clienteId && !x.erpId && !y.clienteId && !y.erpId && norm(y.nome)===norm(x.nome)); });
       if(ja) toast('Esse cliente já está no acordo.');
-      else NG.extra.push({ clienteId:x.clienteId||'', erpId:x.erpId||'', nome:x.nome||'', cidade:x.cidade||'' });
+      else NG.extra.push({ clienteId:x.clienteId||'', erpId:x.erpId||'', nome:x.nome||'', cidade:x.cidade||'', end:pkEnd(x)||'' });   /* endereço: lojas de mesma razão social */
       PK['ng-cli2'].sel=null; pkPintar('ng-cli2'); ngExtraPintar(); } });
   pkMontar('ng-cli', { sel:sel, novo:true, ph:'Nome do cliente (carteira, ERP ou novo)…',
     onSel:function(x){ var c2=x&&x.clienteId?clientePorId(x.clienteId):null; var sd=$('ng-dono');
@@ -2373,7 +2379,7 @@ function ngLerAcordo(){
 function chipUnicoNg(b){ b.parentNode.querySelectorAll('.ng-et').forEach(function(x){ x.classList.toggle('on', x===b); }); }
 function ngExtraPintar(){
   var box=$('ng-extra-l'); if(!box) return;
-  box.innerHTML=(NG.extra||[]).map(function(x, i){ return '<span class="ng-extra">'+esc(x.nome)+(x.cidade?' <small>· '+esc(x.cidade)+'</small>':'')
+  box.innerHTML=(NG.extra||[]).map(function(x, i){ return '<span class="ng-extra">'+esc(x.nome)+((x.end||x.cidade)?' <small>· '+esc(x.end||x.cidade)+'</small>':'')
     + '<button type="button" aria-label="Tirar '+esc(x.nome)+' do acordo" onclick="NG.extra.splice('+i+',1);ngExtraPintar()">×</button></span>'; }).join('');
 }
 function salvarNegoc(el){
@@ -2421,7 +2427,8 @@ function verNegoc(id){
     + '<div class="det">'
     + '<div><span>Cliente</span><b>'+(c?'<a style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="verCliente(\''+esc(c.id)+'\')">'+esc(n.clienteNome)+'</a>':esc(n.clienteNome||'—'))+(n.clienteNovo?' (novo)':'')+'</b></div>'
     + ((n.clientesExtra||[]).length ? '<div><span>Outros clientes do acordo</span><b>'+(n.clientesExtra||[]).map(function(x){ var cx=x.clienteId?clientePorId(x.clienteId):null;
-        return cx ? '<a style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="verCliente(\''+esc(cx.id)+'\')">'+esc(x.nome)+'</a>' : esc(x.nome); }).join(', ')+'</b></div>' : '')
+        var rot=x.nome+(x.end?' ('+x.end+')':'');
+        return cx ? '<a style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="verCliente(\''+esc(cx.id)+'\')">'+esc(rot)+'</a>' : esc(rot); }).join('<br>')+'</b></div>' : '')
     + '<div><span>Valor estimado</span><b>'+(n.valor?fmtRS0(n.valor)+'/mês':'—')+'</b></div>'
     + '<div><span>Vendedor</span><b>'+esc(n.donoNome||'—')+'</b></div>'
     + '<div><span>Aberta em</span><b>'+(n.criadoEm?fmtDia(String(n.criadoEm).slice(0,10)):'—')+'</b></div>'
