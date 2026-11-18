@@ -1053,7 +1053,7 @@ const app=initializeApp(cfg), auth=getAuth(app), db=getFirestore(app);
    o vendedor consulta só o que é dele (where donoUid), o gestor consulta tudo.
    ===================================================================== */
 
-var U={ uid:'', email:'', nome:'', admin:false, gestor:false, comercial:false, comodato:false, veSol:false, cmGerencia:false };
+var U={ uid:'', email:'', nome:'', admin:false, gestor:false, comercial:false, comodato:false, veSol:false, cmGerencia:false, ngTodas:false };
 var CFG={ respondem:{}, diasAlerta:30 }, cfgExiste=false, cfgLido=false;
 var meusTipos=[];                 /* tipos de solicitação que esta pessoa responde */
 var clientes=[], visitas=[], concorrentes=[];
@@ -2055,7 +2055,7 @@ function ngClientes(n){
 function ngNomeCurto(n){ var x=(n.clientesExtra||[]).length; return (n.clienteNome||'—')+(x?' + '+x+' cliente'+(x>1?'s':''):''); }
 function ngFatFonte(x){
   var c=x.clienteId?clientePorId(x.clienteId):null, f=c?fatCliente(c):null;
-  if(!f && U.gestor && fatErp){ var e=x.erpId?erp[x.erpId]:null;
+  if(!f && (U.gestor||U.ngTodas) && fatErp){ var e=x.erpId?erp[x.erpId]:null;
     [x.nome, e&&e.n, e&&e.nErp].filter(Boolean).some(function(nm){ return eqNomes(nm).some(function(k){ if(fatErp[k]){ f=fatErp[k]; return true; } return false; }); }); }
   return f||null;
 }
@@ -2109,7 +2109,8 @@ function ngCardHtml(n){
 function renderNegoc(){
   var lista=$('ng-lista'); if(!lista) return;
   if(negocsErro){ lista.innerHTML='<div class="alert a-err">⚠ '+esc(negocsErro)+'</div>'; return; }
-  var vend=selVendedor('ng-vend', negocs);
+  var sv=$('ng-vend'); if(sv) sv.style.display=(U.gestor||U.ngTodas)?'':'none';
+  var vend=selVendedor('ng-vend', negocs, U.ngTodas);
   var st=$('ng-tipo'), at=st.value;
   st.innerHTML='<option value="">Todos os tipos</option>'+Object.keys(NG_TIPOS).map(function(k){ return '<option value="'+k+'">'+NG_TIPOS[k]+'</option>'; }).join(''); st.value=at;
   $('ng-ord').value=NG.ord;
@@ -2167,12 +2168,12 @@ function ngAcordosHtml(base){
   var tb=0, tq={}; l.forEach(function(n){ if(ngVigente(n, m)){ var c=ngCalc(n, m); if(!c.ben) return;
     if(n.acordo.benTipo==='qtd'){ var u=n.acordo.un||'pacotes'; tq[u]=(tq[u]||0)+c.ben; } else tb+=c.ben; } });
   var tqTxt=Object.keys(tq).map(function(u){ return tq[u]+' '+u; }).join(', ');
-  lista.innerHTML=seg+'<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) '+(ver==='enc'?'encerrado(s) · tocar abre o histórico':'em vigor'+(U.gestor?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios'+(tqTxt?' + <b>'+tqTxt+'</b> em produto':''):''))+'</div>'
+  lista.innerHTML=seg+'<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) '+(ver==='enc'?'encerrado(s) · tocar abre o histórico':'em vigor'+((U.gestor||U.ngTodas)?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios'+(tqTxt?' + <b>'+tqTxt+'</b> em produto':''):''))+'</div>'
     + '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll" style="max-height:none;border:none"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th>'
-    + (U.gestor?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
+    + ((U.gestor||U.ngTodas)?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, m), pr=c.pct!=null?Math.min(1,c.pct):null;
         return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(ngNomeCurto(n))+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
-          + '<td style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+(U.gestor?'<td>'+esc(n.donoNome||'—')+'</td>':'')
+          + '<td style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+((U.gestor||U.ngTodas)?'<td>'+esc(n.donoNome||'—')+'</td>':'')
           + '<td>'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?ngBenVal(c.ben, a)+' <span class="mini">fixo</span>'
               : !(+a.meta>0) ? '<span class="mini">meta em produto · conferir no fim do mês</span>'
               : (c.fat==null?'<span class="mini">sem faturamento</span>':fmtRS0(c.fat)+' <span class="mini">de '+fmtRS0(a.meta)+' ('+Math.round(c.pct*100)+'%)</span>'
@@ -2671,6 +2672,9 @@ onAuthStateChanged(auth, async function(u){
   /* chave "Ver as solicitações de todos" (ex.: Jeferson): vê o que todos os
      vendedores pediram, sem virar gerente (não vê as carteiras dos outros) */
   U.veSol=U.gestor || (U.comercial && d.comercialSolicitacoes===true);
+  /* chave "Acordos de todos" (ex.: Mariana, analista): vê as negociações e os acordos de todos os vendedores,
+     com o faturado do mês, só para consultar — conceder e marcar pago continua com gerente e diretoria */
+  U.ngTodas=U.gestor || (U.comercial && d.comercialAcordos===true);
   try{ var c=await getDoc(doc(db,'comConfig','app')); cfgExiste=c.exists(); aplicarCfg(c.exists()?c.data():{}); }
   catch(e){ console.warn('comConfig:',e); aplicarCfg({}); }
   if(!U.comercial && !meusTipos.length){ negar('Sua conta não tem acesso ao app Comercial. Fale com a diretoria.'); return; }
@@ -2743,7 +2747,7 @@ function ouvir(){
     /* negociações: o vendedor vê as dele; gerentes e diretoria, todas */
     var cng=collection(db,'comNegociacoes');
     var ngErro=function(e){ console.warn('comNegociacoes:', e); negocsErro=(e&&e.code==='permission-denied')?'Sem permissão para ler as negociações (regra do Firestore publicada?).':'Não foi possível ler as negociações.'; render(); };
-    if(U.gestor){
+    if(U.gestor || U.ngTodas){
       subs.push(onSnapshot(query(cng, limit(3000)), function(s){ negocs=s.docs.map(function(x){ return Object.assign({ id:x.id }, x.data()); }); render(); syncDonos(); }, ngErro));
     }else{
       /* vendedor: as que ele abriu e as dos clientes da carteira dele (vendUid), mesmo abertas por outra pessoa */
@@ -2792,6 +2796,7 @@ function ouvir(){
     }
     lerErp();
     ouvirMetas(); ouvirFichas();
+    if(!U.gestor && U.ngTodas) lerFaturamento();      /* faturado do mês dos acordos de todos (só leitura) */
     if(U.gestor){
       lerFaturamento();
       subs.push(onSnapshot(doc(db,'comVendResumo','_meta'), function(s){ resumoMeta=s.exists()?s.data():{}; autoResumo(); render(); },
@@ -3161,8 +3166,8 @@ function kpi(rot, val, dica, acao, cor){
 
 /* ---- CARTEIRA ---- */
 var FILTROS=[['todos','Todos'],['agenda','Contato atrasado/hoje'],['alerta','Sem comprar'],['queda','Comprou menos'],['semctt','Sem próximo contato'],['prospect','Prospects'],['semerp','Sem vínculo ERP'],['inativo','Inativos']];
-function selVendedor(id, lista){
-  var el=$(id); if(!el || !U.gestor) return '';
+function selVendedor(id, lista, forca){
+  var el=$(id); if(!el || !(U.gestor||forca)) return '';
   var nomes={}; lista.forEach(function(x){ if(x.donoUid) nomes[x.donoUid]=(x.donoNome||x.donoEmail||'?')+(String(x.donoUid).indexOf('erp:')===0?' (sem login)':''); });
   var atual=el.value, ids=Object.keys(nomes).sort(function(a,b){ return String(nomes[a]).localeCompare(String(nomes[b]),'pt-BR'); });
   var nSem=lista.filter(function(x){ return !x.donoUid && x.situacao!=='inativo'; }).length;
@@ -4882,7 +4887,16 @@ function cmGerMudar(uid, cb){
     toast((u.nome||u.email)+(cb.checked?' agora gerencia':' não gerencia mais')+' os pedidos de equipamento. Vale na próxima vez que abrir o app.');
   }).catch(function(e){ cb.disabled=false; cb.checked=!cb.checked; falha('mudar a chave')(e); });
 }
-Object.assign(window, { cmNovo:cmNovo, cmEditar:cmEditar, cmExcluir:cmExcluir, cmGerMudar:cmGerMudar });
+/* ---------- chave "Acordos de todos" (Usuários e níveis) ---------- */
+function ngTodasMudar(uid, cb){
+  var u=(usuariosLista||[]).filter(function(x){ return x.uid===uid; })[0]; if(!u) return;
+  cb.disabled=true;
+  updateDoc(doc(db,'usuarios',uid), { comercialAcordos:cb.checked }).then(function(){
+    u.ngTodas=cb.checked; cb.disabled=false;
+    toast((u.nome||u.email)+(cb.checked?' agora vê':' não vê mais')+' os acordos de todos os vendedores. Vale na próxima vez que abrir o app (Ctrl+Shift+R).');
+  }).catch(function(e){ cb.disabled=false; cb.checked=!cb.checked; falha('mudar a chave')(e); });
+}
+Object.assign(window, { cmNovo:cmNovo, cmEditar:cmEditar, cmExcluir:cmExcluir, cmGerMudar:cmGerMudar, ngTodasMudar:ngTodasMudar });
 
 
 
@@ -5575,7 +5589,7 @@ function carregarUsuarios(forcar){
   usuariosLendo=getDocs(collection(db,'usuarios')).then(function(r){
     usuariosLista=r.docs.map(function(d){ var x=d.data()||{};
       return { uid:d.id, nome:x.nome||'', email:x.email||'', ativo:x.ativo===true, admin:x.role==='admin',
-               comercial:x.comercial===true, gerente:x.comercialGestor===true, cmGer:x.comodatoGerencia===true };
+               comercial:x.comercial===true, gerente:x.comercialGestor===true, cmGer:x.comodatoGerencia===true, ngTodas:x.comercialAcordos===true };
     }).sort(function(a,b){ return String(a.nome||a.email).localeCompare(String(b.nome||b.email),'pt-BR'); });
     usuariosLendo=null; return usuariosLista;
   }, function(e){ usuariosLendo=null; throw e; });
@@ -5606,16 +5620,17 @@ function renderUsuarios(){
       +(eu?' <span class="mini">(você)</span>':'')+'<br><span class="mini">'+esc(u.email||u.uid)+'</span></td>'
       +'<td>'+nivel+'</td>'
       +'<td>'+(u.admin?'<span class="mini">sempre (diretoria)</span>':'<label class="chk" style="margin:0"><input type="checkbox"'+(u.cmGer?' checked':'')+' onchange="cmGerMudar(\''+u.uid+'\',this)"> Gerencia</label>')+'</td>'
+      +'<td>'+(u.admin||u.gerente?'<span class="mini">já vê (nível)</span>':'<label class="chk" style="margin:0"><input type="checkbox"'+(u.ngTodas?' checked':'')+' onchange="ngTodasMudar(\''+u.uid+'\',this)"> Vê todos</label>')+'</td>'
       +'<td class="r">'+(cart[u.uid]||'<span class="mini">0</span>')+'</td></tr>';
   };
   var linhaInativo=function(u){
     return '<tr><td><b>'+esc(u.nome||'(sem nome)')+'</b> <button class="pr-x" style="font-size:13px" title="Mudar o nome" onclick="mudarNome(\''+u.uid+'\')">✎</button>'
       +'<br><span class="mini">'+esc(u.email||u.uid)+'</span></td>'
       +'<td><select onchange="liberarConta(\''+u.uid+'\',this)" style="min-width:170px"><option value="">Liberar como…</option>'
-      +'<option value="vendedor">Vendedor</option><option value="gerente">Gerente</option></select></td><td></td><td></td></tr>';
+      +'<option value="vendedor">Vendedor</option><option value="gerente">Gerente</option></select></td><td></td><td></td><td></td></tr>';
   };
-  box.innerHTML='<table class="tb"><tr><th>Pessoa</th><th>Nível no Comercial</th><th title="Edita, exclui e muda a prioridade dos pedidos de equipamento (Remessa Comodato e Manutenção Externa)">Pedidos de equipamento</th><th class="r">Clientes na carteira</th></tr>'
-    +(ativos.length?ativos.map(linha).join(''):'<tr><td colspan="4" class="mini">Ninguém com esse nome.</td></tr>')+'</table>'
+  box.innerHTML='<table class="tb"><tr><th>Pessoa</th><th>Nível no Comercial</th><th title="Edita, exclui e muda a prioridade dos pedidos de equipamento (Remessa Comodato e Manutenção Externa)">Pedidos de equipamento</th><th title="Vê as negociações e os acordos de todos os vendedores, com o faturado do mês (só consulta)">Acordos de todos</th><th class="r">Clientes na carteira</th></tr>'
+    +(ativos.length?ativos.map(linha).join(''):'<tr><td colspan="5" class="mini">Ninguém com esse nome.</td></tr>')+'</table>'
     +(inativos.length?'<div class="sect" style="margin:18px 8px 6px">Esperando liberação ('+inativos.length+')</div>'
       +'<p class="mini" style="margin:0 8px 8px">Entraram uma vez e o cadastro nasceu bloqueado. Liberar aqui ativa a conta e dá o nível no Comercial. Atenção: conta ativa também enxerga o que hoje é aberto a qualquer conta ativa (Manut. Comodato em leitura e o app Campo, que ainda está com as regras temporárias).</p>'
       +'<table class="tb">'+inativos.map(linhaInativo).join('')+'</table>':'');
