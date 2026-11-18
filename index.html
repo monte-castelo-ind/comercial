@@ -626,6 +626,60 @@ tr.ct-sel td{background:color-mix(in srgb,var(--primary) 7%,transparent)}
   main,.side.pin ~ main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
   .fab{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 }
+
+/* ===== celular (revisão de nov/2026): menos rolagem, o que fazer primeiro ===== */
+@media(max-width:600px){
+  /* cartões de números compactos */
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:14px}
+  #kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .kpis .kpi{padding:10px 11px;border-radius:13px}
+  .klabel{font-size:9.5px;letter-spacing:.3px;line-height:1.25}
+  .kval{font-size:21px;margin-top:4px}
+  .khint{font-size:11px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  #kpis .khint{display:none}
+  /* filtros: busca na largura toda; listas lado a lado, do mesmo tamanho */
+  .tools{gap:8px}
+  .tools input[type=search]{flex:1 1 100%}
+  .tools select{flex:1 1 calc(50% - 4px);min-width:0;width:auto}
+  /* atalhos de filtro (chips): uma linha só, desliza para o lado */
+  #c-filtros,#eq-filtros{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  #c-filtros::-webkit-scrollbar,#eq-filtros::-webkit-scrollbar{display:none}
+  #c-filtros .chip,#eq-filtros .chip{flex:0 0 auto}
+  /* Hoje: primeiro o que fazer, depois os números */
+  #page-hoje.on{display:flex;flex-direction:column}
+  #page-hoje > .acoes-cel{order:1}
+  #page-hoje > #h-promos{order:2}
+  #page-hoje > .hj-cols{display:contents}
+  #h-fazer{order:3;margin-bottom:14px}
+  #page-hoje > .cols:not(.hj-cols){order:4}
+  #page-hoje > #h-meta{order:5}
+  #page-hoje > #kpis{order:6}
+  #h-origem{order:7;margin-bottom:14px}
+  #page-hoje > .sect{order:8}
+  #h-sol{order:9}
+  .hj-card.hj-vazio{display:none}
+  /* negociações: coluna vazia não ocupa a tela */
+  .ng-col.vazia{display:none}
+  /* "nada aqui" ocupa pouco */
+  .empty{padding:12px 0;font-size:13px}
+  /* abas das negociações numa linha só (desliza para o lado) */
+  #ng-seg{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
+  #ng-seg::-webkit-scrollbar{display:none}
+  #ng-seg button{flex:0 0 auto}
+  /* Acordos e Avaliação do mês: no celular a tabela vira um cartão por acordo, cada valor com o seu nome */
+  #ng-lista .card{background:transparent;border:none;box-shadow:none;padding:0!important}
+  #ng-lista .tscroll{overflow:visible!important;border:none!important;max-height:none!important}
+  #ng-lista table.eq-tab,#ng-lista table.eq-tab tbody,#ng-lista table.eq-tab tr,#ng-lista table.eq-tab td{display:block;width:auto}
+  #ng-lista table.eq-tab thead{display:none}
+  #ng-lista table.eq-tab tr{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 14px;margin-bottom:10px}
+  #ng-lista table.eq-tab td{border:none!important;padding:3px 0!important;text-align:left!important;white-space:normal!important;min-width:0!important}
+  #ng-lista table.eq-tab tbody{display:grid;grid-template-columns:1fr;gap:0}
+  #ng-lista table.eq-tab tr{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}
+  #ng-lista table.eq-tab td.eq-loja,#ng-lista table.eq-tab td[data-l="Acordo"],#ng-lista table.eq-tab td:last-child:not([data-l]){grid-column:1 / -1}
+  #ng-lista table.eq-tab td[data-l]::before{content:attr(data-l);display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;margin-bottom:1px}
+  #ng-lista table.eq-tab td:last-child:not([data-l]){padding-top:8px!important;display:flex;flex-wrap:wrap;gap:6px}
+  #ng-lista .ng-in{width:130px}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 /* TAMANHO DA TELA (padrão dos apps):
    - notebook (até 1400px): menu encolhido (ver pinPadrao), filtros e indicadores mais compactos;
@@ -2149,7 +2203,7 @@ function renderNegoc(){
     lista.innerHTML='<div class="ng-kan">'+NG_ETAPAS.map(function(e){
       var col=and.filter(function(n){ return (n.etapa||'aberta')===e[0]; }).sort(srt);
       var v=col.reduce(function(t,n){ return t+(+n.valor||0); },0);
-      return '<div class="ng-col"><div class="ng-colt"><span>'+e[1]+' ('+col.length+')</span><span>'+(v?fmtRS0(v):'')+'</span></div>'
+      return '<div class="ng-col'+(col.length?'':' vazia')+'"><div class="ng-colt"><span>'+e[1]+' ('+col.length+')</span><span>'+(v?fmtRS0(v):'')+'</span></div>'
         + (col.length?col.map(ngCardHtml).join(''):'<div class="mini" style="padding:6px">—</div>')+'</div>';
     }).join('')+'</div>';
   }else{
@@ -2176,12 +2230,12 @@ function ngAcordosHtml(base){
     + ((U.gestor||U.ngTodas)?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, m), pr=c.pct!=null?Math.min(1,c.pct):null;
         return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(ngNomeCurto(n))+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
-          + '<td style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+((U.gestor||U.ngTodas)?'<td>'+esc(n.donoNome||'—')+'</td>':'')
-          + '<td>'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?ngBenVal(c.ben, a)+' <span class="mini">fixo</span>'
+          + '<td data-l="Acordo" style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+((U.gestor||U.ngTodas)?'<td data-l="Vendedor">'+esc(n.donoNome||'—')+'</td>':'')
+          + '<td data-l="'+nomeMes(m)+' (até hoje)">'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?ngBenVal(c.ben, a)+' <span class="mini">fixo</span>'
               : !(+a.meta>0) ? '<span class="mini">meta em produto · conferir no fim do mês</span>'
               : (c.fat==null?'<span class="mini">sem faturamento</span>':fmtRS0(c.fat)+' <span class="mini">de '+fmtRS0(a.meta)+' ('+Math.round(c.pct*100)+'%)</span>'
                  +'<div class="ng-bar"><i class="'+(c.atingiu?'ok':'')+'" style="width:'+Math.round(pr*100)+'%"></i></div>'))+'</td>'
-          + '<td>'+(ngVigente(n, ma)?ngStHtml((n.avaliacoes||{})[ma]):'<span class="mini">—</span>')+'</td></tr>'; }).join('')
+          + '<td data-l="'+nomeMes(ma)+'">'+(ngVigente(n, ma)?ngStHtml((n.avaliacoes||{})[ma]):'<span class="mini">—</span>')+'</td></tr>'; }).join('')
     + '</tbody></table></div></div>';
 }
 /* avaliação do mês (diretoria e gerentes): faturado × meta, benefício, conceder / não conceder / pago */
@@ -2227,8 +2281,8 @@ function ngAvalHtml(base){
           : av.status==='concedido' ? '<button class="btn btn-sm" onclick="ngAvaliar(\''+k+'\',\'pago\',this)">'+(a.benTipo==='qtd'?'📦 Marcar enviado':'💸 Marcar pago')+'</button> <button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>'
           : '<button class="btn btn-sm btn-ghost" onclick="ngAvaliar(\''+k+'\',\'desfazer\',this)">desfazer</button>';
         return '<tr><td class="eq-loja"><div class="nm"><a onclick="verNegoc(\''+k+'\')">'+esc(ngNomeCurto(n))+'</a></div><div class="eq-end">'+esc(a.forma||'')+'</div></td>'
-          + '<td style="white-space:normal;min-width:180px" class="mini">'+esc(a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a))+'</td><td>'+esc(n.donoNome||'—')+'</td>'
-          + '<td class="r">'+fatIn+'</td><td>'+metaTxt+'</td><td class="r">'+benIn+'</td><td>'+ngStHtml(av)
+          + '<td data-l="Acordo" style="white-space:normal;min-width:180px" class="mini">'+esc(a.tipo==='meta'?'Meta → '+ngBenTxt(a):'Fixo: '+ngBenTxt(a))+'</td><td data-l="Vendedor">'+esc(n.donoNome||'—')+'</td>'
+          + '<td data-l="Faturado no mês" class="r">'+fatIn+'</td><td data-l="Meta">'+metaTxt+'</td><td data-l="Benefício" class="r">'+benIn+'</td><td data-l="Situação">'+ngStHtml(av)
           + (av&&av.nome?'<div class="mini">'+esc(av.nome.split(' ')[0])+' · '+fmtDia(String(av.em||'').slice(0,10))+'</div>':'')
           + (av&&av.status==='pago'&&av.pagoEm?'<div class="mini">pago: '+esc(String(av.pagoNome||av.pagoPor||'').split(/[ @]/)[0])+' · '+fmtDia(String(av.pagoEm).slice(0,10))+'</div>':'')
           + '</td><td style="white-space:nowrap">'+acoes+'</td></tr>'; }).join('')
@@ -2935,7 +2989,8 @@ function nav(p){
   document.querySelectorAll('.page').forEach(function(x){ x.classList.toggle('on', x.id==='page-'+p); });
   $('ptit').textContent=TITULOS[p][0];
   var a=ACAO[p];
-  $('fab').style.display=(!a || !U.comercial) ? 'none' : '';
+  /* no Hoje do celular o botão grande "Registrar visita ou contato" já está no topo: o "+" redondo sobrava */
+  $('fab').style.display=(!a || !U.comercial || (p==='hoje' && ctCelular())) ? 'none' : '';
   $('topAcao').style.display=(!a || !U.comercial) ? 'none' : '';
   if(a) $('topAcao').textContent=a[0];
   render();
@@ -3152,7 +3207,7 @@ function renderHoje(){
   hjSaudacao();
   if(!ctCelular()) $('topAcao').style.display='none';
   $('h-acoes').innerHTML=hjAcoesHtml();
-  $('h-origem').innerHTML=hjOrigemHtml();
+  var hjo=hjOrigemHtml(); $('h-origem').innerHTML=hjo; $('h-origem').classList.toggle('hj-vazio', hjo.indexOf('hj-donut')<0);
   $('h-fazer').innerHTML=hjFazerHtml();
   var ativos=clientes.filter(function(c){ return c.situacao!=='inativo'; });
   var agenda=ativos.filter(function(c){ return c.proxContato && c.proxContato<=ate; })
@@ -3302,10 +3357,11 @@ function renderCarteira(){
       +'<div class="khint">'+esc(l.length!==clientes.length?'de '+clientes.length+' · '+deQuem:deQuem)+'</div></div>';
   _ctModo=ctCelular()?'cel':'pc';
   var vazio='<div class="empty">'+(clientes.length?'Nenhum cliente neste filtro.':'Sua carteira está vazia. Ela vem do ERP (clientes em que você é o representante). Cliente novo entra por <b>Registrar contato</b>.')+'</div>';
-  var mais=l.length>ctLim?'<div style="text-align:center;margin:12px 0 20px"><button class="btn btn-ghost" onclick="ctLim+=300;renderCarteira()">Mostrar mais ('
-    +(l.length-ctLim).toLocaleString('pt-BR')+' clientes)</button></div>':'';
+  var LIM=(_ctModo==='cel')?ctLimCel:ctLim;
+  var mais=l.length>LIM?'<div style="text-align:center;margin:12px 0 20px"><button class="btn btn-ghost" onclick="'+(_ctModo==='cel'?'ctLimCel+=40':'ctLim+=300')+';renderCarteira()">Mostrar mais ('
+    +(l.length-LIM).toLocaleString('pt-BR')+' clientes)</button></div>':'';
   if(!l.length){ $('c-lista').innerHTML=vazio; return; }
-  if(_ctModo==='cel'){ $('c-lista').innerHTML=l.slice(0,ctLim).map(cartaoCliente).join('')+mais; return; }
+  if(_ctModo==='cel'){ $('c-lista').innerHTML=l.slice(0,LIM).map(cartaoCliente).join('')+mais; return; }
   var colVend=!!U.gestor;
   window._ctRel={ l:l, val:val, pf:pf, deQuem:deQuem, vend:vend, tot:tot, compraram:compraram };
   var vis=l.slice(0,ctLim).map(function(c){ return c.id; }); window._ctVis=vis;
@@ -3324,7 +3380,8 @@ function renderCarteira(){
 }
 /* Carteira em tabela: uma linha por cliente, clique abre a ficha. No celular
    (até 600px) continua em cartões, que cabem na tela. */
-var _ctModo='', ctLim=300;
+var _ctModo='', ctLim=300, ctLimCel=40;
+Object.defineProperty(window, 'ctLimCel', { get:function(){ return ctLimCel; }, set:function(v){ ctLimCel=v; } });
 window.ctLim=ctLim; Object.defineProperty(window, 'ctLim', { get:function(){ return ctLim; }, set:function(v){ ctLim=v; } });
 function ctCelular(){ try{ return window.matchMedia('(max-width:600px)').matches; }catch(e){ return false; } }
 window.addEventListener('resize', function(){
