@@ -2780,14 +2780,18 @@ function relCarregar(){
   /* 1º: compras completas por loja e produto (a mesma base do Gestão › Comparar lojas) + a tabela de
      pesos e tipos do Gestão (configGestao/pesos): dá o tipo de produto e o kg de cada venda.
      2º: comercialRel (robô dos relatórios), se existir. Sem nenhum dos dois, só R$ por cliente. */
+  REL.erroLoja=''; REL.erroPesos='';
   var pRel=Promise.all([
       getDocs(collection(db,'comercialLojaProd')),
-      getDoc(doc(db,'configGestao','pesos')).catch(function(e){ console.warn('configGestao/pesos:', e); return null; })
+      getDoc(doc(db,'configGestao','pesos')).catch(function(e){ console.warn('configGestao/pesos:', e); REL.erroPesos=e.code||e.message||'erro'; return null; })
     ]).then(function(r){
       var docs=r[0].docs, idx=null; docs.forEach(function(x){ if(x.id==='_idx') idx=x.data(); });
       var pesos=(r[1] && r[1].exists()) ? ((r[1].data()||{}).itens||[]) : [];
-      if(docs.length>2){ REL.rel=relDeLojaProd(docs, idx, pesos); REL.fonte='lojas'; REL.temPesos=pesos.length>0; }
-    }).catch(function(e){ console.warn('comercialLojaProd:', e); })
+      if(r[1] && !r[1].exists() && !REL.erroPesos) REL.erroPesos='vazia';
+      REL.nPesos=pesos.length;
+      if(docs.length>2){ REL.rel=relDeLojaProd(docs, idx, pesos); REL.fonte='lojas'; REL.temPesos=pesos.length>0; REL.mesesLoja=Object.keys(REL.rel).sort(); }
+      else REL.erroLoja='vazia';
+    }).catch(function(e){ console.warn('comercialLojaProd:', e); REL.erroLoja=e.code||e.message||'erro'; })
     .then(function(){
       if(REL.fonte) return;
       return getDocs(query(collection(db,'comercialRel'), limit(40)))
@@ -2865,12 +2869,29 @@ function relFiltra(l){
     return true; });
 }
 function relCliCel(r){ return '<b>'+esc(r.nome)+'</b>'+(r.cid?'<span class="ct-cid"> - '+esc(cidadeBonita(r.cid))+'</span>':''); }
+/* diz exatamente por que o kg / o tipo não aparecem */
 function relSemDados(ms){
   if(!ms.length) return 'Escolha o período.';
-  if((REL.med==='kg' || REL.tipo) && !relTemRel(ms))
-    return 'Os valores em kg e o tipo de produto vêm da base de compras por loja e da tabela de pesos do Gestão, que não puderam ser lidas'+(REL.fonte?' para este período':'')+'. Confira se a regra nova do banco foi publicada. Por enquanto, use R$ e todos os tipos.';
+  var precisa=(REL.med==='kg' || REL.tipo || (REL.aba==='cli' && REL.colunas==='tipo') || (REL.aba==='grp' && REL.grp==='tipo'));
+  if(!precisa) return '';
+  if(REL.erroLoja==='permission-denied')
+    return 'O banco recusou a leitura das compras por loja (comercialLojaProd): a regra nova ainda não está publicada no Firebase (ou foi publicada sem a função comVeAcordos). Publique as regras e clique em "Ler de novo".';
+  if(REL.erroLoja==='vazia') return 'A base de compras por loja (comercialLojaProd) está vazia: o robô do ERP ainda não gravou essa base.';
+  if(REL.erroLoja) return 'Não foi possível ler as compras por loja ('+REL.erroLoja+'). Clique em "Ler de novo".';
+  if(REL.fonte==='lojas' && !relTemRel(ms)){
+    var ml=REL.mesesLoja||[];
+    return 'A base de compras por loja tem '+(ml.length?'de '+nomeMes(ml[0])+' a '+nomeMes(ml[ml.length-1]):'nenhum mês')+'; o período escolhido não está todo nela.';
+  }
+  if(REL.fonte==='lojas' && REL.med==='kg' && !REL.temPesos){
+    return REL.erroPesos==='permission-denied'
+      ? 'O banco recusou a leitura da tabela de pesos do Gestão (configGestao/pesos): sem ela o kg fica zerado e tudo aparece como "Sem tipo". Publique a regra nova e clique em "Ler de novo".'
+      : 'A tabela de pesos do Gestão está vazia (Gestão → Configurações → Pesos): sem ela o kg fica zerado e tudo aparece como "Sem tipo".';
+  }
+  if(!REL.fonte) return 'Os valores em kg e o tipo de produto vêm da base de compras por loja e da tabela de pesos do Gestão, que não puderam ser lidas. Clique em "Ler de novo".';
   return '';
 }
+/* lê tudo de novo, sem recarregar a página (ex.: logo depois de publicar a regra) */
+function relRecarregar(){ REL.lido=false; REL.lendo=false; REL.rel={}; REL.cm={}; REL.fonte=''; renderRel(); }
 /* ---------- 1) vendas por cliente, com curva ABC ---------- */
 function relCli(){
   var ms=relPeriodo(), aviso=relSemDados(ms);
@@ -3030,7 +3051,8 @@ function relPintar(){
   $('rel-res').innerHTML=(T.resumo||[]).length ? '<div class="kpis">'+T.resumo.map(function(x){ return '<div class="card kpi fixo"><div class="klabel">'+esc(x[0])+'</div><div class="kval" style="font-size:20px">'+esc(x[1])+'</div></div>'; }).join('')+'</div>' : '';
   var chips=(T.chips||[]).length ? '<div class="chips" style="margin-bottom:12px">'+T.chips.map(function(c){ var on=(REL.aba==='cmp'?REL.cmpF:REL.aba==='grp'?REL.grp:REL.visPer)===c[0];
       return '<button class="chip'+(on?' on':'')+'" onclick="relSet(\''+(REL.aba==='cmp'?'cmpF':REL.aba==='grp'?'grp':'visPer')+'\',\''+c[0]+'\')">'+esc(c[1])+'</button>'; }).join('')+'</div>' : '';
-  var aviso=T.aviso ? '<div class="alert a-info">ⓘ '+esc(T.aviso)+'</div>' : '';
+  var aviso=T.aviso ? '<div class="alert a-info" style="align-items:center">ⓘ <span style="flex:1">'+esc(T.aviso)+'</span>'
+      + '<button class="btn btn-sm btn-ghost" onclick="relRecarregar()">↻ Ler de novo</button></div>' : '';
   if(!T.linhas.length){ $('rel-tab').innerHTML=chips+aviso+'<div class="empty">Nada neste filtro.</div>'; return; }
   $('rel-tab').innerHTML=chips+aviso+'<div class="card" style="padding:0;overflow:clip"><div class="tscroll"><table class="tb rel-tb"><thead><tr>'
     + T.cols.map(function(c){ return '<th'+(c.r?' class="r"':'')+'>'+esc(c.t)+'</th>'; }).join('')+'</tr></thead><tbody>'
@@ -3090,7 +3112,7 @@ function relPdf(){
   window.addEventListener('afterprint', fim);
   setTimeout(function(){ window.print(); }, 60);
 }
-Object.assign(window, { relSet:relSet, relExcel:relExcel, relPdf:relPdf, relPintar:relPintar });
+Object.assign(window, { relSet:relSet, relExcel:relExcel, relPdf:relPdf, relPintar:relPintar, relRecarregar:relRecarregar });
 Object.defineProperty(window, 'REL', { get:function(){ return REL; } });
 
 /* ---------- busca geral: Ctrl K em qualquer tela ---------- */
