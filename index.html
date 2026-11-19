@@ -563,6 +563,11 @@ details.mais[open]{padding-bottom:4px}
 .cm-rec-q{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
 .cm-rec-q input{width:64px;padding:5px 7px}
 
+/* ficha: produto clicável na tabela de compras */
+tr.cp-lin{cursor:pointer}
+tr.cp-lin:hover td{background:var(--card-2)}
+.cp-seta{color:var(--muted);font-weight:700;margin-left:2px}
+
 /* acordo com mais de um cliente */
 .ng-extra-l{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .ng-extra-l:empty{display:none}
@@ -3613,7 +3618,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
-Object.assign(window, { cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
+Object.assign(window, { verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
@@ -6334,6 +6339,67 @@ function prodDe(c){
   for(var i=0;i<ns.length;i++) if(prodErp[ns[i]]) return prodErp[ns[i]];
   return null;
 }
+/* ---------- compras de um produto, dia a dia (clicando na tabela da ficha) ----------
+   Vêm da base completa por loja (comercialLojaProd, campo compras: 'AAAA-MM-DD|qtd|valor;…', gravado
+   pelo robô). Cliente com várias lojas de mesmo nome: junta todas e mostra a loja em cada linha.
+   Sem o campo compras (robô ainda não atualizado), mostra mês a mês. "Voltar" reabre a ficha. */
+var CP_NOMES={}, LP_IDX=null, LP_DOCS={};
+function lpIdx(){
+  if(LP_IDX) return Promise.resolve(LP_IDX);
+  return getDoc(doc(db,'comercialLojaProd','_idx')).then(function(s){ LP_IDX=s.exists()?(s.data()||{}):{ lojas:{}, produtos:{} }; return LP_IDX; });
+}
+function lpLojasDoCliente(c, idx){
+  var ks={}, e=erpDe(c);
+  [c.nome, c.erpNome, e&&e.n, e&&e.nErp].filter(Boolean).forEach(function(n){ eqNomes(n).forEach(function(k){ ks[k]=1; }); });
+  return Object.keys(idx.lojas||{}).filter(function(k){ return eqNomes((idx.lojas[k]||{}).n||'').some(function(x){ return ks[x]; }); });
+}
+function verCompraProduto(cid, i){
+  var c=clientePorId(cid), nome=(CP_NOMES[cid]||[])[i]; if(!c || !nome) return;
+  var voltar={ txt:'← Voltar', cls:'btn-ghost', fn:function(){ verCliente(cid); } };
+  abrirModal({ titulo:nome, sub:esc(c.nome||'')+' · compras do produto', wide:true, corpo:'<div class="empty">Lendo as compras…</div>', botoes:[voltar] });
+  var corpo=function(h){ var b=document.querySelector('.modal .mbody'); if(b) b.innerHTML=h; };
+  lpIdx().then(function(idx){
+    var lojas=lpLojasDoCliente(c, idx), np=norm(nome);
+    var cods=Object.keys(idx.produtos||{}).filter(function(k){ return norm(idx.produtos[k])===np || norm(k)===np; });
+    if(!cods.length) cods=[nome];
+    if(!lojas.length){ corpo('<div class="empty">Este cliente não foi achado na base de compras por loja.</div>'); return; }
+    return Promise.all(lojas.map(function(k){ return LP_DOCS[k] ? Promise.resolve(LP_DOCS[k])
+        : getDoc(doc(db,'comercialLojaProd',k)).then(function(s){ LP_DOCS[k]=s.exists()?(s.data()||{}):{}; return LP_DOCS[k]; }); }))
+      .then(function(docs){
+        var ini=somaDias(hoje(), -89), linhas=[], meses=[], temDia=false, varias=lojas.length>1;
+        docs.forEach(function(d, j){
+          var info=(idx.lojas||{})[lojas[j]]||{}, rot=[info.b, info.ci].filter(Boolean).join(' · ')||lojas[j];
+          if(d.compras) temDia=true;
+          cods.forEach(function(cod){
+            String((d.compras||{})[cod]||'').split(';').forEach(function(t){ if(!t) return; var p=t.split('|');
+              if(p[0]>=ini) linhas.push({ d:p[0], q:+p[1]||0, v:+p[2]||0, loja:rot }); });
+            Object.keys(d.meses||{}).forEach(function(m){ var a=(d.meses[m]||{})[cod]; if(a && m>=ini.slice(0,7)) meses.push({ m:m, q:+a[1]||0, v:+a[0]||0, loja:rot }); });
+          });
+        });
+        var qf=function(n){ return (Math.round(n*1000)/1000).toLocaleString('pt-BR'); };
+        if(temDia && linhas.length){
+          linhas.sort(function(a,b){ return a.d<b.d?1:a.d>b.d?-1:0; });
+          var tq=0, tv=0; linhas.forEach(function(x){ tq+=x.q; tv+=x.v; });
+          corpo('<div class="mini" style="margin-bottom:10px">Últimos 90 dias · '+linhas.length+' compra'+(linhas.length===1?'':'s')+(varias?' · '+lojas.length+' lojas com este nome':'')+'</div>'
+            + '<div class="tscroll"><table class="tb"><tr><th>Data</th>'+(varias?'<th>Loja</th>':'')+'<th class="r">Quantidade</th><th class="r">Valor</th></tr>'
+            + linhas.map(function(x){ return '<tr><td>'+fmtDia(x.d)+' <span class="mini">'+DIAS_SEM[new Date(x.d+'T12:00:00').getDay()].slice(0,3).toLowerCase()+'</span></td>'
+                + (varias?'<td class="mini">'+esc(x.loja)+'</td>':'')+'<td class="r">'+qf(x.q)+'</td><td class="r">'+fmtRS(x.v)+'</td></tr>'; }).join('')
+            + '<tr><td'+(varias?' colspan="2"':'')+'><b>Total</b></td><td class="r"><b>'+qf(tq)+'</b></td><td class="r"><b>'+fmtRS(tv)+'</b></td></tr></table></div>'
+            + '<div class="mini" style="margin-top:8px">Cada linha é um dia com nota desse produto (somadas as notas do mesmo dia).</div>');
+          return;
+        }
+        if(meses.length){
+          meses.sort(function(a,b){ return a.m<b.m?1:-1; });
+          corpo('<div class="alert a-info">ⓘ As compras dia a dia aparecem quando o robô do ERP gravar a versão nova da base por loja. Por enquanto, mês a mês:</div>'
+            + '<div class="tscroll"><table class="tb"><tr><th>Mês</th>'+(varias?'<th>Loja</th>':'')+'<th class="r">Quantidade</th><th class="r">Valor</th></tr>'
+            + meses.map(function(x){ return '<tr><td>'+nomeMes(x.m)+'</td>'+(varias?'<td class="mini">'+esc(x.loja)+'</td>':'')+'<td class="r">'+qf(x.q)+'</td><td class="r">'+fmtRS(x.v)+'</td></tr>'; }).join('')
+            + '</table></div>');
+          return;
+        }
+        corpo('<div class="empty">Sem compras deste produto nos últimos 90 dias na base por loja.</div>');
+      });
+  }).catch(function(e){ corpo('<div class="empty">'+(e&&e.code==='permission-denied'?'Sem permissão para ler a base de compras por loja.':'Não foi possível ler as compras ('+esc(e&&e.message||e)+').')+'</div>'); });
+}
 /* Os últimos 90 dias, no que o ERP permite: o robô soma por MÊS, então entram
    os meses que cobrem os 90 dias (o primeiro deles inteiro) até hoje. */
 function meses90(ms){ var ini=somaDias(hoje(), -89).slice(0,7); return (ms||[]).filter(function(m){ return m>=ini; }); }
@@ -6374,11 +6440,14 @@ function comprasRecentesHtml(c){
   if(!r.l.length) return c.erpId ? tit+'<div class="mini" style="margin-bottom:13px">Sem compras nesse período.</div>' : '';
   var tv=0, tq=0; r.l.forEach(function(x){ tv+=x.v; tq+=x.q; });
   var qtd=function(n){ return n ? (Math.round(n*100)/100).toLocaleString('pt-BR') : '<span class="mini">—</span>'; };
+  var clic=!!(U.gestor||U.ngTodas); CP_NOMES[c.id]=r.l.map(function(x){ return x.p; });
   return tit+'<div class="tscroll" style="max-height:340px;margin-bottom:6px"><table class="tb"><tr><th>Produto</th><th class="r">Quantidade</th><th class="r">Valor</th><th class="r">Última compra</th></tr>'
-    +r.l.map(function(x){ return '<tr><td>'+esc(x.p)+'</td><td class="r">'+qtd(x.q)+'</td><td class="r">'+fmtRS(x.v)+'</td>'
+    +r.l.map(function(x, i){ return '<tr'+(clic?' class="cp-lin" title="Ver as compras deste produto, dia a dia" onclick="verCompraProduto(\''+c.id+'\','+i+')"':'')+'>'
+      +'<td>'+esc(x.p)+(clic?' <span class="cp-seta">›</span>':'')+'</td><td class="r">'+qtd(x.q)+'</td><td class="r">'+fmtRS(x.v)+'</td>'
       +'<td class="r mini">'+(ms[x.ult]?nomeMes(ms[x.ult]):'—')+'</td></tr>'; }).join('')
     +'<tr><td><b>Total · '+r.l.length+' produto'+(r.l.length===1?'':'s')+'</b></td><td class="r"><b>'+qtd(tq)+'</b></td><td class="r"><b>'+fmtRS(tv)+'</b></td><td></td></tr></table></div>'
-    +'<div class="mini" style="margin-bottom:13px">O ERP soma as vendas por mês: '+(ms.length?nomeMes(ms[0])+' entra inteiro. ':'')+'Mostra os produtos que o robô registra para cada cliente'+(r.cortado?' (nesta carteira, só os de maior valor)':'')+'.</div>';
+    +'<div class="mini" style="margin-bottom:13px">O ERP soma as vendas por mês: '+(ms.length?nomeMes(ms[0])+' entra inteiro. ':'')+'Mostra os produtos que o robô registra para cada cliente'+(r.cortado?' (nesta carteira, só os de maior valor)':'')+'.'
+      +(clic?' Clique num produto para ver as compras dia a dia.':'')+'</div>';
 }
 
 /* =====================================================================
