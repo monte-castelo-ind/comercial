@@ -533,6 +533,25 @@ details.mais[open]{padding-bottom:4px}
 }
 .modal table thead th,.modal table tr:first-child>th{position:sticky;top:0;z-index:3;background:var(--card);box-shadow:inset 0 -1px 0 var(--border)}
 
+/* relatórios */
+.rel-abas{margin-bottom:14px;flex-wrap:wrap}
+.rel-fil{align-items:center}
+.rel-lbl{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);font-weight:600}
+.rel-lbl select{min-width:96px}
+.rel-fil select{min-width:0}
+.rel-fil input[type=search]{flex:1 1 170px;min-width:150px}
+.rel-bts{display:flex;gap:6px;margin-left:auto}
+.rel-med button{min-width:46px}
+.rel-tb td.r,.rel-tb th.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rel-tb tfoot td{border-top:2px solid var(--border);background:var(--card-2)}
+.rel-tb tbody tr:hover td{background:var(--card-2)}
+.rel-abc{display:inline-flex;width:22px;height:22px;border-radius:7px;align-items:center;justify-content:center;font-weight:800;font-size:12px}
+.rel-abc.a{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green)}
+.rel-abc.b{background:color-mix(in srgb,var(--blue) 18%,transparent);color:var(--blue)}
+.rel-abc.c{background:var(--card-2);color:var(--muted)}
+.rel-neg{color:var(--red);font-weight:600}
+.rel-pos{color:var(--green);font-weight:600}
+
 /* acordo com mais de um cliente */
 .ng-extra-l{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .ng-extra-l:empty{display:none}
@@ -740,6 +759,7 @@ main{min-width:0;overflow-x:clip}
       <button class="navsub" data-a="fichas" onclick="navProd('fichas')"><span class="lbl">Fichas técnicas</span></button>
     </div>
     <button class="navbtn gestor-only so-desk" data-p="equipe" onclick="nav('equipe')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM20 20v-1.5a3.5 3.5 0 0 0-2.5-3.35M15.5 4.2a3.5 3.5 0 0 1 0 6.6"/></svg></span><span class="lbl lab-d">Equipe</span><span class="lab-m">Equipe</span></button>
+    <button class="navbtn rel-vis so-desk" data-p="rel" onclick="nav('rel')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></span><span class="lbl">Relatórios</span></button>
     <div class="side-sec lbl com-only so-desk">Equipamentos</div>
     <button class="navbtn com-only so-desk" data-p="equip" onclick="nav('equip')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM5 10h14M8 6v2M8 13v3"/></svg></span><span class="lbl lab-d">Nos clientes</span><span class="lab-m">Equip.</span></button>
     <button class="navbtn so-desk gestor-only" data-p="eqhist" onclick="nav('eqhist')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg></span><span class="lbl">Histórico</span></button>
@@ -807,6 +827,14 @@ main{min-width:0;overflow-x:clip}
         <div><div class="sect" id="h-alerta-tit">Sem comprar</div><div id="h-alerta"></div></div>
       </div>
       <div class="sect">Solicitações recentes</div><div id="h-sol"></div>
+    </div>
+
+    <!-- RELATÓRIOS -->
+    <div class="page" id="page-rel">
+      <div class="seg rel-abas" id="rel-abas"></div>
+      <div class="tools rel-fil" id="rel-fil"></div>
+      <div id="rel-res"></div>
+      <div id="rel-tab"></div>
     </div>
 
     <!-- NEGOCIAÇÕES -->
@@ -2622,6 +2650,295 @@ function ngReabrir(id){
     .then(function(){ toast('Negociação reaberta.'); setTimeout(function(){ verNegoc(id); }, 150); }).catch(falha('reabrir'));
 }
 
+/* =====================================================================
+   RELATÓRIOS (nov/2026) — diretoria, gerentes e quem tem "Acordos de todos".
+   Vendas do ERP por cliente (R$ ou kg, filtro por tipo de produto), comparativo
+   de meses, agrupado por vendedor/rota/cidade/tipo, visitas e benefícios.
+   Fonte das vendas: comercialRel/{AAAA-MM} (robô, com tipo e kg); sem ele, o
+   comercialClienteMes (só R$). Cada relatório monta uma "tabela" única que vira
+   tela, Excel e PDF — o mesmo conteúdo nos três.
+   ===================================================================== */
+var REL={ aba:'cli', meses:[], cm:{}, rel:{}, lendo:false, lido:false, erro:'',
+          med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', T:null };
+var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos']];
+function relPode(){ return !!(U.gestor || U.ngTodas); }
+function fmtKg(v){ return (Math.round(v||0)).toLocaleString('pt-BR')+' kg'; }
+function relFmt(v){ return REL.med==='kg' ? fmtKg(v) : fmtRS0(v); }
+var REL_TIPO_NOME={ PAO_FRANCES:'Pão francês', MIUDEZA:'Miudeza', CUCAS:'Cucas', PAO_DE_QUEIJO:'Pão de queijo', MASSA_FOLHADA:'Massa folhada',
+  SALGADOS_LANCHE:'Salgados lanche', SALGADOS_KG:'Salgados kg', 'SEM TIPO':'Sem tipo' };
+function relTipoNome(t){ if(REL_TIPO_NOME[t]) return REL_TIPO_NOME[t];
+  t=String(t||'').replace(/_/g,' ').trim().toLowerCase(); return t ? t.charAt(0).toUpperCase()+t.slice(1) : '—'; }
+function relCarregar(){
+  if(REL.lendo || REL.lido) return;
+  REL.lendo=true; REL.erro='';
+  var ms=mesesAtras(13).reverse(); REL.meses=ms;
+  var pCm=Promise.all(ms.map(function(m){ return getDoc(doc(db,'comercialClienteMes',m))
+    .then(function(s){ if(s.exists()) REL.cm[m]=(s.data()||{}).clientes||{}; }).catch(function(){}); }));
+  var pRel=getDocs(query(collection(db,'comercialRel'), limit(40)))
+    .then(function(s){ s.docs.forEach(function(x){ if(/^\d{4}-\d{2}$/.test(x.id)) REL.rel[x.id]=x.data()||{}; }); })
+    .catch(function(e){ console.warn('comercialRel:', e); });
+  Promise.all([pCm, pRel]).then(function(){
+    REL.lendo=false; REL.lido=true;
+    var com=relMesesComDados();
+    if(!REL.ate) REL.ate=com.length?com[com.length-1]:mesAtual();
+    if(!REL.de) REL.de=REL.ate;
+    if(!REL.mB){ REL.mB=com.length>1?com[com.length-2]:REL.ate; REL.mA=mesAntesDe(REL.mB); }
+    renderRel();
+  }).catch(function(e){ REL.lendo=false; REL.erro=e.message||String(e); renderRel(); });
+}
+function relMesesComDados(){ return REL.meses.filter(function(m){ return REL.cm[m] || REL.rel[m]; }); }
+function relPeriodo(){ var a=REL.de<=REL.ate?REL.de:REL.ate, b=REL.de<=REL.ate?REL.ate:REL.de; return REL.meses.filter(function(m){ return m>=a && m<=b; }); }
+function relTemRel(ms){ return ms.length>0 && ms.every(function(m){ return !!REL.rel[m]; }); }
+function relTipos(ms){ var t={}; ms.forEach(function(m){ ((REL.rel[m]||{}).tipos||[]).forEach(function(x){ t[x]=1; }); }); return Object.keys(t).sort(); }
+/* uma linha por cliente (loja), com o valor de cada mês na medida e no tipo escolhidos */
+function relLinhas(ms, semTipo){
+  var usaRel=relTemRel(ms), med=REL.med==='kg'?1:0, tipo=semTipo?'':REL.tipo, idx={};
+  ms.forEach(function(m){
+    if(usaRel){
+      var cs=(REL.rel[m]||{}).c||{};
+      Object.keys(cs).forEach(function(k){ var c=cs[k]||{}, t=c.t||{}, v=0;
+        Object.keys(t).forEach(function(tp){ if(tipo && tp!==tipo) return; v+=(t[tp]||[])[med]||0; });
+        if(!v) return;
+        var r=idx[k]||(idx[k]={ k:k, nome:c.n||k, cid:c.ci||'', rota:c.ro||'', rep:c.r||'', porMes:{}, total:0, tipos:{} });
+        Object.keys(t).forEach(function(tp){ if(tipo && tp!==tipo) return; r.tipos[tp]=(r.tipos[tp]||0)+((t[tp]||[])[med]||0); });
+        r.porMes[m]=(r.porMes[m]||0)+v; r.total+=v; });
+    } else if(!med && !tipo){
+      var cs2=REL.cm[m]||{};
+      Object.keys(cs2).forEach(function(k){ var c=cs2[k]||{}, v=c.fat||0; if(!v) return;
+        var key=normEmp(c.nome||k);
+        var r=idx[key]||(idx[key]={ k:key, nome:c.nome||k, cid:c.cidade||'', rota:c.rota||'', rep:c.rep||'', porMes:{}, total:0, tipos:{} });
+        r.porMes[m]=(r.porMes[m]||0)+v; r.total+=v; });
+    }
+  });
+  return Object.keys(idx).map(function(k){ var r=idx[k], cc=cliDaCarteira({ nome:r.nome });
+    r.vend=cc ? (cc.donoNome||'') : '';
+    if(cc){ if(!r.cid) r.cid=cidadeDe(cc)||''; if(!r.rota) r.rota=rotaDe(cc)||''; r.cliId=cc.id; }
+    r.vendTxt=r.vend || (r.rep ? r.rep+' (ERP)' : 'Sem vendedor');
+    return r; });
+}
+function relFiltra(l){
+  var q=norm(REL.busca||'').split(' ').filter(Boolean);
+  return l.filter(function(r){
+    if(REL.vend && r.vendTxt!==REL.vend) return false;
+    if(q.length){ var t=norm([r.nome, r.cid, r.rota, r.vendTxt].join(' ')); if(!q.every(function(w){ return t.indexOf(w)>=0; })) return false; }
+    return true; });
+}
+function relCliCel(r){ return '<b>'+esc(r.nome)+'</b>'+(r.cid?'<span class="ct-cid"> - '+esc(cidadeBonita(r.cid))+'</span>':''); }
+function relSemDados(ms){
+  if(!ms.length) return 'Escolha o período.';
+  if((REL.med==='kg' || REL.tipo) && !relTemRel(ms))
+    return 'Os valores em kg e o filtro por tipo de produto aparecem quando o robô dos relatórios gravar este período (comercialRel). Por enquanto, use R$ e todos os tipos.';
+  return '';
+}
+/* ---------- 1) vendas por cliente, com curva ABC ---------- */
+function relCli(){
+  var ms=relPeriodo(), aviso=relSemDados(ms);
+  var base=relLinhas(ms).sort(function(a,b){ return b.total-a.total; });
+  var tot=base.reduce(function(s,r){ return s+r.total; },0), acc=0;
+  base.forEach(function(r){ var antes=acc/(tot||1); acc+=r.total; r.abc=antes<0.8?'A':antes<0.95?'B':'C'; r.pct=tot?r.total/tot:0; });
+  var l=relFiltra(base), mostra=ms.length<=6;
+  var nA=base.filter(function(r){ return r.abc==='A'; }).length, sub=l.reduce(function(s,r){ return s+r.total; },0);
+  var cols=[{t:'#'},{t:'Cliente'},{t:'Vendedor'}].concat(mostra?ms.map(function(m){ return { t:nomeMes(m), r:1 }; }):[]).concat([{t:'Total', r:1},{t:'% do total', r:1},{t:'ABC'}]);
+  var linhas=l.map(function(r, i){
+    var mesC=mostra?ms.map(function(m){ return r.porMes[m]||0; }):[];
+    return { id:r.cliId||'',
+      cels:[String(i+1), relCliCel(r), esc(r.vendTxt)].concat(mesC.map(function(v){ return v?relFmt(v):'<span class="mini">—</span>'; }))
+        .concat(['<b>'+relFmt(r.total)+'</b>', (r.pct*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%', '<span class="rel-abc '+r.abc.toLowerCase()+'">'+r.abc+'</span>']),
+      xls:[i+1, r.nome+(r.cid?' - '+cidadeBonita(r.cid):''), r.vendTxt].concat(mesC.map(function(v){ return Math.round(v); })).concat([Math.round(r.total), Math.round(r.pct*1000)/10, r.abc]) }; });
+  return { titulo:'Vendas por cliente', cols:cols, linhas:linhas, aviso:aviso,
+    total:{ cels:['','<b>Total</b>',''].concat(mostra?ms.map(function(m){ return '<b>'+relFmt(l.reduce(function(s,r){ return s+(r.porMes[m]||0); },0))+'</b>'; }):[]).concat(['<b>'+relFmt(sub)+'</b>', tot?(sub/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'', '']) },
+    resumo:[['Total no período', relFmt(tot)], ['Clientes que compraram', base.length.toLocaleString('pt-BR')],
+            ['Média por cliente', base.length?relFmt(tot/base.length):'—'], ['Curva A', nA+' cliente'+(nA===1?'':'s')+' = 80% do total']],
+    nota:'Curva ABC: A = clientes que somam os primeiros 80% do total; B = os 15% seguintes; C = o resto. Clique no cliente para abrir a ficha.' };
+}
+/* ---------- 2) comparativo entre dois meses ---------- */
+function relCmp(){
+  var ms=[REL.mA, REL.mB].filter(Boolean), aviso=relSemDados(ms);
+  var base=relLinhas(ms), mA=REL.mA, mB=REL.mB;
+  base.forEach(function(r){ r.a=r.porMes[mA]||0; r.b=r.porMes[mB]||0; r.dif=r.b-r.a; r.pc=r.a?r.dif/r.a:null; });
+  var conta={ caiu:0, parou:0, novo:0, subiu:0 };
+  base.forEach(function(r){ if(r.a>0 && r.b===0) conta.parou++; else if(r.a===0 && r.b>0) conta.novo++; else if(r.pc!=null && r.pc<=-0.3) conta.caiu++; else if(r.pc!=null && r.pc>=0.3) conta.subiu++; });
+  var f=REL.cmpF, l=relFiltra(base).filter(function(r){
+    if(f==='parou') return r.a>0 && r.b===0; if(f==='novo') return r.a===0 && r.b>0;
+    if(f==='caiu') return r.b>0 && r.pc!=null && r.pc<=-0.3; if(f==='subiu') return r.a>0 && r.pc!=null && r.pc>=0.3; return true; })
+    .sort(function(x,y){ return x.dif-y.dif; });
+  var tA=base.reduce(function(s,r){ return s+r.a; },0), tB=base.reduce(function(s,r){ return s+r.b; },0);
+  var pct=function(p){ return p==null?'<span class="mini">novo</span>':'<span class="'+(p<0?'rel-neg':'rel-pos')+'">'+(p>0?'+':'')+(Math.round(p*1000)/10).toLocaleString('pt-BR')+'%</span>'; };
+  return { titulo:'Comparativo de meses', aviso:aviso,
+    cols:[{t:'Cliente'},{t:'Vendedor'},{t:nomeMes(mA), r:1},{t:nomeMes(mB), r:1},{t:'Diferença', r:1},{t:'Variação', r:1}],
+    linhas:l.map(function(r){ return { id:r.cliId||'', cels:[relCliCel(r), esc(r.vendTxt), r.a?relFmt(r.a):'—', r.b?relFmt(r.b):'—',
+        '<span class="'+(r.dif<0?'rel-neg':'rel-pos')+'">'+(r.dif>0?'+':'')+relFmt(r.dif)+'</span>', pct(r.pc)],
+      xls:[r.nome+(r.cid?' - '+cidadeBonita(r.cid):''), r.vendTxt, Math.round(r.a), Math.round(r.b), Math.round(r.dif), r.pc==null?'':Math.round(r.pc*1000)/10] }; }),
+    total:{ cels:['<b>Total</b>','','<b>'+relFmt(tA)+'</b>','<b>'+relFmt(tB)+'</b>','<b>'+(tB-tA>0?'+':'')+relFmt(tB-tA)+'</b>', tA?pct((tB-tA)/tA):''] },
+    resumo:[[nomeMes(mA)+' → '+nomeMes(mB), relFmt(tA)+' → '+relFmt(tB)], ['Pararam de comprar', String(conta.parou)], ['Caíram 30% ou mais', String(conta.caiu)], ['Novos no mês', String(conta.novo)]],
+    chips:[['todos','Todos'],['caiu','Caíram 30%+ ('+conta.caiu+')'],['parou','Pararam ('+conta.parou+')'],['novo','Novos ('+conta.novo+')'],['subiu','Subiram 30%+ ('+conta.subiu+')']],
+    nota:'Ordem: maiores quedas primeiro. "Pararam" = compraram em '+nomeMes(mA)+' e nada em '+nomeMes(mB)+'.' };
+}
+/* ---------- 3) agrupado: vendedor, rota, cidade ou tipo de produto ---------- */
+function relGrp(){
+  var ms=relPeriodo(), aviso=relSemDados(ms), g=REL.grp;
+  if(g==='tipo' && !relTemRel(ms)) aviso='O agrupamento por tipo de produto aparece quando o robô dos relatórios gravar este período.';
+  var base=relFiltra(relLinhas(ms, g==='tipo')), grupos={}, mostra=ms.length<=6;
+  base.forEach(function(r){
+    var chaves = g==='tipo' ? Object.keys(r.tipos) : [g==='vend'?r.vendTxt : g==='rota'?(r.rota||'Sem rota') : (r.cid?cidadeBonita(r.cid):'Sem cidade')];
+    chaves.forEach(function(k){
+      var v = g==='tipo' ? (r.tipos[k]||0) : r.total; if(!v) return;
+      var nome = g==='tipo' ? relTipoNome(k) : k;
+      var o=grupos[nome]||(grupos[nome]={ nome:nome, cli:{}, total:0, porMes:{} });
+      o.cli[r.k]=1; o.total+=v;
+      if(g!=='tipo') ms.forEach(function(m){ o.porMes[m]=(o.porMes[m]||0)+(r.porMes[m]||0); });
+    }); });
+  var l=Object.keys(grupos).map(function(k){ return grupos[k]; }).sort(function(a,b){ return b.total-a.total; });
+  var tot=l.reduce(function(s,o){ return s+o.total; },0), rot={ vend:'Vendedor', rota:'Rota', cid:'Cidade', tipo:'Tipo de produto' }[g];
+  var mc=mostra && g!=='tipo';
+  return { titulo:'Vendas por '+rot.toLowerCase(), aviso:aviso,
+    cols:[{t:rot},{t:'Clientes', r:1}].concat(mc?ms.map(function(m){ return { t:nomeMes(m), r:1 }; }):[]).concat([{t:'Total', r:1},{t:'% do total', r:1},{t:'Média por cliente', r:1}]),
+    linhas:l.map(function(o){ var n=Object.keys(o.cli).length;
+      return { cels:['<b>'+esc(o.nome)+'</b>', n.toLocaleString('pt-BR')].concat(mc?ms.map(function(m){ return o.porMes[m]?relFmt(o.porMes[m]):'—'; }):[])
+          .concat(['<b>'+relFmt(o.total)+'</b>', tot?(o.total/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'', relFmt(n?o.total/n:0)]),
+        xls:[o.nome, n].concat(mc?ms.map(function(m){ return Math.round(o.porMes[m]||0); }):[]).concat([Math.round(o.total), tot?Math.round(o.total/tot*1000)/10:0, Math.round(n?o.total/n:0)]) }; }),
+    total:{ cels:['<b>Total</b>', ''].concat(mc?ms.map(function(){ return ''; }):[]).concat(['<b>'+relFmt(tot)+'</b>','100%','']) },
+    resumo:[['Total no período', relFmt(tot)], [{ vend:'Vendedores', rota:'Rotas', cid:'Cidades', tipo:'Tipos de produto' }[g], String(l.length)], ['Maior', l[0]?l[0].nome:'—']],
+    chips:[['vend','Vendedor'],['rota','Rota'],['cid','Cidade'],['tipo','Tipo de produto']],
+    nota:g==='vend'?'Vendedor = dono do cliente na carteira; cliente fora da carteira aparece com o representante do ERP.':'' };
+}
+/* ---------- 4) visitas e contatos por vendedor (últimos 3 meses carregados) ---------- */
+function relVis(){
+  if(!U.gestor) return { titulo:'Visitas e contatos', cols:[], linhas:[], aviso:'Este relatório é da diretoria e dos gerentes.' };
+  var p=REL.visPer, m0=mesAtual(), m1=mesAnterior();
+  var l=(visitas||[]).filter(function(v){ return p==='mes'?v.mes===m0 : p==='ant'?v.mes===m1 : true; });
+  var g={};
+  l.forEach(function(v){ var k=nomeVend(v.donoNome||v.donoEmail); var o=g[k]||(g[k]={ nome:k, visita:0, ligacao:0, whatsapp:0, cli:{}, ult:'' });
+    o[v.tipo]=(o[v.tipo]||0)+1; o.cli[v.clienteId||v.clienteNome||v.id]=1; if(String(v.data||'')>o.ult) o.ult=String(v.data||''); });
+  var rows=Object.keys(g).map(function(k){ return g[k]; }).sort(function(a,b){ return (b.visita+b.ligacao+b.whatsapp)-(a.visita+a.ligacao+a.whatsapp); });
+  var tot=function(f){ return rows.reduce(function(s,o){ return s+(o[f]||0); },0); };
+  return { titulo:'Visitas e contatos',
+    cols:[{t:'Vendedor'},{t:'Visitas', r:1},{t:'Ligações', r:1},{t:'WhatsApp', r:1},{t:'Total', r:1},{t:'Clientes diferentes', r:1},{t:'Último contato'}],
+    linhas:rows.map(function(o){ var t=o.visita+o.ligacao+o.whatsapp, n=Object.keys(o.cli).length;
+      return { cels:['<b>'+esc(o.nome)+'</b>', o.visita, o.ligacao, o.whatsapp, '<b>'+t+'</b>', n, o.ult?fmtDia(o.ult):'—'],
+        xls:[o.nome, o.visita, o.ligacao, o.whatsapp, t, n, o.ult?fmtDia(o.ult):''] }; }),
+    total:{ cels:['<b>Total</b>', tot('visita'), tot('ligacao'), tot('whatsapp'), '<b>'+l.length+'</b>', '', ''] },
+    resumo:[['Contatos', String(l.length)], ['Visitas', String(tot('visita'))], ['Vendedores', String(rows.length)]],
+    chips:[['mes','Este mês'],['ant','Mês passado'],['3m','Últimos 3 meses']] };
+}
+/* ---------- 5) benefícios dos acordos, mês a mês ---------- */
+function relBen(){
+  var ms=mesesAtras(6).reverse(), linhas=[], T={ ac:0, con:0, pag:0, prod:0 };
+  ms.forEach(function(m){
+    var vig=negocs.filter(function(n){ return ngTemAcordo(n) && ngVigente(n, m); });
+    var o={ vig:vig.length, aval:0, con:0, neg:0, rsCon:0, rsPag:0, prod:0 };
+    vig.forEach(function(n){ var av=(n.avaliacoes||{})[m]; if(!av) return; o.aval++;
+      var emProd=(n.acordo||{}).benTipo==='qtd', v=+av.beneficio||0;
+      if(av.status==='negado'){ o.neg++; return; }
+      if(av.status==='concedido' || av.status==='pago'){ o.con++; if(emProd) o.prod+=v; else { o.rsCon+=v; if(av.status==='pago') o.rsPag+=v; } } });
+    T.con+=o.rsCon; T.pag+=o.rsPag; T.prod+=o.prod;
+    linhas.push({ cels:['<b>'+nomeMes(m)+'</b>', o.vig, o.aval+(o.vig>o.aval&&m<mesAtual()?' <span class="mini">('+(o.vig-o.aval)+' a avaliar)</span>':''), o.con, o.neg,
+        fmtRS0(o.rsCon), fmtRS0(o.rsPag), o.rsCon-o.rsPag>0?'<span class="rel-neg">'+fmtRS0(o.rsCon-o.rsPag)+'</span>':'—', o.prod?o.prod.toLocaleString('pt-BR'):'—'],
+      xls:[nomeMes(m), o.vig, o.aval, o.con, o.neg, Math.round(o.rsCon), Math.round(o.rsPag), Math.round(o.rsCon-o.rsPag), o.prod] });
+  });
+  return { titulo:'Benefícios dos acordos',
+    cols:[{t:'Mês'},{t:'Acordos em vigor', r:1},{t:'Avaliados', r:1},{t:'Concedidos', r:1},{t:'Não concedidos', r:1},{t:'Concedido (R$)', r:1},{t:'Pago (R$)', r:1},{t:'A pagar (R$)', r:1},{t:'Em produto (qtd)', r:1}],
+    linhas:linhas, total:{ cels:['<b>6 meses</b>','','','','','<b>'+fmtRS0(T.con)+'</b>','<b>'+fmtRS0(T.pag)+'</b>','<b>'+fmtRS0(T.con-T.pag)+'</b>', T.prod?'<b>'+T.prod.toLocaleString('pt-BR')+'</b>':''] },
+    resumo:[['Concedido em 6 meses', fmtRS0(T.con)], ['Pago', fmtRS0(T.pag)], ['A pagar', fmtRS0(T.con-T.pag)], ['Em produto', T.prod?T.prod.toLocaleString('pt-BR')+' un.':'—']],
+    nota:'Benefício em produto (pacotes, caixas…) conta à parte, em quantidade. O detalhe de cada acordo está em Negociações → Avaliação do mês.' };
+}
+/* ---------- tela ---------- */
+function relFiltrosHtml(){
+  var a=REL.aba, com=relMesesComDados(), op=function(sel){ return com.slice().reverse().map(function(m){ return '<option value="'+m+'"'+(m===sel?' selected':'')+'>'+nomeMes(m)+'</option>'; }).join(''); };
+  var h='';
+  if(a==='cli' || a==='grp'){
+    h+='<label class="rel-lbl">De <select onchange="relSet(\'de\',this.value)">'+op(REL.de)+'</select></label>'
+      +'<label class="rel-lbl">até <select onchange="relSet(\'ate\',this.value)">'+op(REL.ate)+'</select></label>';
+  }
+  if(a==='cmp'){
+    h+='<label class="rel-lbl">Comparar <select onchange="relSet(\'mA\',this.value)">'+op(REL.mA)+'</select></label>'
+      +'<label class="rel-lbl">com <select onchange="relSet(\'mB\',this.value)">'+op(REL.mB)+'</select></label>';
+  }
+  if(a==='cli' || a==='cmp' || a==='grp'){
+    var ms=a==='cmp'?[REL.mA,REL.mB]:relPeriodo(), tipos=relTipos(ms);
+    h+='<div class="seg rel-med" title="Medida"><button class="'+(REL.med==='rs'?'on':'')+'" onclick="relSet(\'med\',\'rs\')">R$</button><button class="'+(REL.med==='kg'?'on':'')+'" onclick="relSet(\'med\',\'kg\')">kg</button></div>'
+      +(a==='grp' && REL.grp==='tipo' ? '' : '<select onchange="relSet(\'tipo\',this.value)" title="Tipo de produto"><option value="">Todos os tipos de produto</option>'
+      +tipos.map(function(t){ return '<option value="'+esc(t)+'"'+(t===REL.tipo?' selected':'')+'>'+esc(relTipoNome(t))+'</option>'; }).join('')+'</select>');
+    var vs={}; relLinhas(ms).forEach(function(r){ vs[r.vendTxt]=1; });
+    h+='<select onchange="relSet(\'vend\',this.value)"><option value="">Todos os vendedores</option>'
+      +Object.keys(vs).sort().map(function(v){ return '<option'+(v===REL.vend?' selected':'')+'>'+esc(v)+'</option>'; }).join('')+'</select>'
+      +'<input type="search" placeholder="Buscar cliente, cidade, rota…" value="'+esc(REL.busca)+'" oninput="REL.busca=this.value;clearTimeout(window._relT);window._relT=setTimeout(relPintar,250)">';
+  }
+  h+='<span class="rel-bts"><button class="btn btn-sm btn-ghost" onclick="relExcel()">⤓ Excel</button><button class="btn btn-sm btn-ghost" onclick="relPdf()">⎙ PDF</button></span>';
+  return h;
+}
+function relCalc(){ return ({ cli:relCli, cmp:relCmp, grp:relGrp, vis:relVis, ben:relBen })[REL.aba](); }
+function renderRel(){
+  var box=$('page-rel'); if(!box) return;
+  if(!relPode()){ box.innerHTML='<div class="empty">Os relatórios são da diretoria e dos gerentes.</div>'; return; }
+  $('rel-abas').innerHTML=REL_ABAS.filter(function(x){ return x[0]!=='vis' || U.gestor; })
+    .map(function(x){ return '<button class="'+(REL.aba===x[0]?'on':'')+'" onclick="relSet(\'aba\',\''+x[0]+'\')">'+x[1]+'</button>'; }).join('');
+  if(!REL.lido){ $('rel-fil').innerHTML=''; $('rel-res').innerHTML=''; $('rel-tab').innerHTML='<div class="empty">'+(REL.erro?'Não foi possível ler as vendas: '+esc(REL.erro):'Lendo as vendas do ERP…')+'</div>'; relCarregar(); return; }
+  $('rel-fil').innerHTML=relFiltrosHtml();
+  relPintar();
+}
+function relPintar(){
+  var T=REL.T=relCalc();
+  $('rel-res').innerHTML=(T.resumo||[]).length ? '<div class="kpis">'+T.resumo.map(function(x){ return '<div class="card kpi fixo"><div class="klabel">'+esc(x[0])+'</div><div class="kval" style="font-size:20px">'+esc(x[1])+'</div></div>'; }).join('')+'</div>' : '';
+  var chips=(T.chips||[]).length ? '<div class="chips" style="margin-bottom:12px">'+T.chips.map(function(c){ var on=(REL.aba==='cmp'?REL.cmpF:REL.aba==='grp'?REL.grp:REL.visPer)===c[0];
+      return '<button class="chip'+(on?' on':'')+'" onclick="relSet(\''+(REL.aba==='cmp'?'cmpF':REL.aba==='grp'?'grp':'visPer')+'\',\''+c[0]+'\')">'+esc(c[1])+'</button>'; }).join('')+'</div>' : '';
+  var aviso=T.aviso ? '<div class="alert a-info">ⓘ '+esc(T.aviso)+'</div>' : '';
+  if(!T.linhas.length){ $('rel-tab').innerHTML=chips+aviso+'<div class="empty">Nada neste filtro.</div>'; return; }
+  $('rel-tab').innerHTML=chips+aviso+'<div class="card" style="padding:0;overflow:clip"><div class="tscroll"><table class="tb rel-tb"><thead><tr>'
+    + T.cols.map(function(c){ return '<th'+(c.r?' class="r"':'')+'>'+esc(c.t)+'</th>'; }).join('')+'</tr></thead><tbody>'
+    + T.linhas.map(function(l){ return '<tr'+(l.id?' style="cursor:pointer" onclick="verCliente(\''+l.id+'\')"':'')+'>'+l.cels.map(function(c, i){ return '<td'+(T.cols[i]&&T.cols[i].r?' class="r"':'')+'>'+c+'</td>'; }).join('')+'</tr>'; }).join('')
+    + '</tbody>'+(T.total?'<tfoot><tr>'+T.total.cels.map(function(c, i){ return '<td'+(T.cols[i]&&T.cols[i].r?' class="r"':'')+'>'+c+'</td>'; }).join('')+'</tr></tfoot>':'')
+    + '</table></div></div>'
+    + '<div class="mini" style="margin-top:8px">'+(T.nota?esc(T.nota)+' ':'')+relFonte()+'</div>';
+}
+function relFonte(){
+  if(REL.aba==='vis' || REL.aba==='ben') return '';
+  var ms=REL.aba==='cmp'?[REL.mA,REL.mB]:relPeriodo(), d=null;
+  if(relTemRel(ms)) ms.forEach(function(m){ var a=(REL.rel[m]||{}).atualizadoEm; if(a && (!d||a>d)) d=a; });
+  return 'Fonte: vendas do ERP'+(relTemRel(ms)?' (por tipo de produto'+(d?', atualizado em '+fmtQuando(d):'')+')':' (total por cliente, em R$)')+'.';
+}
+function relSet(k, v){
+  REL[k]=v;
+  if(k==='aba' || k==='de' || k==='ate' || k==='mA' || k==='mB'){ if(k!=='aba'){ REL.tipo=''; } }
+  renderRel();
+}
+function relFiltrosTxt(){
+  var a=REL.aba, p=[];
+  if(a==='cli' || a==='grp') p.push(REL.de===REL.ate?nomeMes(REL.de):nomeMes(REL.de)+' a '+nomeMes(REL.ate));
+  if(a==='cmp') p.push(nomeMes(REL.mA)+' × '+nomeMes(REL.mB));
+  if(a==='cli' || a==='cmp' || a==='grp'){ p.push(REL.med==='kg'?'em kg':'em R$'); if(REL.tipo) p.push(relTipoNome(REL.tipo)); if(REL.vend) p.push(REL.vend); if(REL.busca) p.push('busca: “'+REL.busca+'”'); }
+  if(a==='vis') p.push({ mes:'este mês', ant:'mês passado', '3m':'últimos 3 meses' }[REL.visPer]);
+  return p.join(' · ');
+}
+function relTxt(h){ var d=document.createElement('div'); d.innerHTML=String(h==null?'':h); return d.textContent; }
+function relExcel(){
+  var T=REL.T; if(!T || !T.linhas.length){ toast('Nada para exportar.', true); return; }
+  carregarXLSX().then(function(){
+    var aoa=[[T.titulo+' — '+relFiltrosTxt()], [], T.cols.map(function(c){ return c.t; })]
+      .concat(T.linhas.map(function(l){ return l.xls || l.cels.map(relTxt); }));
+    if(T.total) aoa.push(T.total.cels.map(relTxt));
+    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=T.cols.map(function(c, i){ return { wch:i<=1?34:14 }; });
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Relatório');
+    XLSX.writeFile(wb, 'relatorio-'+norm(T.titulo).toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+hoje()+'.xlsx');
+  }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
+}
+function relPdf(){
+  var T=REL.T; if(!T || !T.linhas.length){ toast('Nada para imprimir.', true); return; }
+  $('eq-print').innerHTML='<h1>'+esc(T.titulo)+'</h1>'
+    + '<div class="sub">Panificadora Monte Castelo · gerado em '+new Date().toLocaleString('pt-BR')+' por '+esc(U.nome||U.email)+' · '+esc(relFiltrosTxt())+'</div>'
+    + ((T.resumo||[]).length?'<div class="tot">'+T.resumo.map(function(x){ return '<span>'+esc(x[0])+': <b>'+esc(x[1])+'</b></span>'; }).join('')+'</div>':'')
+    + '<table><thead><tr>'+T.cols.map(function(c){ return '<th'+(c.r?' class="r"':'')+'>'+esc(c.t)+'</th>'; }).join('')+'</tr></thead><tbody>'
+    + T.linhas.map(function(l){ return '<tr>'+l.cels.map(function(c, i){ return '<td'+(T.cols[i]&&T.cols[i].r?' class="r"':'')+'>'+relTxt(c)+'</td>'; }).join('')+'</tr>'; }).join('')
+    + (T.total?'<tr class="ini">'+T.total.cels.map(function(c, i){ return '<td'+(T.cols[i]&&T.cols[i].r?' class="r"':'')+' style="font-weight:800">'+relTxt(c)+'</td>'; }).join('')+'</tr>':'')
+    + '</tbody></table>'+(T.nota?'<div class="sub" style="margin-top:6px">'+esc(T.nota)+'</div>':'');
+  document.body.classList.add('imp-eq');
+  var fim=function(){ document.body.classList.remove('imp-eq'); window.removeEventListener('afterprint', fim); };
+  window.addEventListener('afterprint', fim);
+  setTimeout(function(){ window.print(); }, 60);
+}
+Object.assign(window, { relSet:relSet, relExcel:relExcel, relPdf:relPdf, relPintar:relPintar });
+Object.defineProperty(window, 'REL', { get:function(){ return REL; } });
+
 /* ---------- busca geral: Ctrl K em qualquer tela ---------- */
 function abrirBusca(){
   if(!U.uid) return;
@@ -2754,6 +3071,7 @@ onAuthStateChanged(auth, async function(u){
   /* chave "Acordos de todos" (ex.: Mariana, analista): vê as negociações e os acordos de todos os vendedores,
      com o faturado do mês, só para consultar — conceder e marcar pago continua com gerente e diretoria */
   U.ngTodas=U.gestor || (U.comercial && d.comercialAcordos===true);
+  document.querySelectorAll('.rel-vis').forEach(function(el){ el.style.display=(U.gestor||U.ngTodas)?'':'none'; });
   try{ var c=await getDoc(doc(db,'comConfig','app')); cfgExiste=c.exists(); aplicarCfg(c.exists()?c.data():{}); }
   catch(e){ console.warn('comConfig:',e); aplicarCfg({}); }
   if(!U.comercial && !meusTipos.length){ negar('Sua conta não tem acesso ao app Comercial. Fale com a diretoria.'); return; }
@@ -2970,6 +3288,7 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
   usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'],
   produtos:['Produtos','Catálogo e fichas técnicas'],
+  rel:['Relatórios','Vendas do ERP, comparativos e acompanhamento da equipe'],
   negoc:['Negociações','Negociações em andamento com os clientes'],
   equip:['Equipamentos nos clientes','Equipamentos em comodato que estão nos clientes'],
   eqvinc:['Vincular nomes','De-para: cliente da planilha de equipamentos → cliente da carteira ou do ERP'],
@@ -3018,6 +3337,7 @@ function render(){
   else if(pagina==='solic') renderSolic();
   else if(pagina==='config') renderConfig();
   else if(pagina==='equipe') renderEquipe();
+  else if(pagina==='rel') renderRel();
   else if(pagina==='usuarios') renderUsuarios();
   else if(pagina==='produtos') renderProdutos();
   else if(pagina==='equip') renderEquip();
