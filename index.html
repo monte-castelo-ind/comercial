@@ -2768,7 +2768,7 @@ function relPode(){ return !!(U.gestor || U.ngTodas); }
 function fmtKg(v){ return (Math.round(v||0)).toLocaleString('pt-BR')+' kg'; }
 function relFmt(v){ return REL.med==='kg' ? fmtKg(v) : fmtRS0(v); }
 var REL_TIPO_NOME={ PAO_FRANCES:'Pão francês', MIUDEZA:'Miudeza', CUCAS:'Cucas', PAO_DE_QUEIJO:'Pão de queijo', MASSA_FOLHADA:'Massa folhada',
-  SALGADOS_LANCHE:'Salgados lanche', SALGADOS_KG:'Salgados kg', 'SEM TIPO':'Sem tipo (cadastrar no Gestão)' };
+  SALGADOS_LANCHE:'Salgados lanche', SALGADOS_KG:'Salgados kg', 'SEM TIPO':'Sem tipo (cadastrar no Gestão)', OUTROS:'Outros produtos' };
 function relTipoNome(t){ if(REL_TIPO_NOME[t]) return REL_TIPO_NOME[t];
   t=String(t||'').replace(/_/g,' ').trim().toLowerCase(); return t ? t.charAt(0).toUpperCase()+t.slice(1) : '—'; }
 function relCarregar(){
@@ -2780,18 +2780,16 @@ function relCarregar(){
   /* 1º: compras completas por loja e produto (a mesma base do Gestão › Comparar lojas) + a tabela de
      pesos e tipos do Gestão (configGestao/pesos): dá o tipo de produto e o kg de cada venda.
      2º: comercialRel (robô dos relatórios), se existir. Sem nenhum dos dois, só R$ por cliente. */
-  REL.erroLoja=''; REL.erroPesos='';
-  var pRel=Promise.all([
-      getDocs(collection(db,'comercialLojaProd')),
-      getDoc(doc(db,'configGestao','pesos')).catch(function(e){ console.warn('configGestao/pesos:', e); REL.erroPesos=e.code||e.message||'erro'; return null; })
-    ]).then(function(r){
+  REL.erroLoja=''; REL.erroPesos=''; REL._pesos=[];
+  var pPes=getDoc(doc(db,'configGestao','pesos')).then(function(s){
+      if(!s.exists()){ REL.erroPesos='vazia'; return; }
+      REL._pesos=(s.data()||{}).itens||[]; REL.temPesos=REL._pesos.length>0; if(!REL.temPesos) REL.erroPesos='vazia';
+    }).catch(function(e){ console.warn('configGestao/pesos:', e); REL.erroPesos=e.code||e.message||'erro'; });
+  var pRel=Promise.all([getDocs(collection(db,'comercialLojaProd')), pPes]).then(function(r){
       var docs=r[0].docs, idx=null; docs.forEach(function(x){ if(x.id==='_idx') idx=x.data(); });
-      var pesos=(r[1] && r[1].exists()) ? ((r[1].data()||{}).itens||[]) : [];
-      if(r[1] && !r[1].exists() && !REL.erroPesos) REL.erroPesos='vazia';
-      REL.nPesos=pesos.length;
-      if(docs.length>2){ REL.rel=relDeLojaProd(docs, idx, pesos); REL.fonte='lojas'; REL.temPesos=pesos.length>0; REL.mesesLoja=Object.keys(REL.rel).sort(); }
+      if(docs.length>2){ REL.rel=relDeLojaProd(docs, idx, REL._pesos); REL.fonte='lojas'; REL.mesesLoja=Object.keys(REL.rel).sort(); }
       else REL.erroLoja='vazia';
-    }).catch(function(e){ console.warn('comercialLojaProd:', e); REL.erroLoja=e.code||e.message||'erro'; })
+    }).catch(function(e){ console.warn('comercialLojaProd:', e); REL.erroLoja=e.code||e.message||'erro'; return pPes; })
     .then(function(){
       if(REL.fonte) return;
       return getDocs(query(collection(db,'comercialRel'), limit(40)))
@@ -2799,6 +2797,7 @@ function relCarregar(){
         .catch(function(e){ console.warn('comercialRel:', e); });
     });
   Promise.all([pCm, pRel]).then(function(){
+    if(!REL.fonte && Object.keys(REL.cm).length && REL._pesos.length){ REL.rel=relDeClienteMes(REL.cm, REL._pesos); REL.fonte='resumo'; }
     REL.lendo=false; REL.lido=true;
     var com=relMesesComDados();
     if(!REL.ate) REL.ate=com.length?com[com.length-1]:mesAtual();
@@ -2829,6 +2828,31 @@ function relDeLojaProd(docs, idx, pesos){
     });
   });
   Object.keys(out).forEach(function(m){ out[m].tipos=Object.keys(out[m].tipos).sort(); });
+  return out;
+}
+/* sem a base completa por loja: os principais produtos de cada cliente no resumo do ERP (comercialClienteMes,
+   campo prod) + a tabela de pesos do Gestão. O que o resumo não detalha entra como "Outros produtos". */
+function relDeClienteMes(cm, pesos){
+  var P={}, PN={}, out={};
+  (pesos||[]).forEach(function(it){ if(it.id) P[String(it.id).trim()]=it; if(it.nome) PN[norm(it.nome)]=it; });
+  Object.keys(cm).forEach(function(m){
+    var o=out[m]={ c:{}, tipos:{}, cob:{ v:0, vt:0 } }, cs=cm[m]||{};
+    Object.keys(cs).forEach(function(k){
+      var c=cs[k]||{}, fat=+c.fat||0, pr=c.prod||{}, cl={ n:c.nome||k, ci:c.cidade||'', ro:c.rota||'', r:c.rep||'', t:{} }, soma=0;
+      Object.keys(pr).forEach(function(p){
+        var a=pr[p], v=Array.isArray(a)?(+a[0]||0):(+a||0), q=Array.isArray(a)?(+a[1]||0):0;
+        var pe=P[String(p).trim()] || PN[norm(p)] || null;
+        var tp=(pe && pe.tipo) ? String(pe.tipo).trim().toUpperCase() : 'SEM TIPO';
+        var t=cl.t[tp]||(cl.t[tp]=[0,0,0]); t[0]+=v; t[1]+=(pe && +pe.kg>0) ? q*(+pe.kg) : 0; t[2]+=q; soma+=v;
+        o.tipos[tp]=1; if(pe && pe.tipo) o.cob.v+=v;
+      });
+      var resto=fat-soma;
+      if(resto>0.5){ var t2=cl.t['OUTROS']||(cl.t['OUTROS']=[0,0,0]); t2[0]+=resto; o.tipos['OUTROS']=1; }
+      o.cob.vt+=Math.max(fat, soma);
+      if(Object.keys(cl.t).length) o.c[normEmp(cl.n)||k]=cl;
+    });
+    o.tipos=Object.keys(o.tipos).sort();
+  });
   return out;
 }
 function relMesesComDados(){ return REL.meses.filter(function(m){ return REL.cm[m] || REL.rel[m]; }); }
@@ -2874,8 +2898,12 @@ function relSemDados(ms){
   if(!ms.length) return 'Escolha o período.';
   var precisa=(REL.med==='kg' || REL.tipo || (REL.aba==='cli' && REL.colunas==='tipo') || (REL.aba==='grp' && REL.grp==='tipo'));
   if(!precisa) return '';
+  if(REL.fonte && relTemRel(ms) && (REL.med!=='kg' || REL.temPesos || REL.fonte==='robo')) return '';
   if(REL.erroLoja==='permission-denied')
     return 'O banco recusou a leitura das compras por loja (comercialLojaProd): a regra nova ainda não está publicada no Firebase (ou foi publicada sem a função comVeAcordos). Publique as regras e clique em "Ler de novo".';
+  if(REL.erroLoja==='vazia' && !REL.temPesos) return REL.erroPesos==='permission-denied'
+      ? 'O banco recusou a leitura da tabela de pesos do Gestão (configGestao/pesos): publique a regra nova e clique em "Ler de novo".'
+      : 'A tabela de pesos do Gestão (Gestão → Configurações → Pesos) está vazia: é ela que diz o tipo e o kg de cada produto.';
   if(REL.erroLoja==='vazia') return 'A base de compras por loja (comercialLojaProd) está vazia: o robô do ERP ainda não gravou essa base.';
   if(REL.erroLoja) return 'Não foi possível ler as compras por loja ('+REL.erroLoja+'). Clique em "Ler de novo".';
   if(REL.fonte==='lojas' && !relTemRel(ms)){
@@ -2891,7 +2919,7 @@ function relSemDados(ms){
   return '';
 }
 /* lê tudo de novo, sem recarregar a página (ex.: logo depois de publicar a regra) */
-function relRecarregar(){ REL.lido=false; REL.lendo=false; REL.rel={}; REL.cm={}; REL.fonte=''; renderRel(); }
+function relRecarregar(){ REL.lido=false; REL.lendo=false; REL.rel={}; REL.cm={}; REL.fonte=''; REL.temPesos=false; renderRel(); }
 /* ---------- 1) vendas por cliente, com curva ABC ---------- */
 function relCli(){
   var ms=relPeriodo(), aviso=relSemDados(ms);
@@ -3065,6 +3093,12 @@ function relFonte(){
   if(REL.aba==='vis' || REL.aba==='ben') return '';
   var ms=REL.aba==='cmp'?[REL.mA,REL.mB]:relPeriodo(), d=null;
   if(relTemRel(ms)) ms.forEach(function(m){ var a=(REL.rel[m]||{}).atualizadoEm; if(a && (!d||a>d)) d=a; });
+  if(REL.fonte==='resumo' && relTemRel(ms)){
+    var v2=0, vt2=0; ms.forEach(function(m){ var c=(REL.rel[m]||{}).cob||{}; v2+=c.v||0; vt2+=c.vt||0; });
+    var pc2=vt2?Math.round(v2/vt2*100):0;
+    return 'Fonte: resumo de vendas do ERP (os principais produtos de cada cliente) + tabela de pesos do Gestão: '+pc2+'% do faturamento do período com tipo e kg. '
+      + 'O que o resumo não detalha aparece como "Outros produtos" (sem kg). Para 100%, o robô precisa gravar a base completa por loja (a mesma do Gestão › Comparar lojas).';
+  }
   if(REL.fonte==='lojas' && relTemRel(ms)){
     var v=0, vt=0; ms.forEach(function(m){ var c=(REL.rel[m]||{}).cob||{}; v+=c.v||0; vt+=c.vt||0; });
     var pc=vt?Math.round(v/vt*100):0;
