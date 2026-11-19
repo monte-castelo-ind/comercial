@@ -552,6 +552,17 @@ details.mais[open]{padding-bottom:4px}
 .rel-neg{color:var(--red);font-weight:600}
 .rel-pos{color:var(--green);font-weight:600}
 
+/* recolha: equipamentos que estão no cliente */
+.cm-rec-l{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.cm-rec-it{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:var(--card-2);cursor:pointer;
+           color:var(--text)!important;font-size:13.5px!important;font-weight:500!important;text-transform:none!important;letter-spacing:0!important;margin:0!important}
+.cm-rec-it:has(input:checked){border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--card-2))}
+.cm-rec-it.ja{opacity:.55;cursor:default}
+.cm-rec-it input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary);flex:0 0 auto}
+.cm-rec-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.cm-rec-q{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
+.cm-rec-q input{width:64px;padding:5px 7px}
+
 /* acordo com mais de um cliente */
 .ng-extra-l{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .ng-extra-l:empty{display:none}
@@ -1238,6 +1249,7 @@ function carregarEquip(forcar){
     EQ.meta=(r[1] && r[1].exists()) ? r[1].data() : null;
     EQ.aval={}; if(r[2]) r[2].docs.forEach(function(x){ EQ.aval[x.id]=x.data(); });
     EQ.hist=r[3] ? r[3].docs.map(function(x){ return x.data(); }) : null;
+    eqAplicarRecolhas();
     EQ.lendo=false; EQ.erro=''; if(pagina==='equip') render();
   }).catch(function(e){
     console.warn('comEquipamentos:', e); EQ.lendo=false; EQ.docs=[];
@@ -1335,6 +1347,7 @@ function eqFichaPreencher(c){
     el.innerHTML='<div class="det-sec">Equipamentos em comodato <span class="mini" style="text-transform:none;letter-spacing:0">'
       + q+' '+(q===1?'item':'itens')+' · '+fmtRS0(val)+(EQ.meta&&EQ.meta.importadoEm?' · planilha de '+fmtQuando(EQ.meta.importadoEm):'')+'</span></div>'
       + eqItensHtml(itens, function(it){ return dono.get(it); })
+      + lista.map(eqRecolhidosTxt).join('')
       + '<div class="mini" style="margin-top:6px">Na visita, confira cada equipamento e marque se fica ou se deve ser recolhido.</div>';
   };
   if(EQ.docs){ mostra(EQ.docs.filter(function(d){ return d.clienteId===c.id; })); return; }
@@ -1416,7 +1429,7 @@ function renderEquip(){
         return '<tr'+(r.ini?' class="ini"':'')+'><td class="eq-loja"><div class="nm">'
           + (c ? '<a onclick="verCliente(\''+esc(c.id)+'\')">'+nome+'</a>' : nome)
           + (r.ini ? '<div class="eq-end">'+esc(r.onde)+(r.ds!=null?' · <span class="'+(r.al?'eq-alerta':'')+'">última compra há '+r.ds+' d</span>':'')
-              + eqRendeTxt(d) + eqRetiradaBtn(d)
+              + eqRendeTxt(d) + eqRetiradaBtn(d) + eqRecolhidosTxt(d)
               + (U.admin && !c ? ' · <a style="cursor:pointer;color:var(--accent,#e0303d);font-weight:700" onclick="eqLigar(\''+esc(d.id)+'\')">🔗 ligar</a>' : '')+'</div>' : '')
           + '</div></td><td>'+esc(r.vend)+'</td><td><b>'+esc(it.t||'—')+'</b></td><td>'+esc(it.ma||'')+'</td>'
           + '<td>'+esc(it.mo&&it.mo!=='N/D'?it.mo:'')+'</td><td class="eq-pat">'+(it.p&&U.gestor?'<span class="eh-pat" title="Ver o caminho deste equipamento" onclick="ehLinha(\''+esc(it.p)+'\')">'+esc(it.p)+'</span>':esc(it.p||'s/ nº'))+'</td><td class="r">'+(it.q||1)+'</td>'
@@ -1511,6 +1524,11 @@ function eqPedirRetirada(id){
     if(U.comodato){
       var bt=document.querySelector('#cm-cat .chip[data-v="remessa"]'); if(bt) cmCat(bt);
       var sv=$('cm-serv'); if(sv) sv.value='retirar';
+      /* recolha pela lista dos equipamentos do cliente, com os marcados como "Recolhe" já escolhidos */
+      if($('cm-obs')) $('cm-obs').value=obs;
+      cmRecolhaPintar(EQ.retPend ? EQ.retPend.chaves : []);
+      toast('Confira os equipamentos marcados e escolha a data da retirada.');
+      return;
       grupos.forEach(function(o, i){
         if(i>0) cmItemAdd();
         var linhas=document.querySelectorAll('#cm-itens .cm-it'), lin=linhas[linhas.length-1], n=lin.getAttribute('data-i');
@@ -1530,6 +1548,85 @@ function eqPedirRetirada(id){
       var is=document.querySelector('#fs-campos input[data-k="servico"]'); if(is) is.value='Retirar';
     }
   }, 80);
+}
+/* ---------- RECOLHA (nov/2026) ----------
+   No pedido com serviço "Retirar", a lista mostra só os equipamentos que estão no cliente (planilha de
+   comodato); quem pede marca os que voltam. Cada item do pedido leva eqChave (a chave do equipamento).
+   Quando a manutenção marca o pedido como entregue, o equipamento sai de "Nos clientes" e o Histórico
+   mostra o retorno com a data da recolha — até a próxima planilha trazer o retorno oficial. */
+var CMREC={ ativo:false, itens:[] };
+function eqDocsDoCliente(sel){
+  if(!sel) return [];
+  var nm=eqNomes(sel.nome||'');
+  return (EQ.docs||[]).filter(function(d){
+    if(sel.clienteId && d.clienteId===sel.clienteId) return true;
+    if(sel.erpId && d.erpId===sel.erpId) return true;
+    return eqNomes(d.cliente||'').some(function(k){ return nm.indexOf(k)>=0; }); });
+}
+function cmRecPendentes(){                   /* equipamentos com retirada já pedida e ainda não feita */
+  var r={}; (cmLista||[]).forEach(function(x){ if(x.servico!=='retirar' || ['autorizacao','aberta','separacao'].indexOf(x.status)<0) return;
+    (x.itens||[]).forEach(function(i){ if(i.eqChave) r[i.eqChave]=1; }); }); return r;
+}
+function cmRecolhaPintar(pre){
+  var box=$('cm-rec'); if(!box) return;
+  var sel=PK['fs-cli'] && PK['fs-cli'].sel;
+  var editor=function(sim){ var a=$('cm-itens'), b=document.querySelector('.cm-add'); if(a) a.style.display=sim?'':'none'; if(b) b.style.display=sim?'':'none'; };
+  if(($('cm-serv')||{}).value!=='retirar' || !sel || sel.novo){ CMREC.ativo=false; CMREC.itens=[]; box.innerHTML=''; editor(true); return; }
+  box.innerHTML='<div class="mini" style="margin:6px 0 12px">Lendo os equipamentos do cliente…</div>';
+  carregarEquip().then(function(){
+    if(($('cm-serv')||{}).value!=='retirar') return;
+    var docs=eqDocsDoCliente(sel), pend=cmRecPendentes(), lista=[];
+    docs.forEach(function(d){ (d.itens||[]).forEach(function(it){ lista.push({ k:eqKey(d, it), d:d, it:it }); }); });
+    CMREC.itens=lista; CMREC.ativo=lista.length>0;
+    if(!lista.length){ editor(true);
+      box.innerHTML='<div class="alert a-info">ⓘ Nenhum equipamento deste cliente na planilha de comodato. Descreva acima o que vai ser recolhido.</div>'; return; }
+    editor(false);
+    box.innerHTML='<div class="mini" style="margin:2px 0 8px">Estes são os equipamentos que estão no cliente (planilha de comodato). <b>Marque o que vai voltar.</b></div>'
+      + '<div class="cm-rec-l">'+lista.map(function(x, i){ var it=x.it, ja=pend[x.k], q=it.q||1;
+          return '<label class="cm-rec-it'+(ja?' ja':'')+'"><input type="checkbox" data-i="'+i+'"'+(ja?' disabled':'')+((pre && pre.indexOf(x.k)>=0 && !ja)?' checked':'')+'>'
+            + '<span class="cm-rec-tx"><span><b>'+esc(it.t||'—')+'</b>'+(q>1?' × '+q:'')+' <span class="eq-pat">'+esc(it.p||'s/ nº')+'</span></span>'
+            + '<span class="mini">'+esc([it.ma, (it.mo&&it.mo!=='N/D')?it.mo:''].filter(Boolean).join(' · '))+(it.d?' · desde '+fmtDia(it.d):'')+(it.nf?' · NF '+esc(it.nf):'')
+            + (ja?' · <b>retirada já pedida</b>':'')+'</span></span>'
+            + (q>1 && !ja ? '<span class="cm-rec-q" onclick="event.preventDefault()">volta <input type="number" min="1" max="'+q+'" value="'+q+'" id="cm-rq-'+i+'" inputmode="numeric" onclick="event.stopPropagation()"> de '+q+'</span>' : '')
+            + '</label>'; }).join('')+'</div>';
+  });
+}
+/* pedidos de retirada já feitos (entregues pela manutenção): o que voltou de cada equipamento, e quando */
+function eqRecolhas(){
+  var r={};
+  (cmLista||[]).forEach(function(x){
+    if(x.status!=='entregue' || x.servico!=='retirar') return;
+    var dt=x.entregueEm||x.atualizadoEm; dt=(typeof dt==='number')?new Date(dt):new Date(String(dt||''));
+    var ymd=isNaN(dt.getTime()) ? '' : dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
+    (x.itens||[]).forEach(function(i){ if(!i.eqChave) return; var o=r[i.eqChave]||(r[i.eqChave]={ q:0, data:'', pedido:x.id }); o.q+=(+i.quantidade||1); if(ymd>o.data) o.data=ymd; });
+  });
+  return r;
+}
+/* aplica as recolhas: tira de "Nos clientes" (ou baixa a quantidade) e põe a data no retorno do Histórico */
+function eqAplicarRecolhas(){
+  var R=eqRecolhas();
+  (EQ.docs||[]).forEach(function(d){
+    if(!d._orig) d._orig={ itens:(d.itens||[]).slice(), qtd:d.qtd, valor:d.valor };
+    var rec=[];
+    d.itens=d._orig.itens.map(function(it){ var o=R[eqKey(d, it)]; if(!o) return it; var q=it.q||1;
+      if(o.q>=q){ rec.push({ it:it, data:o.data }); return null; }
+      rec.push({ it:it, data:o.data, parcial:o.q });
+      return Object.assign({}, it, { q:q-o.q, v:it.v?Math.round(it.v*(q-o.q)/q):it.v }); }).filter(Boolean);
+    d._recolhidos=rec;
+    if(rec.length){ d.qtd=d.itens.reduce(function(t,it){ return t+(it.q||1); },0); d.valor=d.itens.reduce(function(t,it){ return t+(it.v||0); },0); }
+    else { d.qtd=d._orig.qtd; d.valor=d._orig.valor; }
+  });
+  (EQ.mov||[]).forEach(function(m){
+    if(m._rtPlan===undefined) m._rtPlan=m.rt||'';
+    var o=null;
+    if(!m._rtPlan){ o=R[eqKey({ id:'io_'+String(m.io||'').replace(/[^\w-]/g,'') }, { p:m.p, t:m.t, nf:m.nr, d:m.re })]||null; }
+    m.rt=m._rtPlan || ((o && o.q>=(m.q||1)) ? o.data : '');
+    m.rtApp=(!m._rtPlan && o) ? o : null;
+  });
+}
+function eqRecolhidosTxt(d){
+  var r=d._recolhidos||[]; if(!r.length) return '';
+  return '<div class="mini" style="color:var(--blue);margin-top:4px">↩ Recolhido pelo app: '+r.map(function(x){ return (x.parcial?x.parcial+' de ':'')+esc(x.it.t||'')+(x.it.p?' '+esc(x.it.p):'')+' em '+fmtDia(x.data); }).join('; ')+'</div>';
 }
 /* chamado quando o pedido de equipamento foi enviado: marca os equipamentos como "retirada pedida" */
 function eqRetiradaEnviada(){
@@ -1565,7 +1662,7 @@ function carregarMov(){
   getDocs(collection(db,'comEquipMov')).then(function(r){
     var l=[], meta=null;
     r.docs.sort(function(a,b){ return a.id.localeCompare(b.id); }).forEach(function(x){ if(x.id==='_meta'){ meta=x.data(); return; } l=l.concat((x.data()||{}).linhas||[]); });
-    EQ.mov=l; EQ.movMeta=meta; EH.lendo=false; EH.erro=''; if(pagina==='eqhist') renderEqHist();
+    EQ.mov=l; EQ.movMeta=meta; EH.lendo=false; EH.erro=''; eqAplicarRecolhas(); if(pagina==='eqhist') renderEqHist();
   }).catch(function(e){ EH.lendo=false; EQ.mov=[]; EH.erro=e.code==='permission-denied'?'Sem permissão para ler o histórico (regra do Firestore publicada?).':'Não foi possível ler o histórico.'; console.warn('comEquipMov', e); if(pagina==='eqhist') renderEqHist(); });
 }
 function ehModo(m){ EH.modo=m; EH.lim=500; document.querySelectorAll('#eh-modo button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-m')===m); }); renderEqHist(); }
@@ -1603,7 +1700,8 @@ function renderEqHist(){
     + l.slice(0, EH.lim).map(function(m){
         var dias=m.re ? difDias(m.re, m.rt||hoje()) : null;
         return '<tr><td>'+(m.re?fmtDia(m.re):'—')+'</td>'
-          + '<td>'+(m.rt?fmtDia(m.rt):'<span style="color:var(--green);font-weight:700">no cliente</span>'+(m.rtx?'<div class="mini">“'+esc(m.rtx)+'”</div>':''))
+          + '<td>'+(m.rt?fmtDia(m.rt)+(m.rtApp?'<div class="mini" style="color:var(--blue)">recolhido pelo app</div>':''):'<span style="color:var(--green);font-weight:700">no cliente</span>'+(m.rtx?'<div class="mini">“'+esc(m.rtx)+'”</div>':'')
+              + (m.rtApp?'<div class="mini" style="color:var(--blue)">'+m.rtApp.q+' recolhido(s) em '+fmtDia(m.rtApp.data)+'</div>':''))
           + (dias!=null?'<div class="mini">'+eqTempo(dias)+(m.rt?' lá':'')+'</div>':'')+'</td>'
           + '<td class="eq-loja" style="min-width:220px"><div class="nm">'+esc(m.c)+'</div>'+(m.io?'<div class="eq-end">IO '+esc(m.io)+'</div>':'')+'</td>'
           + '<td>'+esc(m.ci)+'</td><td>'+esc(m.r)+'</td><td><b>'+esc(m.t)+'</b></td><td>'+esc(m.ma)+'</td><td>'+esc(m.mo&&m.mo!=='N/D'?m.mo:'')+'</td>'
@@ -3403,7 +3501,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
-Object.assign(window, { navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
+Object.assign(window, { cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
@@ -4951,8 +5049,9 @@ function cmPintarCampos(){
     +'<div class="fld" style="margin-bottom:0"><label>Equipamentos *</label></div>'
     +'<div id="cm-itens" data-prox="1">'+cmItRow(0, 1)+'</div>'
     +'<button type="button" class="cm-add" onclick="cmItemAdd()">+ Adicionar outro equipamento</button>'
+    +'<div id="cm-rec"></div>'
     +'<div class="grid2">'
-    +'<div class="fld"><label>Serviço *</label><select id="cm-serv">'+opS+'</select></div>'
+    +'<div class="fld"><label>Serviço *</label><select id="cm-serv" onchange="cmRecolhaPintar()">'+opS+'</select></div>'
     +'<div class="fld"><label id="cm-data-lab">Data programada</label><input type="date" id="cm-data"></div></div>'
     +'<div class="fld"><label>Observações</label><textarea id="cm-obs" placeholder="Endereço de entrega, horário, quem recebe…"></textarea></div>'
     +'<div class="fld" id="cm-novo-box" style="border:1px dashed var(--border);border-radius:10px;padding:10px 12px">'
@@ -4972,6 +5071,7 @@ function cmCat(b){
   /* equipamento NOVO só existe em remessa */
   var nb=$('cm-novo-box'); if(nb) nb.style.display=k==='remessa'?'':'none';
   if(k!=='remessa' && $('cm-novo')){ $('cm-novo').checked=false; $('cm-novo-w').style.display='none'; }
+  cmRecolhaPintar();
 }
 /* ---------- vários equipamentos no mesmo pedido ----------
    Mesmo formato do Manut. Comodato: cada equipamento é uma linha (equipamento,
@@ -5025,6 +5125,7 @@ function fsCliMudou(sel){
   if(!(fs && fs.tipo==='equipamento' && U.comodato)) return;
   var e=$('cm-end'); if(e) e.textContent=cmEndLinha(sel);
   var c=$('cm-cid'); if(c && sel && !c.value.trim()) c.value=sel.cidade||'';
+  cmRecolhaPintar();
 }
 function cmSalvar(el){
   var sel=fsSel();
@@ -5035,7 +5136,19 @@ function cmSalvar(el){
   if(!cat){ toast('Escolha o tipo do pedido: remessa/retorno ou manutenção externa.', true); return; }
   if(sel.novo && !g('cm-cid')){ toast('Cliente novo: informe a cidade.', true); $('cm-cid').focus(); return; }
   if(sel.novo && !g('cm-endnovo')){ toast('Cliente novo: informe o endereço.', true); $('cm-endnovo').focus(); return; }
-  var linhas=document.querySelectorAll('#cm-itens .cm-it'), its=[];
+  var linhas=document.querySelectorAll('#cm-itens .cm-it'), its=[], recK=[];
+  /* recolha: só os equipamentos que estão no cliente, escolhidos na lista */
+  if(CMREC.ativo && g('cm-serv')==='retirar'){
+    document.querySelectorAll('#cm-rec input[type=checkbox]:checked').forEach(function(cb){
+      var ix=cb.getAttribute('data-i'), x=CMREC.itens[+ix]; if(!x) return;
+      var it=x.it, qi=$('cm-rq-'+ix), q=qi ? Math.max(1, Math.min(it.q||1, parseInt(qi.value,10)||1)) : (it.q||1);
+      its.push({ equipamento:it.t||'', modelo:[it.ma, (it.mo&&it.mo!=='N/D')?it.mo:''].filter(Boolean).join(' · '), quantidade:q,
+                 patrimonio:it.p||'', eqDoc:x.d.id, eqChave:x.k });
+      recK.push(x.k);
+    });
+    if(!its.length){ toast('Marque os equipamentos que vão voltar.', true); return; }
+    linhas=[];
+  }
   for(var k=0;k<linhas.length;k++){
     var i=linhas[k].getAttribute('data-i'), qual=(linhas.length>1?' (equipamento '+(k+1)+')':'');
     var eq=g('cm-eq-'+i); if(eq==='__outro') eq=g('cm-outro-'+i);
@@ -5053,7 +5166,8 @@ function cmSalvar(el){
     servico:g('cm-serv')||'entregar', dataProgramada:data, obs:g('cm-obs'),
     status:'aberta', solicitadoPor:U.email, solicitadoNome:U.nome, solicitadoUid:U.uid,
     criadoEm:agora, atualizadoEm:agora, historico:[{ em:agora, por:U.email, nome:U.nome, acao:'pediu' }] }, cmResumoItens(its));
-  if(its.length>1) d.itens=its;
+  if(its.length>1 || recK.length) d.itens=its;             /* na recolha vai sempre a lista: é ela que liga ao equipamento */
+  if(recK.length) EQ.retPend={ chaves:recK };
   var pare=ocupado(el,'Enviando…'), pr, pedId='';
   if($('cm-novo') && $('cm-novo').checked){
     /* equipamento NOVO: o pedido e a autorização nascem juntos (um lote só);
@@ -5122,6 +5236,7 @@ function cmVer(id){
 }
 /* chamado quando chega mudança do banco: redesenha a folha aberta */
 function cmAtualizarAberto(){
+  if(EQ.docs || EQ.mov){ eqAplicarRecolhas(); if(pagina==='equip' || pagina==='eqhist') setTimeout(render, 0); }
   if(!cmAbertoId) return;
   var host=$('modal-host'); if(!host || !host.innerHTML){ cmAbertoId=null; return; }
   if(document.activeElement && host.contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return;
