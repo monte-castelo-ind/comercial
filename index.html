@@ -1523,9 +1523,10 @@ function eqPedirRetirada(id){
     }
     if(U.comodato){
       var bt=document.querySelector('#cm-cat .chip[data-v="remessa"]'); if(bt) cmCat(bt);
-      var sv=$('cm-serv'); if(sv) sv.value='retirar';
       /* recolha pela lista dos equipamentos do cliente, com os marcados como "Recolhe" já escolhidos */
       if($('cm-obs')) $('cm-obs').value=obs;
+      document.querySelectorAll('#cm-mov .chip').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-v')==='retirar'); });
+      var sv=$('cm-serv'); if(sv) sv.value='retirar';
       cmRecolhaPintar(EQ.retPend ? EQ.retPend.chaves : []);
       toast('Confira os equipamentos marcados e escolha a data da retirada.');
       return;
@@ -1571,16 +1572,20 @@ function cmRecolhaPintar(pre){
   var box=$('cm-rec'); if(!box) return;
   var sel=PK['fs-cli'] && PK['fs-cli'].sel;
   var editor=function(sim){ var a=$('cm-itens'), b=document.querySelector('.cm-add'); if(a) a.style.display=sim?'':'none'; if(b) b.style.display=sim?'':'none'; };
-  if(($('cm-serv')||{}).value!=='retirar' || !sel || sel.novo){ CMREC.ativo=false; CMREC.itens=[]; box.innerHTML=''; editor(true); return; }
+  if(($('cm-serv')||{}).value!=='retirar' || cmCatSel()!=='remessa'){ CMREC.ativo=false; CMREC.itens=[]; box.innerHTML=''; editor(true); return; }
+  /* recolha: só o que está no cliente — nada de digitar outro equipamento */
+  editor(false); CMREC.ativo=true; CMREC.itens=[];
+  if(!sel){ box.innerHTML='<div class="alert a-info">ⓘ Escolha o cliente para ver os equipamentos que estão lá.</div>'; return; }
+  if(sel.novo){ box.innerHTML='<div class="alert a-info">ⓘ Cliente novo não tem equipamento em comodato para recolher.</div>'; return; }
   box.innerHTML='<div class="mini" style="margin:6px 0 12px">Lendo os equipamentos do cliente…</div>';
   carregarEquip().then(function(){
     if(($('cm-serv')||{}).value!=='retirar') return;
     var docs=eqDocsDoCliente(sel), pend=cmRecPendentes(), lista=[];
     docs.forEach(function(d){ (d.itens||[]).forEach(function(it){ lista.push({ k:eqKey(d, it), d:d, it:it }); }); });
-    CMREC.itens=lista; CMREC.ativo=lista.length>0;
-    if(!lista.length){ editor(true);
-      box.innerHTML='<div class="alert a-info">ⓘ Nenhum equipamento deste cliente na planilha de comodato. Descreva acima o que vai ser recolhido.</div>'; return; }
-    editor(false);
+    CMREC.itens=lista; CMREC.ativo=true;
+    if(!lista.length){
+      box.innerHTML='<div class="alert a-info">ⓘ Este cliente não tem equipamento na planilha de comodato, então não há o que recolher. '
+        + 'Se o equipamento está lá e não aparece aqui, a manutenção precisa atualizar a planilha (e a diretoria importar de novo).</div>'; return; }
     box.innerHTML='<div class="mini" style="margin:2px 0 8px">Estes são os equipamentos que estão no cliente (planilha de comodato). <b>Marque o que vai voltar.</b></div>'
       + '<div class="cm-rec-l">'+lista.map(function(x, i){ var it=x.it, ja=pend[x.k], q=it.q||1;
           return '<label class="cm-rec-it'+(ja?' ja':'')+'"><input type="checkbox" data-i="'+i+'"'+(ja?' disabled':'')+((pre && pre.indexOf(x.k)>=0 && !ja)?' checked':'')+'>'
@@ -3552,7 +3557,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
-Object.assign(window, { cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
+Object.assign(window, { cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
@@ -4976,7 +4981,7 @@ function solEnviarManut(s){
     var serv=/CONSERT|ARRUM|REPAR|MANUTEN|QUEBR|DEFEIT/.test(txt)?'consertar':/TROC/.test(txt)?'trocar':/RETIR|RECOLH/.test(txt)?'retirar':'entregar';
     var cat=serv==='consertar'?'externa':'remessa';
     var bt=document.querySelector('#cm-cat .chip[data-v="'+cat+'"]'); if(bt) cmCat(bt);
-    var sv=$('cm-serv'); if(sv) sv.value=serv;
+    if(cat==='remessa') cmMov(serv); else { var sv=$('cm-serv'); if(sv) sv.value=serv; }
     var eqTxt=norm((s.campos||{}).equipamento||'')+' '+txt;
     var opc=CM_TIPOS.filter(function(x){ return eqTxt.indexOf(norm(x))>=0; })[0];
     var lin=document.querySelector('#cm-itens .cm-it'), n=lin&&lin.getAttribute('data-i');
@@ -5082,7 +5087,7 @@ function cmEndDe(sel){
     return [a.end, a.bairro, [a.cidade||sel.cidade, a.uf].filter(Boolean).join('/'), cep].filter(Boolean).join(' · '); }
   return pkEnd(sel);
 }
-function cmEndLinha(sel){ var t=cmEndDe(sel); return t ? '📍 Endereço para entrega: '+t : ''; }
+function cmEndLinha(sel){ var t=cmEndDe(sel); return t ? '📍 Endereço do cliente: '+t : ''; }
 function cmPintarCampos(){
   var lab=$('fs-cli-lab'); if(lab) lab.innerHTML='Cliente * <span class="mini">— carteira ou ERP</span>';
   var box=$('fs-campos'); if(!box) return;
@@ -5091,6 +5096,10 @@ function cmPintarCampos(){
   box.innerHTML='<div class="mini" style="margin:-4px 0 12px">Vai direto para a <b>manutenção</b> (Manut. Comodato), que separa e entrega. O andamento aparece aqui em Solicitações.</div>'
     +'<div class="fld"><label>Tipo do pedido *</label><div class="chips" id="cm-cat">'
     +Object.keys(CM_CAT).map(function(k){ return '<button type="button" class="chip" data-v="'+k+'" onclick="cmCat(this)">'+CM_CAT[k].nome+'</button>'; }).join('')+'</div></div>'
+    +'<div class="fld" id="cm-mov-w" style="display:none"><label>O que vai ser feito? *</label><div class="chips" id="cm-mov">'
+    +  '<button type="button" class="chip" data-v="entregar" onclick="cmMov(\'entregar\')">Remessa — levar ao cliente</button>'
+    +  '<button type="button" class="chip" data-v="retirar" onclick="cmMov(\'retirar\')">Recolha — buscar no cliente</button>'
+    +  '<button type="button" class="chip" data-v="trocar" onclick="cmMov(\'trocar\')">Troca</button></div></div>'
     +'<div class="fld" id="cm-end-w" style="margin-top:-6px"><div class="mini" id="cm-end"'+(fsNovo()?' style="display:none"':'')+'>'+esc(cmEndLinha(sel))+'</div></div>'
     +'<div class="fld" id="cm-endnovo-w"'+(fsNovo()?'':' style="display:none"')+'><label>Endereço do cliente novo *</label><input type="text" id="cm-endnovo" placeholder="rua, número, bairro"></div>'
     +'<div class="grid2">'
@@ -5102,7 +5111,7 @@ function cmPintarCampos(){
     +'<button type="button" class="cm-add" onclick="cmItemAdd()">+ Adicionar outro equipamento</button>'
     +'<div id="cm-rec"></div>'
     +'<div class="grid2">'
-    +'<div class="fld"><label>Serviço *</label><select id="cm-serv" onchange="cmRecolhaPintar()">'+opS+'</select></div>'
+    +'<div class="fld" id="cm-serv-w"><label>Serviço *</label><select id="cm-serv" onchange="cmRecolhaPintar()">'+opS+'</select></div>'
     +'<div class="fld"><label id="cm-data-lab">Data programada</label><input type="date" id="cm-data"></div></div>'
     +'<div class="fld"><label>Observações</label><textarea id="cm-obs" placeholder="Endereço de entrega, horário, quem recebe…"></textarea></div>'
     +'<div class="fld" id="cm-novo-box" style="border:1px dashed var(--border);border-radius:10px;padding:10px 12px">'
@@ -5122,8 +5131,22 @@ function cmCat(b){
   /* equipamento NOVO só existe em remessa */
   var nb=$('cm-novo-box'); if(nb) nb.style.display=k==='remessa'?'':'none';
   if(k!=='remessa' && $('cm-novo')){ $('cm-novo').checked=false; $('cm-novo-w').style.display='none'; }
+  /* remessa: escolhe remessa, recolha ou troca nos botões; manutenção externa: o serviço é consertar */
+  var mw=$('cm-mov-w'), sw=$('cm-serv-w');
+  if(mw) mw.style.display=k==='remessa'?'':'none';
+  if(sw) sw.style.display=(k==='remessa' && mw)?'none':'';
+  if(k==='remessa'){ var on=document.querySelector('#cm-mov .chip.on'); if(on) s.value=on.getAttribute('data-v'); }
   cmRecolhaPintar();
 }
+/* remessa (levar), recolha (buscar) ou troca */
+function cmMov(v){
+  document.querySelectorAll('#cm-mov .chip').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-v')===v); });
+  var s=$('cm-serv'); if(s) s.value=v;
+  var ob=$('cm-novo-box'); if(ob) ob.style.display=v==='retirar'?'none':'';
+  if(v==='retirar' && $('cm-novo')){ $('cm-novo').checked=false; $('cm-novo-w').style.display='none'; }
+  cmRecolhaPintar();
+}
+function cmMovSel(){ var b=document.querySelector('#cm-mov .chip.on'); return b?b.getAttribute('data-v'):''; }
 /* ---------- vários equipamentos no mesmo pedido ----------
    Mesmo formato do Manut. Comodato: cada equipamento é uma linha (equipamento,
    modelo, quantidade, patrimônio); cliente, serviço e data valem para o pedido
@@ -5185,6 +5208,7 @@ function cmSalvar(el){
   var g=function(id){ var x=$(id); return x?String(x.value||'').trim():''; };
   var cat=cmCatSel();
   if(!cat){ toast('Escolha o tipo do pedido: remessa/retorno ou manutenção externa.', true); return; }
+  if(cat==='remessa' && $('cm-mov') && !cmMovSel()){ toast('Escolha o que vai ser feito: remessa, recolha ou troca.', true); return; }
   if(sel.novo && !g('cm-cid')){ toast('Cliente novo: informe a cidade.', true); $('cm-cid').focus(); return; }
   if(sel.novo && !g('cm-endnovo')){ toast('Cliente novo: informe o endereço.', true); $('cm-endnovo').focus(); return; }
   var linhas=document.querySelectorAll('#cm-itens .cm-it'), its=[], recK=[];
@@ -5197,7 +5221,7 @@ function cmSalvar(el){
                  patrimonio:it.p||'', eqDoc:x.d.id, eqChave:x.k });
       recK.push(x.k);
     });
-    if(!its.length){ toast('Marque os equipamentos que vão voltar.', true); return; }
+    if(!its.length){ toast(CMREC.itens.length ? 'Marque os equipamentos que vão voltar.' : 'Este cliente não tem equipamento para recolher.', true); return; }
     linhas=[];
   }
   for(var k=0;k<linhas.length;k++){
