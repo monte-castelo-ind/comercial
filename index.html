@@ -2756,14 +2756,14 @@ function ngReabrir(id){
    comercialClienteMes (só R$). Cada relatório monta uma "tabela" única que vira
    tela, Excel e PDF — o mesmo conteúdo nos três.
    ===================================================================== */
-var REL={ aba:'cli', meses:[], cm:{}, rel:{}, lendo:false, lido:false, erro:'',
-          med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', T:null };
+var REL={ aba:'cli', meses:[], cm:{}, rel:{}, lendo:false, lido:false, erro:'', fonte:'', cobertura:null,
+          med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', colunas:'tipo', T:null };
 var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos']];
 function relPode(){ return !!(U.gestor || U.ngTodas); }
 function fmtKg(v){ return (Math.round(v||0)).toLocaleString('pt-BR')+' kg'; }
 function relFmt(v){ return REL.med==='kg' ? fmtKg(v) : fmtRS0(v); }
 var REL_TIPO_NOME={ PAO_FRANCES:'Pão francês', MIUDEZA:'Miudeza', CUCAS:'Cucas', PAO_DE_QUEIJO:'Pão de queijo', MASSA_FOLHADA:'Massa folhada',
-  SALGADOS_LANCHE:'Salgados lanche', SALGADOS_KG:'Salgados kg', 'SEM TIPO':'Sem tipo' };
+  SALGADOS_LANCHE:'Salgados lanche', SALGADOS_KG:'Salgados kg', 'SEM TIPO':'Sem tipo (cadastrar no Gestão)' };
 function relTipoNome(t){ if(REL_TIPO_NOME[t]) return REL_TIPO_NOME[t];
   t=String(t||'').replace(/_/g,' ').trim().toLowerCase(); return t ? t.charAt(0).toUpperCase()+t.slice(1) : '—'; }
 function relCarregar(){
@@ -2772,9 +2772,23 @@ function relCarregar(){
   var ms=mesesAtras(13).reverse(); REL.meses=ms;
   var pCm=Promise.all(ms.map(function(m){ return getDoc(doc(db,'comercialClienteMes',m))
     .then(function(s){ if(s.exists()) REL.cm[m]=(s.data()||{}).clientes||{}; }).catch(function(){}); }));
-  var pRel=getDocs(query(collection(db,'comercialRel'), limit(40)))
-    .then(function(s){ s.docs.forEach(function(x){ if(/^\d{4}-\d{2}$/.test(x.id)) REL.rel[x.id]=x.data()||{}; }); })
-    .catch(function(e){ console.warn('comercialRel:', e); });
+  /* 1º: compras completas por loja e produto (a mesma base do Gestão › Comparar lojas) + a tabela de
+     pesos e tipos do Gestão (configGestao/pesos): dá o tipo de produto e o kg de cada venda.
+     2º: comercialRel (robô dos relatórios), se existir. Sem nenhum dos dois, só R$ por cliente. */
+  var pRel=Promise.all([
+      getDocs(collection(db,'comercialLojaProd')),
+      getDoc(doc(db,'configGestao','pesos')).catch(function(e){ console.warn('configGestao/pesos:', e); return null; })
+    ]).then(function(r){
+      var docs=r[0].docs, idx=null; docs.forEach(function(x){ if(x.id==='_idx') idx=x.data(); });
+      var pesos=(r[1] && r[1].exists()) ? ((r[1].data()||{}).itens||[]) : [];
+      if(docs.length>2){ REL.rel=relDeLojaProd(docs, idx, pesos); REL.fonte='lojas'; REL.temPesos=pesos.length>0; }
+    }).catch(function(e){ console.warn('comercialLojaProd:', e); })
+    .then(function(){
+      if(REL.fonte) return;
+      return getDocs(query(collection(db,'comercialRel'), limit(40)))
+        .then(function(s){ s.docs.forEach(function(x){ if(/^\d{4}-\d{2}$/.test(x.id)) REL.rel[x.id]=x.data()||{}; }); if(Object.keys(REL.rel).length) REL.fonte='robo'; })
+        .catch(function(e){ console.warn('comercialRel:', e); });
+    });
   Promise.all([pCm, pRel]).then(function(){
     REL.lendo=false; REL.lido=true;
     var com=relMesesComDados();
@@ -2783,6 +2797,30 @@ function relCarregar(){
     if(!REL.mB){ REL.mB=com.length>1?com[com.length-2]:REL.ate; REL.mA=mesAntesDe(REL.mB); }
     renderRel();
   }).catch(function(e){ REL.lendo=false; REL.erro=e.message||String(e); renderRel(); });
+}
+/* compras por loja → { mês: { c: { loja: { n, ci, ro, r, t: { TIPO: [valor, kg, qtd] } } }, tipos, cob } }.
+   Tipo e kg por unidade vêm da tabela de pesos do Gestão (código do produto; sem código, pelo nome). */
+function relDeLojaProd(docs, idx, pesos){
+  var P={}, PN={}, nomes=(idx&&idx.produtos)||{}, lojas=(idx&&idx.lojas)||{}, out={};
+  (pesos||[]).forEach(function(it){ if(it.id) P[String(it.id).trim()]=it; if(it.nome) PN[norm(it.nome)]=it; });
+  docs.forEach(function(x){
+    if(x.id.charAt(0)==='_') return;
+    var d=x.data()||{}, info=lojas[x.id]||{}, ms=d.meses||{};
+    Object.keys(ms).forEach(function(m){
+      var o=out[m]||(out[m]={ c:{}, tipos:{}, cob:{ v:0, vt:0 } }), prods=ms[m]||{};
+      var cl={ n:d.nome||info.n||x.id, ci:info.ci||'', ro:info.r||'', r:info.p||'', t:{} };
+      Object.keys(prods).forEach(function(pk){
+        var a=prods[pk]||[], v=+a[0]||0, q=+a[1]||0;
+        var pe=P[String(pk).trim()] || PN[norm(nomes[pk]||pk)] || null;
+        var tp=(pe && pe.tipo) ? String(pe.tipo).trim().toUpperCase() : 'SEM TIPO';
+        var t=cl.t[tp]||(cl.t[tp]=[0,0,0]); t[0]+=v; t[1]+=(pe && +pe.kg>0) ? q*(+pe.kg) : 0; t[2]+=q;
+        o.tipos[tp]=1; o.cob.vt+=v; if(pe && pe.tipo) o.cob.v+=v;
+      });
+      if(Object.keys(cl.t).length) o.c[x.id]=cl;
+    });
+  });
+  Object.keys(out).forEach(function(m){ out[m].tipos=Object.keys(out[m].tipos).sort(); });
+  return out;
 }
 function relMesesComDados(){ return REL.meses.filter(function(m){ return REL.cm[m] || REL.rel[m]; }); }
 function relPeriodo(){ var a=REL.de<=REL.ate?REL.de:REL.ate, b=REL.de<=REL.ate?REL.ate:REL.de; return REL.meses.filter(function(m){ return m>=a && m<=b; }); }
@@ -2825,7 +2863,7 @@ function relCliCel(r){ return '<b>'+esc(r.nome)+'</b>'+(r.cid?'<span class="ct-c
 function relSemDados(ms){
   if(!ms.length) return 'Escolha o período.';
   if((REL.med==='kg' || REL.tipo) && !relTemRel(ms))
-    return 'Os valores em kg e o filtro por tipo de produto aparecem quando o robô dos relatórios gravar este período (comercialRel). Por enquanto, use R$ e todos os tipos.';
+    return 'Os valores em kg e o tipo de produto vêm da base de compras por loja e da tabela de pesos do Gestão, que não puderam ser lidas'+(REL.fonte?' para este período':'')+'. Confira se a regra nova do banco foi publicada. Por enquanto, use R$ e todos os tipos.';
   return '';
 }
 /* ---------- 1) vendas por cliente, com curva ABC ---------- */
@@ -2834,17 +2872,23 @@ function relCli(){
   var base=relLinhas(ms).sort(function(a,b){ return b.total-a.total; });
   var tot=base.reduce(function(s,r){ return s+r.total; },0), acc=0;
   base.forEach(function(r){ var antes=acc/(tot||1); acc+=r.total; r.abc=antes<0.8?'A':antes<0.95?'B':'C'; r.pct=tot?r.total/tot:0; });
-  var l=relFiltra(base), mostra=ms.length<=6;
+  var l=relFiltra(base), porTipo=REL.colunas==='tipo' && relTemRel(ms), mostra=!porTipo && ms.length<=6;
   var nA=base.filter(function(r){ return r.abc==='A'; }).length, sub=l.reduce(function(s,r){ return s+r.total; },0);
-  var cols=[{t:'#'},{t:'Cliente'},{t:'Vendedor'}].concat(mostra?ms.map(function(m){ return { t:nomeMes(m), r:1 }; }):[]).concat([{t:'Total', r:1},{t:'% do total', r:1},{t:'ABC'}]);
+  /* colunas extras: um tipo de produto por coluna (do que mais vende para o que menos), ou um mês por coluna */
+  var tiposCol=[];
+  if(porTipo){ var tt={}; base.forEach(function(r){ Object.keys(r.tipos).forEach(function(tp){ tt[tp]=(tt[tp]||0)+r.tipos[tp]; }); });
+    tiposCol=Object.keys(tt).filter(function(tp){ return tt[tp]; }).sort(function(a,b){ return tt[b]-tt[a]; }); }
+  var extras=porTipo ? tiposCol.map(function(tp){ return { t:relTipoNome(tp).replace(' (cadastrar no Gestão)',''), r:1, k:tp }; })
+                     : (mostra ? ms.map(function(m){ return { t:nomeMes(m), r:1, k:m }; }) : []);
+  var cols=[{t:'#'},{t:'Cliente'},{t:'Vendedor'}].concat(extras.map(function(e){ return { t:e.t, r:1 }; })).concat([{t:'Total', r:1},{t:'% do total', r:1},{t:'ABC'}]);
   var linhas=l.map(function(r, i){
-    var mesC=mostra?ms.map(function(m){ return r.porMes[m]||0; }):[];
+    var mesC=extras.map(function(e){ return porTipo ? (r.tipos[e.k]||0) : (r.porMes[e.k]||0); });
     return { id:r.cliId||'',
       cels:[String(i+1), relCliCel(r), esc(r.vendTxt)].concat(mesC.map(function(v){ return v?relFmt(v):'<span class="mini">—</span>'; }))
         .concat(['<b>'+relFmt(r.total)+'</b>', (r.pct*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%', '<span class="rel-abc '+r.abc.toLowerCase()+'">'+r.abc+'</span>']),
       xls:[i+1, r.nome+(r.cid?' - '+cidadeBonita(r.cid):''), r.vendTxt].concat(mesC.map(function(v){ return Math.round(v); })).concat([Math.round(r.total), Math.round(r.pct*1000)/10, r.abc]) }; });
   return { titulo:'Vendas por cliente', cols:cols, linhas:linhas, aviso:aviso,
-    total:{ cels:['','<b>Total</b>',''].concat(mostra?ms.map(function(m){ return '<b>'+relFmt(l.reduce(function(s,r){ return s+(r.porMes[m]||0); },0))+'</b>'; }):[]).concat(['<b>'+relFmt(sub)+'</b>', tot?(sub/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'', '']) },
+    total:{ cels:['','<b>Total</b>',''].concat(extras.map(function(e){ return '<b>'+relFmt(l.reduce(function(s,r){ return s+(porTipo?(r.tipos[e.k]||0):(r.porMes[e.k]||0)); },0))+'</b>'; })).concat(['<b>'+relFmt(sub)+'</b>', tot?(sub/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'', '']) },
     resumo:[['Total no período', relFmt(tot)], ['Clientes que compraram', base.length.toLocaleString('pt-BR')],
             ['Média por cliente', base.length?relFmt(tot/base.length):'—'], ['Curva A', nA+' cliente'+(nA===1?'':'s')+' = 80% do total']],
     nota:'Curva ABC: A = clientes que somam os primeiros 80% do total; B = os 15% seguintes; C = o resto. Clique no cliente para abrir a ficha.' };
@@ -2957,6 +3001,7 @@ function relFiltrosHtml(){
     h+='<div class="seg rel-med" title="Medida"><button class="'+(REL.med==='rs'?'on':'')+'" onclick="relSet(\'med\',\'rs\')">R$</button><button class="'+(REL.med==='kg'?'on':'')+'" onclick="relSet(\'med\',\'kg\')">kg</button></div>'
       +(a==='grp' && REL.grp==='tipo' ? '' : '<select onchange="relSet(\'tipo\',this.value)" title="Tipo de produto"><option value="">Todos os tipos de produto</option>'
       +tipos.map(function(t){ return '<option value="'+esc(t)+'"'+(t===REL.tipo?' selected':'')+'>'+esc(relTipoNome(t))+'</option>'; }).join('')+'</select>');
+    if(a==='cli') h+='<div class="seg rel-med" title="O que vai nas colunas"><button class="'+(REL.colunas==='tipo'?'on':'')+'" onclick="relSet(\'colunas\',\'tipo\')">Por tipo</button><button class="'+(REL.colunas==='mes'?'on':'')+'" onclick="relSet(\'colunas\',\'mes\')">Por mês</button></div>';
     var vs={}; relLinhas(ms).forEach(function(r){ vs[r.vendTxt]=1; });
     h+='<select onchange="relSet(\'vend\',this.value)"><option value="">Todos os vendedores</option>'
       +Object.keys(vs).sort().map(function(v){ return '<option'+(v===REL.vend?' selected':'')+'>'+esc(v)+'</option>'; }).join('')+'</select>'
@@ -2993,6 +3038,12 @@ function relFonte(){
   if(REL.aba==='vis' || REL.aba==='ben') return '';
   var ms=REL.aba==='cmp'?[REL.mA,REL.mB]:relPeriodo(), d=null;
   if(relTemRel(ms)) ms.forEach(function(m){ var a=(REL.rel[m]||{}).atualizadoEm; if(a && (!d||a>d)) d=a; });
+  if(REL.fonte==='lojas' && relTemRel(ms)){
+    var v=0, vt=0; ms.forEach(function(m){ var c=(REL.rel[m]||{}).cob||{}; v+=c.v||0; vt+=c.vt||0; });
+    var pc=vt?Math.round(v/vt*100):0;
+    return 'Fonte: compras por loja do ERP (a mesma base do Gestão). Tipo e kg pela tabela de pesos do Gestão: '+pc+'% do faturamento do período tem tipo cadastrado'
+      + (pc<100?' — o resto aparece como "Sem tipo"; cadastre esses produtos em Gestão → Configurações → Pesos.':'.');
+  }
   return 'Fonte: vendas do ERP'+(relTemRel(ms)?' (por tipo de produto'+(d?', atualizado em '+fmtQuando(d):'')+')':' (total por cliente, em R$)')+'.';
 }
 function relSet(k, v){
