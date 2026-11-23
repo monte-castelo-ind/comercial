@@ -1243,11 +1243,14 @@ function carregarEquip(forcar){
   if(EQ.lendo || (EQ.docs && !forcar)) return Promise.resolve();
   EQ.lendo=true;
   var col=collection(db,'comEquipamentos');
-  var q1=U.gestor ? getDocs(query(col, limit(6000))) : getDocs(query(col, where('donoUid','==',U.uid)));
+  /* gerente/diretoria e quem gerencia os pedidos de equipamento (comodatoGerencia, ex.: Jeferson — monta
+     as recolhas de qualquer cliente) veem os equipamentos de todos; o vendedor, os da carteira dele */
+  var todos=!!(U.gestor || U.cmGerencia);
+  var q1=todos ? getDocs(query(col, limit(6000))) : getDocs(query(col, where('donoUid','==',U.uid)));
   var q2=getDoc(doc(db,'comEquipamentos','_meta')).catch(function(){ return null; });
   /* avaliações (fica / recolhe / conferido): ficam fora dos documentos da planilha, para não se perderem a cada importação */
   var ca=collection(db,'comEquipAval');
-  var q3=(U.gestor ? getDocs(query(ca, limit(30000))) : getDocs(query(ca, where('donoUid','==',U.uid)))).catch(function(e){ console.warn('comEquipAval:', e); return null; });
+  var q3=(todos ? getDocs(query(ca, limit(30000))) : getDocs(query(ca, where('donoUid','==',U.uid)))).catch(function(e){ console.warn('comEquipAval:', e); return null; });
   var q4=U.gestor ? getDocs(query(collection(db,'comEquipHist'), orderBy('em','desc'), limit(36))).catch(function(e){ console.warn('comEquipHist:', e); return null; }) : Promise.resolve(null);
   return Promise.all([q1, q2, q3, q4]).then(function(r){
     EQ.docs=r[0].docs.filter(function(x){ return x.id!=='_meta'; }).map(function(x){ return Object.assign({ id:x.id }, x.data()); });
@@ -1614,6 +1617,9 @@ function eqRecolhas(){
 }
 /* aplica as recolhas: tira de "Nos clientes" (ou baixa a quantidade) e põe a data no retorno do Histórico */
 function eqAplicarRecolhas(){
+  try{ eqAplicarRecolhas_(); }catch(e){ console.warn('recolhas:', e); }
+}
+function eqAplicarRecolhas_(){
   var R=eqRecolhas();
   (EQ.docs||[]).forEach(function(d){
     if(!d._orig) d._orig={ itens:(d.itens||[]).slice(), qtd:d.qtd, valor:d.valor };
