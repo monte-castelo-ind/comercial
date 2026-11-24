@@ -780,10 +780,6 @@ main{min-width:0;overflow-x:clip}
     <button class="navbtn com-only" data-p="visitas" onclick="nav('visitas')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg></span><span class="lbl lab-d">Visitas e contatos</span><span class="lab-m">Visitas</span></button>
     <button class="navbtn com-only" data-p="negoc" onclick="navMenu('negoc')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span><span class="lbl lab-d">Negociações</span><span class="lab-m">Negoc.</span><span class="nbadge" id="ng-badge" style="display:none"></span></button>
     <button class="navbtn com-only" data-p="produtos" onclick="navProd()"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl lab-d">Produtos</span><span class="lab-m">Produtos</span></button>
-    <div class="subnav" id="sub-prod">
-      <button class="navsub" data-a="catalogo" onclick="navProd('catalogo')"><span class="lbl">Catálogo</span></button>
-      <button class="navsub" data-a="fichas" onclick="navProd('fichas')"><span class="lbl">Fichas técnicas</span></button>
-    </div>
     <button class="navbtn gestor-only so-desk" data-p="equipe" onclick="nav('equipe')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM20 20v-1.5a3.5 3.5 0 0 0-2.5-3.35M15.5 4.2a3.5 3.5 0 0 1 0 6.6"/></svg></span><span class="lbl lab-d">Equipe</span><span class="lab-m">Equipe</span></button>
     <button class="navbtn rel-vis so-desk" data-p="rel" onclick="nav('rel')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></span><span class="lbl">Relatórios</span></button>
     <div class="side-sec lbl com-only so-desk">Equipamentos</div>
@@ -1070,7 +1066,6 @@ main{min-width:0;overflow-x:clip}
     <!-- PRODUTOS E FICHAS TÉCNICAS -->
     <div class="page" id="page-produtos">
       <div class="tools">
-        <div class="seg so-cel" id="prod-seg"></div>
         <input type="search" placeholder="Buscar produto, peso, código de barras…" oninput="setFichaBusca(this.value)">
         <select id="prod-linha" onchange="renderProdutos()"></select>
         <button class="btn btn-sm btn-ghost" id="cat-ocultos" style="display:none" onclick="alternarOcultos()"></button>
@@ -3537,7 +3532,7 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   importar:['Carteira pelo ERP','A carteira segue o representante cadastrado no ERP'],
   equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
   usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'],
-  produtos:['Produtos','Catálogo e fichas técnicas'],
+  produtos:['Fichas técnicas','Fichas técnicas dos produtos e o catálogo para enviar ao cliente'],
   rel:['Relatórios','Vendas do ERP, comparativos e acompanhamento da equipe'],
   negoc:['Negociações','Negociações em andamento com os clientes'],
   equip:['Equipamentos nos clientes','Equipamentos em comodato que estão nos clientes'],
@@ -3557,7 +3552,7 @@ function navMenu(p){
 function nav(p){
   pagina=p;
   document.querySelectorAll('.navbtn').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-p')===p); });
-  var sp=$('sub-prod'); if(sp) sp.classList.toggle('on', p==='produtos');
+
   document.querySelectorAll('.page').forEach(function(x){ x.classList.toggle('on', x.id==='page-'+p); });
   $('ptit').textContent=TITULOS[p][0];
   var a=ACAO[p];
@@ -6949,16 +6944,14 @@ function ouvirFichas(){
 function renderProdutos(){
   var box=$('prod-lista'); if(!box) return;
   $('prod-imp').style.display=(U.admin && abaProd==='fichas')?'':'none';
-  $('prod-linha').style.display=abaProd==='catalogo'?'':'none';
-  $('cat-share').style.display=abaProd==='catalogo'?'':'none';
-  if(abaProd!=='catalogo') $('cat-ocultos').style.display='none';
-  if(abaProd!=='fichas') $('fic-semvinc').style.display='none';
-  $('ptit').textContent=abaProd==='catalogo'?'Catálogo':'Fichas técnicas';
-  document.querySelectorAll('#sub-prod .navsub').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-a')===abaProd); });
-  var nCat=catalogo?catalogo.produtos.filter(function(p){ return !produtoOculto(p); }).length:0;
-  $('prod-seg').innerHTML=[['catalogo','Catálogo',nCat],['fichas','Fichas técnicas',fichas.length]].map(function(x){
-    return '<button class="'+(abaProd===x[0]?'on':'')+'" onclick="setAbaProd(\''+x[0]+'\')">'+x[1]+(x[2]?'<span class="n">'+x[2]+'</span>':'')+'</button>'; }).join('');
-  if(abaProd==='catalogo'){ renderCatalogo(); return; }
+  /* nov/2026: a tela de Catálogo saiu — Produtos mostra só as fichas técnicas, e o "Compartilhar o
+     catálogo" (o PDF) veio para cá. O catálogo (catalogo.json) continua sendo lido para as fotos das fichas. */
+  abaProd='fichas';
+  $('prod-linha').style.display='none';
+  $('cat-share').style.display='';
+  $('cat-ocultos').style.display='none';
+  $('ptit').textContent='Fichas técnicas';
+
   if(!catalogo) carregarCatalogo();          /* as fotos das fichas vêm do catálogo */
   if(!fichasLidas){ box.innerHTML='<div class="empty">Carregando…</div>'; return; }
   var q=norm(fichaBusca).split(' ').filter(Boolean);
@@ -7231,7 +7224,7 @@ Object.assign(window, { EQ:EQ, renderEquip:renderEquip, exportarEquip:exportarEq
    repositório do app). Arquivo estático: o navegador guarda em cache e
    não custa leitura no Firebase. Atualizar = gerar um catalogo.json novo.
    ===================================================================== */
-var catalogo=null, catLendo=false, catErro='', abaProd='catalogo';
+var catalogo=null, catLendo=false, catErro='', abaProd='fichas';
 var PARADAS={ DE:1, DA:1, DO:1, COM:1, C:1, E:1, EM:1, A:1, O:1 };
 /* nome comparável: sem "de/com/e…" e sem o peso da embalagem ("400G", "1KG"), em qualquer ordem */
 function chaveProduto(n){ return normEmp(n).split(' ').filter(function(w){ return w && !PARADAS[w] && !/^\d+([.,]\d+)?(G|GR|KG|ML|L)$/.test(w); }).sort().join(' '); }
@@ -7320,8 +7313,8 @@ function salvarVinculo(p, el){
       toast(p?'Ficha ligada a '+p.nome+'.':'Vínculo manual desfeito.'); verFicha(f.id); })
     .catch(function(e){ pare(); falha('vincular a ficha')(e); });
 }
-function setAbaProd(a){ abaProd=a; renderProdutos(); }
-function navProd(a){ abaProd=a||abaProd||'catalogo'; if(pagina!=='produtos') nav('produtos'); else renderProdutos(); }
+function setAbaProd(a){ abaProd='fichas'; renderProdutos(); }
+function navProd(a){ abaProd='fichas'; if(pagina!=='produtos') nav('produtos'); else renderProdutos(); }
 
 /* ---- compartilhar o catálogo em PDF: no celular abre o "Compartilhar" do
    aparelho (WhatsApp, e-mail…); no computador baixa o arquivo ---- */
