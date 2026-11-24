@@ -6041,7 +6041,7 @@ function distVisita(v){ if(v.lat==null || v.tipo!=='visita') return null; var cp
    (dono do cliente na carteira; fora da carteira = "Sem vendedor", cinza). Gestor vê todos; o
    vendedor, só a carteira dele. Clicar na legenda esconde/mostra o vendedor.
    ===================================================================== */
-var CMP={ dias:90, vend:'', rota:'', ocultos:{}, mapa:null, camada:null, ajustou:false };
+var CMP={ dias:90, vend:'', rota:'', ocultos:{}, mapa:null, camada:null, ajustou:false, motor:'' };
 var CMP_CORES=['#e0303d','#3b6ef5','#1f9d6b','#e8a23a','#8b5cf6','#12a39a','#f08c3a','#e86fb0','#9bbf3f','#b5651d','#5aa9ff','#c9a227','#6d4c41','#00897b'];
 function cmpPontos(){
   var corte=somaDias(hoje(), -CMP.dias), porErp={}, pts=[], semPos=0, total=0;
@@ -6081,7 +6081,68 @@ function renderCMapa(){
   $('cmp-leg').innerHTML=C.ordem.map(function(v){ return '<button class="cmp-li'+(CMP.ocultos[v]?' off':'')+'" onclick="cmpOcultar(\''+esc(v).replace(/'/g,"\\'")+'\')" title="Clique para esconder ou mostrar">'
       + '<i style="background:'+C.cor[v]+'"></i>'+esc(v)+' <b>'+C.tot[v]+'</b></button>'; }).join('')
     + (C.ordem.length>1?'<span class="mini">Clique num vendedor para esconder ou mostrar.</span>':'');
+  /* Google Maps (a mesma chave do Roteirizar da Logística); sem chave ou se o Google recusar: OpenStreetMap */
+  gmCarregar().then(function(ok){ if(ok) cmpGoogle(vis, C); else cmpLeaflet(vis, C); });
+}
+function cmpPopup(p, C){
+  var e=p.e, c=p.c, f=c ? fatCliente(c) : null, fm=f ? (f[mesAtual()]||0) : 0;
+  return '<div style="font:13px/1.45 Archivo,Arial,sans-serif;color:#1b1c21;min-width:180px"><b>'+esc(e.n||(c&&c.nome)||'—')+'</b><br>'+esc([e.c, p.rota].filter(Boolean).join(' · '))
+    + '<br><span style="color:'+C.cor[p.vend]+';font-weight:700">●</span> '+esc(p.vend)
+    + '<br>Última compra: '+fmtDia(p.u)+(fm?'<br>'+nomeMes(mesAtual())+': '+fmtRS0(fm):'')
+    + (c?'<br><a href="#" style="color:#c4232f;font-weight:600" onclick="verCliente(\''+c.id+'\');return false">Abrir a ficha</a>':'')+'</div>';
+}
+/* ---- Google Maps ---- */
+var GM={ estado:'', erro:'', chave:null, mapa:null, objs:[], info:null, _p:null };
+function gmChave(){
+  if(GM.chave!==null) return Promise.resolve(GM.chave);
+  return getDoc(doc(db,'frotaConfig','app')).then(function(s){ GM.chave=String(((s.exists() && s.data())||{}).googleMapsKey||'').trim(); return GM.chave; })
+    .catch(function(e){ console.warn('frotaConfig/app (chave do Google Maps):', e); GM.chave=''; return ''; });
+}
+function gmCarregar(){
+  if(GM.estado==='ok' && window.google && google.maps) return Promise.resolve(true);
+  if(GM.estado==='falhou') return Promise.resolve(false);
+  if(GM._p) return GM._p;
+  GM._p=gmChave().then(function(k){
+    if(!k){ GM.estado='falhou'; GM.erro='sem chave'; return false; }
+    return new Promise(function(ok){
+      window.__gmPronto=function(){ GM.estado='ok'; ok(true); };
+      /* o Google chama esta função quando recusa a chave (site não liberado, API desligada, cobrança) */
+      window.gm_authFailure=function(){ GM.estado='falhou'; GM.erro='O Google recusou a chave'; ok(false); console.warn('Google Maps: chave recusada — usando OpenStreetMap');
+        if(pagina==='cmapa'){ CMP.motor=''; GM.mapa=null; renderCMapa(); } };
+      var sc=document.createElement('script');
+      sc.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(k)+'&language=pt-BR&region=BR&loading=async&callback=__gmPronto';
+      sc.async=true; sc.onerror=function(){ GM.estado='falhou'; GM.erro='não carregou'; ok(false); };
+      document.head.appendChild(sc);
+    });
+  });
+  return GM._p;
+}
+function cmpTrocarMotor(m){
+  if(CMP.motor===m) return;
+  if(CMP.mapa && CMP.mapa.remove){ CMP.mapa.remove(); } CMP.mapa=null; CMP.camada=null;
+  GM.mapa=null; GM.objs=[]; $('cmp-mapa').innerHTML=''; CMP.motor=m; CMP.ajustou=false;
+}
+function cmpGoogle(vis, C){
+  cmpTrocarMotor('g');
+  if(!GM.mapa){
+    GM.mapa=new google.maps.Map($('cmp-mapa'), { center:{ lat:-29.7, lng:-52.4 }, zoom:7, mapTypeControl:true, streetViewControl:false,
+      fullscreenControl:true, gestureHandling:'greedy', clickableIcons:false });
+    GM.info=new google.maps.InfoWindow();
+  }
+  GM.objs.forEach(function(m){ m.setMap(null); }); GM.objs=[];
+  var b=new google.maps.LatLngBounds();
+  vis.forEach(function(p){
+    var m=new google.maps.Marker({ position:{ lat:p.e.la, lng:p.e.lo }, map:GM.mapa, title:p.e.n||'',
+      icon:{ path:google.maps.SymbolPath.CIRCLE, scale:6.5, fillColor:C.cor[p.vend], fillOpacity:.95, strokeColor:'#ffffff', strokeWeight:1.5 } });
+    m.addListener('click', function(){ GM.info.setContent(cmpPopup(p, C)); GM.info.open({ map:GM.mapa, anchor:m }); });
+    GM.objs.push(m); b.extend(m.getPosition());
+  });
+  if(GM.objs.length && !CMP.ajustou){ GM.mapa.fitBounds(b, 40); CMP.ajustou=true; }
+}
+/* ---- OpenStreetMap (Leaflet), quando não há Google ---- */
+function cmpLeaflet(vis, C){
   carregarLeaflet().then(function(){
+    cmpTrocarMotor('l');
     if(!CMP.mapa){
       CMP.mapa=L.map('cmp-mapa', { preferCanvas:true }).setView([-29.7,-52.4], 7);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' }).addTo(CMP.mapa);
@@ -6091,15 +6152,9 @@ function renderCMapa(){
     CMP.camada.clearLayers();
     var ll=[];
     vis.forEach(function(p){
-      var cor=C.cor[p.vend], e=p.e, c=p.c;
-      var f=c ? fatCliente(c) : null, fm=f ? (f[mesAtual()]||0) : 0;
-      L.circleMarker([e.la, e.lo], { radius:6, color:'#ffffff', weight:1.2, fillColor:cor, fillOpacity:.92 })
-        .bindPopup('<b>'+esc(e.n||(c&&c.nome)||'—')+'</b><br>'+esc([e.c, p.rota].filter(Boolean).join(' · '))
-          + '<br><span style="color:'+cor+';font-weight:700">●</span> '+esc(p.vend)
-          + '<br>Última compra: '+fmtDia(p.u)+(fm?'<br>'+nomeMes(mesAtual())+': '+fmtRS0(fm):'')
-          + (c?'<br><a href="#" onclick="verCliente(\''+c.id+'\');return false">Abrir a ficha</a>':''))
-        .addTo(CMP.camada);
-      ll.push([e.la, e.lo]);
+      L.circleMarker([p.e.la, p.e.lo], { radius:6, color:'#ffffff', weight:1.2, fillColor:C.cor[p.vend], fillOpacity:.92 })
+        .bindPopup(cmpPopup(p, C)).addTo(CMP.camada);
+      ll.push([p.e.la, p.e.lo]);
     });
     if(ll.length && !CMP.ajustou){ CMP.mapa.fitBounds(ll, { padding:[30,30], maxZoom:12 }); CMP.ajustou=true; }
   }).catch(function(e){ $('cmp-res').innerHTML+='<div class="alert a-info">ⓘ Não foi possível carregar o mapa ('+esc(e.message||e)+').</div>'; });
