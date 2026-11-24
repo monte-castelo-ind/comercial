@@ -6053,8 +6053,14 @@ function cmpPontos(){
     if(CMP.vend && vend!==CMP.vend) return;
     if(CMP.rota && rota!==CMP.rota) return;
     total++;
-    if(!(e.la!=null && e.lo!=null && e.p==='ok')){ semPos++; return; }
-    pts.push({ k:k, e:e, c:c, vend:vend, rota:rota, u:u });
+    if(e.la==null || e.lo==null || ['ok','aprox','cidade'].indexOf(e.p)<0){ semPos++; return; }
+    var la=+e.la, lo=+e.lo;
+    if(e.p==='cidade'){                      /* todos os da cidade caem no mesmo ponto: espalha um pouco (sempre igual para o mesmo cliente) */
+      var h=0; for(var i=0;i<k.length;i++) h=(h*31+k.charCodeAt(i))|0;
+      var ang=(Math.abs(h)%360)*Math.PI/180, r=0.004+(Math.abs(h>>8)%100)/100*0.008;
+      la+=Math.sin(ang)*r; lo+=Math.cos(ang)*r;
+    }
+    pts.push({ k:k, e:e, c:c, vend:vend, rota:rota, u:u, la:la, lo:lo, prec:e.p });
   });
   return { pts:pts, semPos:semPos, total:total };
 }
@@ -6076,8 +6082,10 @@ function renderCMapa(){
     + Object.keys(rotas).sort().map(function(r){ return '<option'+(r===CMP.rota?' selected':'')+'>'+esc(r)+'</option>'; }).join('')+'</select>';
   var P=cmpPontos(), C=cmpCores(P.pts);
   var vis=P.pts.filter(function(p){ return !CMP.ocultos[p.vend]; });
+  var nCid=P.pts.filter(function(p){ return p.prec==='cidade'; }).length;
   $('cmp-res').innerHTML='<div class="mini" style="margin:0 0 10px">'+P.total.toLocaleString('pt-BR')+' cliente'+(P.total===1?'':'s')+' compraram nos últimos '+CMP.dias+' dias'
-    + ' · '+P.pts.length.toLocaleString('pt-BR')+' no mapa'+(P.semPos?' · '+P.semPos+' sem localização (o robô ainda não achou o endereço)':'')+'</div>';
+    + ' · '+P.pts.length.toLocaleString('pt-BR')+' no mapa'+(nCid?' ('+nCid+' no centro da cidade, ponto vazado: o robô ainda não achou a rua)':'')
+    + (P.semPos?' · '+P.semPos+' sem localização':'')+'</div>';
   $('cmp-leg').innerHTML=C.ordem.map(function(v){ return '<button class="cmp-li'+(CMP.ocultos[v]?' off':'')+'" onclick="cmpOcultar(\''+esc(v).replace(/'/g,"\\'")+'\')" title="Clique para esconder ou mostrar">'
       + '<i style="background:'+C.cor[v]+'"></i>'+esc(v)+' <b>'+C.tot[v]+'</b></button>'; }).join('')
     + (C.ordem.length>1?'<span class="mini">Clique num vendedor para esconder ou mostrar.</span>':'');
@@ -6089,6 +6097,7 @@ function cmpPopup(p, C){
   return '<div style="font:13px/1.45 Archivo,Arial,sans-serif;color:#1b1c21;min-width:180px"><b>'+esc(e.n||(c&&c.nome)||'—')+'</b><br>'+esc([e.c, p.rota].filter(Boolean).join(' · '))
     + '<br><span style="color:'+C.cor[p.vend]+';font-weight:700">●</span> '+esc(p.vend)
     + '<br>Última compra: '+fmtDia(p.u)+(fm?'<br>'+nomeMes(mesAtual())+': '+fmtRS0(fm):'')
+    + (p.prec==='cidade'?'<br><span style="color:#5a5d67">Posição aproximada: centro da cidade</span>':p.prec==='aprox'?'<br><span style="color:#5a5d67">Posição pela rua (sem o número)</span>':'')
     + (c?'<br><a href="#" style="color:#c4232f;font-weight:600" onclick="verCliente(\''+c.id+'\');return false">Abrir a ficha</a>':'')+'</div>';
 }
 /* ---- Google Maps ---- */
@@ -6132,8 +6141,10 @@ function cmpGoogle(vis, C){
   GM.objs.forEach(function(m){ m.setMap(null); }); GM.objs=[];
   var b=new google.maps.LatLngBounds();
   vis.forEach(function(p){
-    var m=new google.maps.Marker({ position:{ lat:p.e.la, lng:p.e.lo }, map:GM.mapa, title:p.e.n||'',
-      icon:{ path:google.maps.SymbolPath.CIRCLE, scale:6.5, fillColor:C.cor[p.vend], fillOpacity:.95, strokeColor:'#ffffff', strokeWeight:1.5 } });
+    var cid=p.prec==='cidade';
+    var m=new google.maps.Marker({ position:{ lat:p.la, lng:p.lo }, map:GM.mapa, title:p.e.n||'',
+      icon:{ path:google.maps.SymbolPath.CIRCLE, scale:cid?5.5:6.5, fillColor:C.cor[p.vend], fillOpacity:cid?.25:.95,
+             strokeColor:cid?C.cor[p.vend]:'#ffffff', strokeWeight:cid?2:1.5 } });
     m.addListener('click', function(){ GM.info.setContent(cmpPopup(p, C)); GM.info.open({ map:GM.mapa, anchor:m }); });
     GM.objs.push(m); b.extend(m.getPosition());
   });
@@ -6152,9 +6163,10 @@ function cmpLeaflet(vis, C){
     CMP.camada.clearLayers();
     var ll=[];
     vis.forEach(function(p){
-      L.circleMarker([p.e.la, p.e.lo], { radius:6, color:'#ffffff', weight:1.2, fillColor:C.cor[p.vend], fillOpacity:.92 })
+      var cid=p.prec==='cidade';
+      L.circleMarker([p.la, p.lo], { radius:cid?5:6, color:cid?C.cor[p.vend]:'#ffffff', weight:cid?2:1.2, fillColor:C.cor[p.vend], fillOpacity:cid?.25:.92 })
         .bindPopup(cmpPopup(p, C)).addTo(CMP.camada);
-      ll.push([p.e.la, p.e.lo]);
+      ll.push([p.la, p.lo]);
     });
     if(ll.length && !CMP.ajustou){ CMP.mapa.fitBounds(ll, { padding:[30,30], maxZoom:12 }); CMP.ajustou=true; }
   }).catch(function(e){ $('cmp-res').innerHTML+='<div class="alert a-info">ⓘ Não foi possível carregar o mapa ('+esc(e.message||e)+').</div>'; });
