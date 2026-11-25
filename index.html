@@ -586,6 +586,13 @@ tr.cp-lin:hover td{background:var(--card-2)}
 .cmp-li b{color:var(--muted);font-weight:700}
 .cmp-li.off{opacity:.4;text-decoration:line-through}
 
+/* aviso de sem internet / registros esperando o sinal */
+.rede-aviso{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 8px);z-index:9999;
+  background:#3a2a06;color:#ffe2a3;border:1px solid #8a6514;border-radius:20px;padding:7px 14px;font:500 12.5px 'Archivo',sans-serif;
+  box-shadow:var(--sombra-pop,0 8px 24px rgba(0,0,0,.35));max-width:calc(100vw - 24px);text-align:center}
+.rede-aviso.on{background:#0f2a44;color:#cfe5ff;border-color:#2a63c4}
+.rede-aviso[hidden]{display:none}
+
 /* acordo com mais de um cliente */
 .ng-extra-l{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .ng-extra-l:empty{display:none}
@@ -756,6 +763,7 @@ main{min-width:0;overflow-x:clip}
 </style>
 <!-- base visual comum dos apps (cores, fonte, aviso ⚠): raiz do hub -->
 <link rel="stylesheet" href="https://monte-castelo-ind.github.io/mc-base.css?v=1">
+<link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
 
@@ -1118,6 +1126,7 @@ main{min-width:0;overflow-x:clip}
 
 <div id="modal-host"></div>
 <div class="toast" id="toast"></div>
+<div class="rede-aviso" id="rede-aviso" hidden></div>
 <div id="eq-print" aria-hidden="true"></div>
 <style>
 /* Relatório de equipamentos para imprimir / salvar em PDF. Só aparece na
@@ -1149,15 +1158,82 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
          setPersistence, browserLocalPersistence, browserSessionPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, doc, getDoc, getDocs, setDoc, updateDoc,
-         query, where, orderBy, limit, writeBatch, serverTimestamp, deleteDoc, deleteField }
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+         collection, onSnapshot, doc, getDoc, getDocs, setDoc as _setDoc, updateDoc as _updateDoc,
+         query, where, orderBy, limit, writeBatch as _writeBatch, serverTimestamp, deleteDoc as _deleteDoc, deleteField }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const cfg={ apiKey:"AIzaSyCH_t074MvkJn-qVMvCtLfEMaQHf_e_d7M",
   authDomain:"manutencao-comodato.firebaseapp.com", projectId:"manutencao-comodato",
   storageBucket:"manutencao-comodato.firebasestorage.app",
   messagingSenderId:"89709396101", appId:"1:89709396101:web:22ee225ffa806e07a269ec" };
-const app=initializeApp(cfg), auth=getAuth(app), db=getFirestore(app);
+const app=initializeApp(cfg), auth=getAuth(app);
+
+/* =====================================================================
+   SEM INTERNET (nov/2026)
+   1) O banco guarda no aparelho (IndexedDB) o que o app já leu e o que a pessoa grava. Sem sinal,
+      as telas abrem com os últimos dados e o que for registrado (visita, contato, solicitação…) fica
+      na fila do próprio Firebase e sobe sozinho quando a internet voltar.
+   2) Toda gravação passa por fila(): sem sinal (ou com sinal tão fraco que não responde em 8 s), a
+      tela segue como "salvo" na hora — o banco já aplicou no aparelho — e um aviso no topo mostra
+      quantos registros esperam o sinal. Quando o servidor confirma, o aviso some.
+   3) O app em si (esta página, o Firebase, as fontes) fica guardado pelo sw.js desta pasta, para
+      abrir mesmo sem sinal. Com internet, a página vem sempre da rede (atualização na hora).
+   ===================================================================== */
+var db;
+try{
+  db=initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+}catch(e){ console.warn('cache local do banco indisponível (navegador anônimo?):', e); db=getFirestore(app); }
+var FILA={ n:0, falhas:0 };
+function fila(p){
+  return new Promise(function(ok, falha){
+    var solto=false;
+    var soltar=function(){ if(solto) return; solto=true; FILA.n++; redeAviso(); ok({ offline:true });
+      if(!navigator.onLine) toast('Sem internet: ficou salvo no celular e será enviado quando o sinal voltar.'); };
+    var t=setTimeout(soltar, navigator.onLine===false ? 300 : 8000);
+    p.then(function(r){
+      clearTimeout(t);
+      if(!solto){ solto=true; ok(r); return; }
+      FILA.n=Math.max(0, FILA.n-1); redeAviso();
+      if(!FILA.n) toast('Tudo o que estava no celular foi enviado.');
+    }, function(e){
+      clearTimeout(t);
+      if(!solto){ solto=true; falha(e); return; }
+      FILA.n=Math.max(0, FILA.n-1); FILA.falhas++; redeAviso();
+      toast('Um registro feito sem sinal não foi aceito pelo servidor ('+(e&&e.code||e&&e.message||e)+'). Confira e registre de novo.', true);
+    });
+  });
+}
+/* Gravação automática (as sincronizações que o app faz sozinho ao abrir) não roda sem internet: ela
+   depende de dados frescos, e roda de novo na próxima vez que o app abrir com sinal. O que a pessoa
+   faz (tocou na tela há pouco) sempre grava — e entra na fila se estiver sem sinal. */
+var ULT_TOQUE=0;
+['pointerdown','touchstart','keydown'].forEach(function(ev){ document.addEventListener(ev, function(){ ULT_TOQUE=Date.now(); }, true); });
+function gravar(fn){
+  if(navigator.onLine===false && Date.now()-ULT_TOQUE > 15000){ console.info('sem internet: gravação automática adiada'); return new Promise(function(){}); }
+  return fila(fn());
+}
+function setDoc(){ var a=arguments; return gravar(function(){ return _setDoc.apply(null, a); }); }
+function updateDoc(){ var a=arguments; return gravar(function(){ return _updateDoc.apply(null, a); }); }
+function deleteDoc(){ var a=arguments; return gravar(function(){ return _deleteDoc.apply(null, a); }); }
+function writeBatch(d){ var b=_writeBatch(d), c=b.commit.bind(b); b.commit=function(){ return gravar(c); }; return b; }
+function redeAviso(){
+  var el=document.getElementById('rede-aviso'); if(!el) return;
+  var off=navigator.onLine===false;
+  if(!off && !FILA.n){ el.hidden=true; return; }
+  el.hidden=false;
+  el.innerHTML=(off?'<b>Sem internet</b>':'<b>Enviando…</b>')
+    + (FILA.n ? ' · '+FILA.n+' registro'+(FILA.n>1?'s':'')+' esperando o sinal' : ' · o que você registrar fica salvo no celular');
+  el.classList.toggle('on', !off);
+}
+window.addEventListener('online', function(){ redeAviso(); });
+window.addEventListener('offline', function(){ redeAviso(); });
+document.addEventListener('DOMContentLoaded', redeAviso);
+setTimeout(redeAviso, 0);
+/* guarda o app no aparelho para abrir sem sinal (o sw.js fica nesta mesma pasta: só vale para o Comercial) */
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  navigator.serviceWorker.register('sw.js', { scope:'./' }).catch(function(e){ console.warn('sw do Comercial:', e); });
+}
 
 /* =====================================================================
    COMERCIAL — acompanhamento de clientes e solicitações dos vendedores
