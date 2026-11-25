@@ -594,6 +594,9 @@ tr.cp-lin:hover td{background:var(--card-2)}
 .rede-aviso.on{background:#0f2a44;color:#cfe5ff;border-color:#2a63c4}
 .rede-aviso[hidden]{display:none}
 
+/* celular estreito: no topo fica só "Comercial", para caber o botão do guia */
+@media(max-width:420px){ .tm-mc{display:none} }
+
 /* acordo com mais de um cliente */
 .ng-extra-l{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .ng-extra-l:empty{display:none}
@@ -818,6 +821,7 @@ main{min-width:0;overflow-x:clip}
         <div class="lbl" style="min-width:0"><div class="uname" id="unome">—</div><div class="urole" id="upapel">—</div></div>
       </div>
       <div style="display:flex;gap:6px;padding:0 2px">
+        <button class="btn btn-sm btn-ghost" onclick="abrirGuia()" style="flex:1" title="Passo a passo de como usar o app (PDF)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg> Guia do app</button>
         <button class="btn btn-sm btn-ghost" onclick="sair()" style="flex:1">Sair</button>
       </div>
     </div>
@@ -825,10 +829,11 @@ main{min-width:0;overflow-x:clip}
 
   <main>
     <div id="topo-m">
-      <span class="tm-marca">Monte Castelo · Comercial</span>
+      <span class="tm-marca"><span class="tm-mc">Monte Castelo · </span>Comercial</span>
       <button class="luabtn" onclick="abrirBusca()" aria-label="Buscar"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"/></svg></button>
       <button class="luabtn olho-btn" onclick="alternarValores()" aria-label="Esconder valores"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg></button>
       <button class="luabtn lua" onclick="toggleTema()" aria-label="Claro ou escuro">☀</button>
+      <button class="luabtn" onclick="abrirGuia()" aria-label="Guia do app"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></button>
       <button class="btn btn-sm btn-ghost" onclick="sair()">Sair</button>
     </div>
     <div class="topbar">
@@ -3043,6 +3048,12 @@ function relSemDados(ms){
   return '';
 }
 /* lê tudo de novo, sem recarregar a página (ex.: logo depois de publicar a regra) */
+/* Guia do app (PDF com o passo a passo para os vendedores), no mesmo repositório. Trocou o guia: suba o ?v= */
+var GUIA_URL='guia-app-comercial.pdf?v=20261125';
+function abrirGuia(){
+  var w=window.open(GUIA_URL, '_blank');
+  if(!w) location.href=GUIA_URL;          /* navegador bloqueou a aba nova: abre na mesma */
+}
 function relRecarregar(){ REL.lido=false; REL.lendo=false; REL.rel={}; REL.cm={}; REL.fonte=''; REL.temPesos=false; REL.raw=null; REL.opoProds=null; renderRel(); }
 /* ---------- 1) vendas por cliente, com curva ABC ---------- */
 function relCli(){
@@ -3846,7 +3857,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
-Object.assign(window, { cmpAtualizar:cmpAtualizar, cmpSet:cmpSet, cmpOcultar:cmpOcultar, verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
+Object.assign(window, { abrirGuia:abrirGuia, cmpAtualizar:cmpAtualizar, cmpSet:cmpSet, cmpOcultar:cmpOcultar, verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
