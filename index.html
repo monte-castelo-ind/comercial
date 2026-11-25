@@ -560,6 +560,7 @@ details.mais[open]{padding-bottom:4px}
 .rel-abc.c{background:var(--card-2);color:var(--muted)}
 .rel-neg{color:var(--red);font-weight:600}
 .rel-pos{color:var(--green);font-weight:600}
+.rel-med2{color:var(--amber);font-weight:700}
 
 /* recolha: equipamentos que estão no cliente */
 .cm-rec-l{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
@@ -2872,7 +2873,7 @@ function ngReabrir(id){
    ===================================================================== */
 var REL={ aba:'cli', meses:[], cm:{}, rel:{}, lendo:false, lido:false, erro:'', fonte:'', cobertura:null,
           med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', colunas:'tipo', T:null };
-var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos']];
+var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['risco','Clientes em risco'],['opo','Oportunidades por produto'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos']];
 function relPode(){ return !!(U.gestor || U.ngTodas); }
 function fmtKg(v){ return (Math.round(v||0)).toLocaleString('pt-BR')+' kg'; }
 function relFmt(v){ return REL.med==='kg' ? fmtKg(v) : fmtRS0(v); }
@@ -2902,7 +2903,12 @@ function relCarregar(){
     });
   var pRel=Promise.all([getDocs(collection(db,'comercialLojaProd')), pPes]).then(function(r){
       var docs=r[0].docs, idx=null; docs.forEach(function(x){ if(x.id==='_idx') idx=x.data(); });
-      if(docs.length>2){ REL.rel=relDeLojaProd(docs, idx, REL._pesos); REL.fonte='lojas'; REL.mesesLoja=Object.keys(REL.rel).sort(); }
+      if(docs.length>2){ REL.rel=relDeLojaProd(docs, idx, REL._pesos); REL.fonte='lojas'; REL.mesesLoja=Object.keys(REL.rel).sort();
+        var lj={}, li=(idx&&idx.lojas)||{};
+        docs.forEach(function(x){ if(x.id.charAt(0)==='_') return; var d=x.data()||{}, inf=li[x.id]||{}, ms={};
+          Object.keys(d.meses||{}).forEach(function(m){ var pm={}, src=d.meses[m]||{}; Object.keys(src).forEach(function(p){ pm[p]=+((src[p]||[])[0])||0; }); ms[m]=pm; });
+          lj[x.id]={ nome:d.nome||inf.n||x.id, ci:inf.ci||'', rep:inf.p||'', meses:ms }; });
+        REL.raw={ lojas:lj, nomes:(idx&&idx.produtos)||{}, resumo:false }; }
       else REL.erroLoja='vazia';
     }).catch(function(e){ console.warn('comercialLojaProd:', e); REL.erroLoja=e.code||e.message||'erro'; return pPes; })
     .then(function(){
@@ -3037,7 +3043,7 @@ function relSemDados(ms){
   return '';
 }
 /* lê tudo de novo, sem recarregar a página (ex.: logo depois de publicar a regra) */
-function relRecarregar(){ REL.lido=false; REL.lendo=false; REL.rel={}; REL.cm={}; REL.fonte=''; REL.temPesos=false; renderRel(); }
+function relRecarregar(){ REL.lido=false; REL.lendo=false; REL.rel={}; REL.cm={}; REL.fonte=''; REL.temPesos=false; REL.raw=null; REL.opoProds=null; renderRel(); }
 /* ---------- 1) vendas por cliente, com curva ABC ---------- */
 function relCli(){
   var ms=relPeriodo(), aviso=relSemDados(ms);
@@ -3179,10 +3185,115 @@ function relFiltrosHtml(){
       +Object.keys(vs).sort().map(function(v){ return '<option'+(v===REL.vend?' selected':'')+'>'+esc(v)+'</option>'; }).join('')+'</select>'
       +'<input type="search" placeholder="Buscar cliente, cidade, rota…" value="'+esc(REL.busca)+'" oninput="REL.busca=this.value;clearTimeout(window._relT);window._relT=setTimeout(relPintar,250)">';
   }
+  if(a==='risco' || a==='opo'){
+    if(a==='opo'){ if(!REL.opoProds) relOpo();
+      h+='<select onchange="relSet(\'prod\',this.value)" title="Produto" style="max-width:360px">'
+        +(REL.opoProds||[]).map(function(x){ return '<option value="'+esc(x[0])+'"'+(x[0]===REL.prod?' selected':'')+'>'+esc(x[1])+' · '+x[2]+' clientes</option>'; }).join('')+'</select>'; }
+    var T0=a==='risco'?clientes.map(riscoDe).filter(Boolean):[], vs2={};
+    var vv=REL.vend, bb=REL.busca; REL.vend=''; REL.busca='';
+    if(a==='risco') T0.forEach(function(x){ vs2[x.vendTxt]=1; }); else (relOpo().linhas||[]).forEach(function(l){ vs2[relTxt(l.cels[1])]=1; });
+    REL.vend=vv; REL.busca=bb;
+    h+='<select onchange="relSet(\'vend\',this.value)"><option value="">Todos os vendedores</option>'
+      +Object.keys(vs2).sort().map(function(v){ return '<option'+(v===REL.vend?' selected':'')+'>'+esc(v)+'</option>'; }).join('')+'</select>'
+      +'<input type="search" placeholder="Buscar cliente, cidade…" value="'+esc(REL.busca)+'" oninput="REL.busca=this.value;clearTimeout(window._relT);window._relT=setTimeout(relPintar,250)">';
+  }
   h+='<span class="rel-bts"><button class="btn btn-sm btn-ghost" onclick="relExcel()">⤓ Excel</button><button class="btn btn-sm btn-ghost" onclick="relPdf()">⎙ PDF</button></span>';
   return h;
 }
-function relCalc(){ return ({ cli:relCli, cmp:relCmp, grp:relGrp, vis:relVis, ben:relBen })[REL.aba](); }
+/* ---------- 6) clientes em risco ----------
+   Junta os sinais que hoje ficam espalhados: parou de comprar, queda no último mês fechado, mês atual
+   num ritmo bem abaixo da média, e fornecedor concorrente na ficha. Ordena pelo R$ por mês em risco
+   (média dos 3 últimos meses fechados × peso dos sinais). Mostra o comodato que está no cliente. */
+function riscoDe(c){
+  if(!c || c.situacao==='prospect' || c.situacao==='inativo' || !c.erpId) return null;
+  var f=fatCliente(c), ms=mesesFat(); if(!f || ms.length<2) return null;
+  var m0=ms[ms.length-1], fech=ms.slice(0,-1).slice(-3); if(!fech.length) return null;
+  var base=fech.reduce(function(s,m){ return s+(f[m]||0); },0)/fech.length; if(base<300) return null;
+  var mUlt=fech[fech.length-1], ult=f[mUlt]||0, qMes=1-ult/base;
+  var d=new Date(), dia=d.getDate(), dm=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  var atual=f[m0]||0, proj=dia>=7 ? atual/dia*dm : null, qProj=proj!=null ? 1-proj/base : null;
+  var dsc=diasSemComprar(c), r=0, s=[];
+  var pc=function(x){ return Math.round(x*100)+'%'; };
+  if(dsc!=null && dsc>=30){ r+=1; s.push('sem comprar há '+dsc+' dias'); }
+  else if(dsc!=null && dsc>=18){ r+=0.3; s.push(dsc+' dias sem comprar'); }
+  if(qMes>=0.5){ r+=0.8; s.push('caiu '+pc(qMes)+' em '+nomeMes(mUlt)); }
+  else if(qMes>=0.3){ r+=0.5; s.push('caiu '+pc(qMes)+' em '+nomeMes(mUlt)); }
+  if(qProj!=null && qProj>=0.4 && !(dsc!=null && dsc>=30)){ r+=0.4; s.push(nomeMes(m0)+' no ritmo de '+fmtRS0(proj)+' (−'+pc(qProj)+')'); }
+  var forn=String(c.fornecedor||'').trim();
+  if(forn && !/monte\s*castelo/i.test(forn)){ r+=0.2; s.push('compra também de '+forn); }
+  if(r<0.5) return null;
+  r=Math.min(1, r);
+  var com=0; (EQ.docs||[]).forEach(function(x){ if(x.clienteId===c.id) com+=x.valor||0; });
+  return { c:c, nome:c.nome, cid:cidadeDe(c)||c.cidade||'', rota:rotaDe(c)||'', vendTxt:c.donoNome||'Sem vendedor', base:base, ult:ult, mUlt:mUlt,
+           proj:proj, m0:m0, dsc:dsc, r:r, valor:base*r, sinais:s, com:com, nivel:r>=0.9?'Alto':r>=0.7?'Médio':'Atenção' };
+}
+function relRisco(){
+  if(!EQ.docs && !EQ.lendo) carregarEquip().then(function(){ if(pagina==='rel' && REL.aba==='risco') relPintar(); });
+  var l=relFiltra(clientes.map(riscoDe).filter(Boolean)).sort(function(a,b){ return b.valor-a.valor; });
+  var tot=l.reduce(function(s,x){ return s+x.valor; },0), com=l.reduce(function(s,x){ return s+x.com; },0);
+  var nA=l.filter(function(x){ return x.nivel==='Alto'; }).length;
+  var cls={ Alto:'rel-neg', 'Médio':'rel-med2', 'Atenção':'mini' };
+  return { titulo:'Clientes em risco', aviso:(mesesFat().length<2?'O faturamento por cliente ainda não foi lido (abra a Carteira uma vez e volte).':''),
+    cols:[{t:'Cliente'},{t:'Vendedor'},{t:'Média 3 meses', r:1},{t:'Último mês', r:1},{t:'Mês atual (ritmo)', r:1},{t:'Sinais'},{t:'Comodato', r:1},{t:'Risco'},{t:'Em risco/mês', r:1}],
+    linhas:l.map(function(x){ return { id:x.c.id,
+      cels:['<b>'+esc(x.nome)+'</b>'+(x.cid?'<span class="ct-cid"> - '+esc(cidadeBonita(x.cid))+'</span>':''), esc(x.vendTxt), fmtRS0(x.base), fmtRS0(x.ult),
+            x.proj!=null?fmtRS0(x.proj):'<span class="mini">cedo</span>', '<span class="mini">'+esc(x.sinais.join(' · '))+'</span>', x.com?fmtRS0(x.com):'—',
+            '<span class="'+cls[x.nivel]+'">'+x.nivel+'</span>', '<b>'+fmtRS0(x.valor)+'</b>'],
+      xls:[x.nome+(x.cid?' - '+cidadeBonita(x.cid):''), x.vendTxt, Math.round(x.base), Math.round(x.ult), x.proj!=null?Math.round(x.proj):'', x.sinais.join(' · '), Math.round(x.com), x.nivel, Math.round(x.valor)] }; }),
+    total:{ cels:['<b>Total</b>','','','','','',com?'<b>'+fmtRS0(com)+'</b>':'','','<b>'+fmtRS0(tot)+'</b>'] },
+    resumo:[['Clientes em risco', String(l.length)], ['Risco alto', String(nA)], ['Em risco por mês', fmtRS0(tot)], ['Comodato nesses clientes', com?fmtRS0(com):'—']],
+    nota:'Sinais: 30+ dias sem comprar; queda de 30% ou mais no último mês fechado (contra a média dos 3 anteriores); mês atual no ritmo de 40% abaixo da média (a partir do dia 7); '
+      + 'fornecedor concorrente na ficha. "Em risco/mês" = média mensal × peso dos sinais. Só entram clientes com média de R$ 300 ou mais. Clique no cliente para abrir a ficha.' };
+}
+/* ---------- 7) oportunidades por produto ----------
+   Escolhe um produto e lista os clientes que compram bem da Monte Castelo e NÃO compram esse produto
+   (nos últimos 3 meses), com o potencial estimado pelo que quem compra costuma comprar dele. */
+function relOpoBase(){
+  /* lojas → { nome, ci, rep, meses: { mês: { produto: valor } } } e nome de cada produto */
+  if(REL.raw) return REL.raw;
+  var lojas={}, nomes={};
+  Object.keys(REL.cm||{}).forEach(function(m){ var cs=REL.cm[m]||{};
+    Object.keys(cs).forEach(function(k){ var c=cs[k]||{}, key=normEmp(c.nome||k), o=lojas[key]||(lojas[key]={ nome:c.nome||k, ci:'', rep:c.rep||'', meses:{}, fat:{} });
+      o.fat[m]=(o.fat[m]||0)+(+c.fat||0);
+      var pm=o.meses[m]||(o.meses[m]={}); Object.keys(c.prod||{}).forEach(function(p){ var a=c.prod[p]; pm[p]=(pm[p]||0)+(Array.isArray(a)?(+a[0]||0):(+a||0)); nomes[p]=p; }); }); });
+  return { lojas:lojas, nomes:nomes, resumo:true };
+}
+function relOpo(){
+  var B=relOpoBase(), ms=REL.meses.slice(-3), lojas=B.lojas, nomes=B.nomes;
+  var aviso=B.resumo?'Sem a base completa por loja: a lista usa os principais produtos de cada cliente e pode marcar como "não compra" quem compra pouco do produto.':'';
+  /* produtos por número de clientes que compraram nos 3 meses */
+  var cont={};
+  Object.keys(lojas).forEach(function(k){ var vis={}; ms.forEach(function(m){ Object.keys((lojas[k].meses||{})[m]||{}).forEach(function(p){ vis[p]=1; }); }); Object.keys(vis).forEach(function(p){ cont[p]=(cont[p]||0)+1; }); });
+  REL.opoProds=Object.keys(cont).sort(function(a,b){ return cont[b]-cont[a]; }).slice(0,250).map(function(p){ return [p, nomes[p]||p, cont[p]]; });
+  if(!REL.prod || !cont[REL.prod]) REL.prod=REL.opoProds.length?REL.opoProds[0][0]:'';
+  var P=REL.prod, ativos=0, compram=0, somaP=0, alvos=[];
+  Object.keys(lojas).forEach(function(k){
+    var o=lojas[k], tot=0, vp=0;
+    ms.forEach(function(m){ var pm=(o.meses||{})[m]||{}; vp+=+pm[P]||0;
+      tot+= o.fat && o.fat[m]!=null ? o.fat[m] : Object.keys(pm).reduce(function(s,p){ return s+(+pm[p]||0); },0); });
+    if(tot<=0) return; ativos++;
+    if(vp>0){ compram++; somaP+=vp; return; }
+    if(tot<900) return;
+    var antes=''; Object.keys(o.meses||{}).sort().forEach(function(m){ if(ms.indexOf(m)<0 && (+((o.meses[m]||{})[P])||0)>0) antes=m; });
+    var cc=cliDaCarteira({ nome:o.nome });
+    alvos.push({ k:k, nome:o.nome, cid:o.ci||(cc&&cidadeDe(cc))||'', rota:'', id:cc?cc.id:'', vendTxt:cc ? (cc.donoNome||'Sem vendedor') : (o.rep?o.rep+' (ERP)':'Sem vendedor'), tot:tot, antes:antes });
+  });
+  var ticket=compram ? somaP/compram/ms.length : 0;
+  var l=relFiltra(alvos).sort(function(a,b){ return b.tot-a.tot; });
+  var nomeP=nomes[P]||P;
+  return { titulo:'Oportunidades: '+nomeP, aviso:aviso,
+    cols:[{t:'Cliente'},{t:'Vendedor'},{t:'Compra em 3 meses', r:1},{t:'Já comprou este produto?'},{t:'Potencial/mês', r:1}],
+    linhas:l.map(function(x){ return { id:x.id,
+      cels:['<b>'+esc(x.nome)+'</b>'+(x.cid?'<span class="ct-cid"> - '+esc(cidadeBonita(x.cid))+'</span>':''), esc(x.vendTxt), fmtRS0(x.tot),
+            x.antes?'<span class="rel-pos">sim, até '+nomeMes(x.antes)+'</span> <span class="mini">(reativar)</span>':'<span class="mini">nunca (no último ano)</span>', fmtRS0(ticket)],
+      xls:[x.nome+(x.cid?' - '+cidadeBonita(x.cid):''), x.vendTxt, Math.round(x.tot), x.antes?'até '+nomeMes(x.antes):'nunca', Math.round(ticket)] }; }),
+    total:{ cels:['<b>'+l.length+' clientes</b>','','','','<b>'+fmtRS0(ticket*l.length)+'</b>'] },
+    resumo:[['Compram o produto', compram+' de '+ativos+' clientes ('+(ativos?Math.round(compram/ativos*100):0)+'%)'], ['Não compram (com R$ 300+/mês)', String(alvos.length)],
+            ['Quem compra leva, em média', fmtRS0(ticket)+'/mês'], ['Potencial se todos comprarem', fmtRS0(ticket*alvos.length)+'/mês']],
+    nota:'Período: '+nomeMes(ms[0])+' a '+nomeMes(ms[ms.length-1])+'. Entram os clientes que compraram R$ 900 ou mais nos 3 meses (R$ 300/mês). '
+      + '"Já comprou" = comprou este produto antes, no último ano: é reativação, a conversa mais fácil. O potencial usa a média de quem já compra o produto.' };
+}
+function relCalc(){ return ({ cli:relCli, cmp:relCmp, grp:relGrp, vis:relVis, ben:relBen, risco:relRisco, opo:relOpo })[REL.aba](); }
 function renderRel(){
   var box=$('page-rel'); if(!box) return;
   if(!relPode()){ box.innerHTML='<div class="empty">Os relatórios são da diretoria e dos gerentes.</div>'; return; }
@@ -3208,7 +3319,7 @@ function relPintar(){
     + '<div class="mini" style="margin-top:8px">'+(T.nota?esc(T.nota)+' ':'')+relFonte()+'</div>';
 }
 function relFonte(){
-  if(REL.aba==='vis' || REL.aba==='ben') return '';
+  if(REL.aba==='vis' || REL.aba==='ben' || REL.aba==='risco' || REL.aba==='opo') return '';
   var ms=REL.aba==='cmp'?[REL.mA,REL.mB]:relPeriodo(), d=null;
   if(relTemRel(ms)) ms.forEach(function(m){ var a=(REL.rel[m]||{}).atualizadoEm; if(a && (!d||a>d)) d=a; });
   if(REL.fonte==='resumo' && relTemRel(ms)){
@@ -3229,6 +3340,7 @@ function relFonte(){
 function relSet(k, v){
   REL[k]=v;
   if(k==='aba' || k==='de' || k==='ate' || k==='mA' || k==='mB'){ if(k!=='aba'){ REL.tipo=''; } }
+  if(k==='aba'){ REL.vend=''; REL.busca=''; }
   renderRel();
 }
 function relFiltrosTxt(){
@@ -3884,7 +3996,7 @@ function renderHoje(){
   $('kpis').innerHTML=k.join('');
 
   renderPromos();
-  $('h-meta').innerHTML=metaCardHtml();
+  $('h-meta').innerHTML=metaCardHtml()+metaEquipeHtml();
   $('h-agenda').innerHTML=agenda.length ? agenda.slice(0,LIM.ag).map(cartaoCliente).join('')+maisBtn(agenda.length-LIM.ag, 'ag', 30, 'renderHoje', 'clientes')
     : '<div class="empty">Nenhum contato marcado para os próximos 7 dias.</div>';
   $('h-alerta-tit').textContent='Sem comprar há mais de '+CFG.diasAlerta+' dias';
@@ -6887,6 +6999,36 @@ function diasUteisRestantes(){
   for(var x=new Date(d.getFullYear(), m, d.getDate()); x.getMonth()===m; x.setDate(x.getDate()+1)) if(x.getDay()!==0) n++;
   return n;
 }
+/* dias de venda do mês (seg a sáb) e a projeção de fechamento no ritmo atual */
+function diasUteisMes(){ var d=new Date(), m=d.getMonth(), n=0; for(var x=new Date(d.getFullYear(), m, 1); x.getMonth()===m; x.setDate(x.getDate()+1)) if(x.getDay()!==0) n++; return n; }
+function projecaoMes(v){ var tot=diasUteisMes(), feitos=tot-diasUteisRestantes(); return feitos>=3 ? v/feitos*tot : null; }
+function projTxt(v, meta){
+  var p=projecaoMes(v); if(p==null || !meta) return '';
+  var pc=Math.round(p/meta*100), cor=pc>=100?'var(--green)':pc>=85?'var(--amber)':'var(--red)';
+  return '<div class="khint" style="margin-top:4px">No ritmo atual, fecha o mês em <b style="color:'+cor+'">'+fmtRS0(p)+'</b> ('+pc+'% da meta)'
+    + (pc<100 ? '' : ' 👏')+'</div>';
+}
+/* gestão: a meta de cada vendedor no mês, do mais atrasado ao mais adiantado */
+function metaEquipeHtml(){
+  if(!U.gestor) return '';
+  var ids=Object.keys(metas).filter(function(u){ return metas[u]>0; }); if(!ids.length) return '';
+  var vd=vendasPorRep(), m=mesCorrente(), nomes={};
+  clientes.forEach(function(c){ if(c.donoUid) nomes[c.donoUid]=nomes[c.donoUid]||c.donoNome; });
+  var l=ids.map(function(u){ var v=vd&&vd.por[u]?(vd.por[u][m]||0):0, p=projecaoMes(v);
+    return { u:u, nome:nomes[u]||(vd&&vd.nomes[u])||'—', v:v, meta:metas[u], pct:v/metas[u], pp:p!=null?p/metas[u]:null }; })
+    .sort(function(a,b){ return (a.pp==null?a.pct:a.pp)-(b.pp==null?b.pct:b.pp); });
+  var tv=l.reduce(function(s,x){ return s+x.v; },0), tm=l.reduce(function(s,x){ return s+x.meta; },0), tp=projecaoMes(tv);
+  var cor=function(x){ return x==null?'var(--muted)':x>=1?'var(--green)':x>=0.85?'var(--amber)':'var(--red)'; };
+  return '<div class="card meta-card"><div class="meta-top"><div><div class="klabel">Metas da equipe · '+nomeMes(m)+'</div>'
+    + '<div class="kval">'+fmtRS0(tv)+' <span class="mini" style="font-weight:600">de '+fmtRS0(tm)+'</span></div></div>'
+    + '<div class="meta-pct">'+Math.round(tv/tm*100)+'%</div></div>'
+    + (tp!=null?'<div class="khint">No ritmo atual, a equipe fecha em <b style="color:'+cor(tp/tm)+'">'+fmtRS0(tp)+'</b> ('+Math.round(tp/tm*100)+'% da meta)</div>':'')
+    + '<table class="tb" style="margin-top:10px"><tr><th>Vendedor</th><th class="r">Vendido</th><th class="r">Meta</th><th class="r">%</th><th class="r">Ritmo do mês</th></tr>'
+    + l.map(function(x){ return '<tr><td><b>'+esc(x.nome)+'</b></td><td class="r">'+fmtRS0(x.v)+'</td><td class="r">'+fmtRS0(x.meta)+'</td>'
+        + '<td class="r">'+Math.round(x.pct*100)+'%</td><td class="r" style="color:'+cor(x.pp)+';font-weight:700">'+(x.pp!=null?Math.round(x.pp*100)+'%':'—')+'</td></tr>'; }).join('')
+    + '</table><div class="khint" style="margin-top:6px">Ritmo do mês = quanto da meta o vendedor fecha se continuar vendendo como até agora (dias de venda, seg a sáb). '
+    + (U.admin?'As metas se definem em Equipe → Definir metas do mês.':'')+'</div></div>';
+}
 function vendidoNoMes(uid){
   var m=mesCorrente();
   if(U.gestor){ var vd=vendasPorRep(); return vd && vd.por[uid] ? (vd.por[uid][m]||0) : null; }
@@ -6903,7 +7045,8 @@ function metaCardHtml(){
     +'<div class="kval">'+fmtRS0(v)+' <span class="mini" style="font-weight:600">de '+fmtRS0(meta)+'</span></div></div>'
     +'<div class="meta-pct" style="color:'+(pct>=100?'var(--green)':'var(--text)')+'">'+pct+'%</div></div>'
     +'<div class="barra" style="height:10px;margin:10px 0 8px"><i style="width:'+Math.min(100,pct)+'%;background:'+(pct>=100?'var(--green)':'var(--primary)')+'"></i></div>'
-    +'<div class="khint">'+(falta ? 'Faltam <b>'+fmtRS0(falta)+'</b> · '+(dias?'<b>'+fmtRS0(falta/dias)+'</b> por dia de venda ('+dias+' dia'+(dias>1?'s':'')+', seg a sáb)':'último dia do mês') : 'Meta batida. 🎉')+quando+'</div></div>';
+    +'<div class="khint">'+(falta ? 'Faltam <b>'+fmtRS0(falta)+'</b> · '+(dias?'<b>'+fmtRS0(falta/dias)+'</b> por dia de venda ('+dias+' dia'+(dias>1?'s':'')+', seg a sáb)':'último dia do mês') : 'Meta batida. 🎉')+quando+'</div>'
+    +(falta ? projTxt(v, meta) : '')+'</div>';
 }
 /* metas de todos os vendedores do mês, numa tela só */
 function abrirMetas(){
