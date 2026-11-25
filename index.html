@@ -3471,11 +3471,11 @@ function juntarSols(){
 /* base de clientes do ERP (robô, uma vez por dia): nome, cidade, rota, última compra */
 function lerErp(){
   erpEstado='lendo';
-  getDocs(collection(db,'logClientesMapa')).then(function(r){
+  return getDocs(collection(db,'logClientesMapa')).then(function(r){
     var b={};
     r.docs.forEach(function(d){ var cl=(d.data()||{}).clientes||{}; Object.keys(cl).forEach(function(k){ b[k]=cl[k]; }); });
     Object.keys(b).forEach(function(k){ var c=b[k]; c._busca=norm([c.n,c.nErp,c.c,c.r,c.e].join(' ')); });
-    erp=b; erpEstado='ok'; render(); tentarSyncCarteira();
+    erp=b; erpEstado='ok'; render(); return tentarSyncCarteira();
   }).catch(function(e){ console.warn('logClientesMapa:', e); erpEstado='erro'; render(); });
 }
 /* gestor: faturamento por cliente nos últimos 3 meses. O ERP não guarda o mesmo
@@ -3649,7 +3649,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
-Object.assign(window, { cmpSet:cmpSet, cmpOcultar:cmpOcultar, verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
+Object.assign(window, { cmpAtualizar:cmpAtualizar, cmpSet:cmpSet, cmpOcultar:cmpOcultar, verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
@@ -5891,17 +5891,20 @@ function adotarOrfaos(){
     return gravarPlano(ops).then(function(f){ if(f) toast(f+' cliente'+(f>1?'s':'')+' que estava'+(f>1?'m':'')+' no nome de vendedor sem login passa'+(f>1?'ram':'ou')+' para quem já tem login.'); return f; });
   }).catch(function(e){ console.warn('passar clientes do vendedor sem login:', e); return 0; });
 }
+var SYNC_FORCAR=false;
 function tentarSyncCarteira(){
-  if(!U.admin || syncRodando || syncFeito || !cfgLido) return;
+  var forcar=SYNC_FORCAR; SYNC_FORCAR=false;
+  if(forcar){ syncFeito=false; orfaosFeito=false; }
+  if(!U.admin || syncRodando || syncFeito || !cfgLido) return Promise.resolve(0);
   if(clientesOk) adotarOrfaos();
-  if(!cmDocs.length || erpEstado!=='ok' || !clientesOk) return;
-  if(!Object.keys(CFG.vendMapa||{}).length) return;
+  if(!cmDocs.length || erpEstado!=='ok' || !clientesOk) return Promise.resolve(0);
+  if(!Object.keys(CFG.vendMapa||{}).length) return Promise.resolve(0);
   var t=Date.parse((CFG.carteiraSync&&CFG.carteiraSync.em)||'');
   /* versão 2 = também traz os clientes sem representante no ERP ("sem vendedor"): na primeira vez, não espera as 12 horas */
   var versaoOk=((CFG.carteiraSync&&CFG.carteiraSync.versao)||1)>=2;
-  if(versaoOk && t && Date.now()-t < 12*3600*1000){ syncFeito=true; return; }
+  if(!forcar && versaoOk && t && Date.now()-t < 12*3600*1000){ syncFeito=true; return Promise.resolve(0); }
   syncRodando=true;
-  carregarUsuarios().then(function(lista){
+  return carregarUsuarios().then(function(lista){
     var r=linhasErpAtivas(), mapa={}, ok={};
     lista.forEach(function(u){ if(u.ativo) ok[u.uid]=u; });
     r.linhas.forEach(function(l){ var v=l[1], s=CFG.vendMapa[normEmp(v)]; mapa[v]=(s==='')?'':((s && ok[s])?s:'#nome'); });
@@ -5911,8 +5914,9 @@ function tentarSyncCarteira(){
     var itens=calcularPlano(true); IMP=guard;
     var ops=itens.filter(function(x){ return x.acao==='novo' || x.acao==='transferir' || x.acao==='vincular'; });
     return (ops.length ? gravarPlano(ops) : Promise.resolve(0)).then(function(f){
-      syncRodando=false; syncFeito=true; registrarSync(ops, 'automática');
+      syncRodando=false; syncFeito=true; registrarSync(ops, forcar?'pelo botão Atualizar':'automática');
       if(f) toast('Carteira atualizada pelo ERP: '+f+' cliente'+(f>1?'s':'')+'.');
+      return f;
     });
   }).catch(function(e){ syncRodando=false; syncFeito=true; console.warn('sincronizar carteira:', e); });
 }
@@ -6038,13 +6042,26 @@ function distVisita(v){ if(v.lat==null || v.tipo!=='visita') return null; var cp
    ===================================================================== */
 var CMP={ dias:90, vend:'', rota:'', ocultos:{}, mapa:null, camada:null, ajustou:false, motor:'' };
 var CMP_CORES=['#e0303d','#3b6ef5','#1f9d6b','#e8a23a','#8b5cf6','#12a39a','#f08c3a','#e86fb0','#9bbf3f','#b5651d','#5aa9ff','#c9a227','#6d4c41','#00897b'];
+/* representante de cada cliente no resumo do ERP (o mês mais recente vale) → nome da pessoa no app */
+function cmpRepPorNome(){
+  var r={}; (cmDocs||[]).slice().sort(function(a,b){ return a.mes<b.mes?-1:a.mes>b.mes?1:0; }).forEach(function(d){
+    Object.keys(d.clientes||{}).forEach(function(k){ var c=d.clientes[k]||{}, v=String(c.rep||'').trim(); if(v) r[normEmp(c.nome||k)]=v; }); });
+  return r;
+}
+function cmpVendErp(e, rp, nomeUid){
+  var v=rp[normEmp(e.n||'')] || (e.nErp && rp[normEmp(e.nErp)]); if(!v) return '';
+  var uid=(CFG.vendMapa||{})[normEmp(v)];
+  return (uid && nomeUid[uid]) || v;
+}
 function cmpPontos(){
-  var corte=somaDias(hoje(), -CMP.dias), porErp={}, pts=[], semPos=0, total=0;
-  clientes.forEach(function(c){ if(c.erpId) porErp[c.erpId]=c; });
+  var corte=somaDias(hoje(), -CMP.dias), porErp={}, pts=[], semPos=0, total=0, rp=cmpRepPorNome(), nomeUid={};
+  clientes.forEach(function(c){ if(c.erpId) porErp[c.erpId]=c; if(c.donoUid && c.donoNome && String(c.donoUid).indexOf('erp:')!==0) nomeUid[c.donoUid]=c.donoNome; });
   (U.gestor ? Object.keys(erp) : Object.keys(porErp)).forEach(function(k){
     var e=erp[k]; if(!e) return;
     var u=String(e.u||'').slice(0,10); if(!u || u<corte) return;
-    var c=porErp[k]||null, vend=c ? (c.donoNome||'Sem vendedor') : 'Sem vendedor', rota=String(e.r||(c&&c.rota)||'').replace(/\s+/g,' ').trim();
+    var c=porErp[k]||null, vend=c ? (c.donoNome||'') : '', viaErp=false, rota=String(e.r||(c&&c.rota)||'').replace(/\s+/g,' ').trim();
+    if(!vend || norm(vend)==='sem vendedor'){ var ve=cmpVendErp(e, rp, nomeUid); if(ve){ vend=ve; viaErp=true; } }
+    if(!vend) vend='Sem vendedor';
     if(CMP.vend && vend!==CMP.vend) return;
     if(CMP.rota && rota!==CMP.rota) return;
     total++;
@@ -6055,7 +6072,7 @@ function cmpPontos(){
       var ang=(Math.abs(h)%360)*Math.PI/180, r=0.004+(Math.abs(h>>8)%100)/100*0.008;
       la+=Math.sin(ang)*r; lo+=Math.cos(ang)*r;
     }
-    pts.push({ k:k, e:e, c:c, vend:vend, rota:rota, u:u, la:la, lo:lo, prec:e.p });
+    pts.push({ k:k, e:e, c:c, vend:vend, rota:rota, u:u, la:la, lo:lo, prec:e.p, viaErp:viaErp });
   });
   return { pts:pts, semPos:semPos, total:total };
 }
@@ -6070,7 +6087,8 @@ function renderCMapa(){
   /* filtros: período, vendedor (gestor) e rota */
   var base=(function(){ var v=CMP.vend, r=CMP.rota; CMP.vend=''; CMP.rota=''; var x=cmpPontos(); CMP.vend=v; CMP.rota=r; return x; })();
   var vends={}, rotas={}; base.pts.forEach(function(p){ vends[p.vend]=1; if(p.rota) rotas[p.rota]=1; });
-  $('cmp-fil').innerHTML='<div class="seg">'+[30,60,90].map(function(d){ return '<button class="'+(CMP.dias===d?'on':'')+'" onclick="cmpSet(\'dias\','+d+')">'+d+' dias</button>'; }).join('')+'</div>'
+  $('cmp-fil').innerHTML='<button class="btn btn-sm btn-ghost" id="cmp-atu" onclick="cmpAtualizar(this)" title="Lê de novo a base do ERP'+(U.admin?' e atualiza as carteiras pelos representantes':'')+'">↻ Atualizar</button>'
+    + '<div class="seg">'+[30,60,90].map(function(d){ return '<button class="'+(CMP.dias===d?'on':'')+'" onclick="cmpSet(\'dias\','+d+')">'+d+' dias</button>'; }).join('')+'</div>'
     + (U.gestor ? '<select onchange="cmpSet(\'vend\',this.value)"><option value="">Todos os vendedores</option>'
         + Object.keys(vends).sort().map(function(v){ return '<option'+(v===CMP.vend?' selected':'')+'>'+esc(v)+'</option>'; }).join('')+'</select>' : '')
     + '<select onchange="cmpSet(\'rota\',this.value)"><option value="">Todas as rotas</option>'
@@ -6091,6 +6109,7 @@ function cmpPopup(p, C){
   var e=p.e, c=p.c, f=c ? fatCliente(c) : null, fm=f ? (f[mesAtual()]||0) : 0;
   return '<div style="font:13px/1.45 Archivo,Arial,sans-serif;color:#1b1c21;min-width:180px"><b>'+esc(e.n||(c&&c.nome)||'—')+'</b><br>'+esc([e.c, p.rota].filter(Boolean).join(' · '))
     + '<br><span style="color:'+C.cor[p.vend]+';font-weight:700">●</span> '+esc(p.vend)
+    + (p.viaErp?'<br><span style="color:#5a5d67">vendedor pelo ERP — ainda fora da carteira dele no app</span>':'')
     + '<br>Última compra: '+fmtDia(p.u)+(fm?'<br>'+nomeMes(mesAtual())+': '+fmtRS0(fm):'')
     + (p.prec==='cidade'?'<br><span style="color:#5a5d67">Posição aproximada: centro da cidade</span>':p.prec==='aprox'?'<br><span style="color:#5a5d67">Posição pela rua (sem o número)</span>':'')
     + (c?'<br><a href="#" style="color:#c4232f;font-weight:600" onclick="verCliente(\''+c.id+'\');return false">Abrir a ficha</a>':'')+'</div>';
@@ -6165,6 +6184,18 @@ function cmpLeaflet(vis, C){
     });
     if(ll.length && !CMP.ajustou){ CMP.mapa.fitBounds(ll, { padding:[30,30], maxZoom:12 }); CMP.ajustou=true; }
   }).catch(function(e){ $('cmp-res').innerHTML+='<div class="alert a-info">ⓘ Não foi possível carregar o mapa ('+esc(e.message||e)+').</div>'; });
+}
+/* relê a base do ERP; na diretoria, também passa para a carteira de cada vendedor os clientes que mudaram
+   de representante no ERP (sem esperar as 12 horas da sincronização automática) */
+function cmpAtualizar(btn){
+  if(btn){ btn.disabled=true; btn.textContent='Atualizando…'; }
+  CMP.ajustou=false;
+  if(U.admin) SYNC_FORCAR=true;
+  Promise.resolve(lerErp()).then(function(f){
+    renderCMapa();
+    toast(f ? 'Mapa atualizado. Carteira atualizada pelo ERP: '+f+' cliente'+(f>1?'s':'')+'.' : 'Mapa atualizado.');
+  }).catch(function(e){ toast('Não foi possível atualizar: '+(e.message||e), true); })
+  .then(function(){ var b=$('cmp-atu'); if(b){ b.disabled=false; b.textContent='↻ Atualizar'; } });
 }
 function cmpSet(k, v){ CMP[k]=v; CMP.ajustou=false; renderCMapa(); }
 function cmpOcultar(v){ CMP.ocultos[v]=!CMP.ocultos[v]; renderCMapa(); }
