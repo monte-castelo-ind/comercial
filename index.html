@@ -573,6 +573,14 @@ details.mais[open]{padding-bottom:4px}
 .cm-rec-q{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
 .cm-rec-q input{width:64px;padding:5px 7px}
 
+/* pedidos por data */
+.pd-dia{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.pd-cab{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;padding:9px 12px;background:var(--card-2)}
+.pd-tot{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.pd-tot b{color:var(--text)}
+.pd-tb{margin:0!important;border:0!important}
+.pd-tb td{padding:6px 12px!important}
+
 /* ficha: produto clicável na tabela de compras */
 tr.cp-lin{cursor:pointer}
 tr.cp-lin:hover td{background:var(--card-2)}
@@ -3918,7 +3926,7 @@ function irAviso(i){ var a=_avisos[i]; if(!a) return; $('warnWrap').classList.re
 function toggleAvisos(e){ if(e) e.stopPropagation(); $('warnWrap').classList.toggle('open'); }
 document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.contains(e.target)) w.classList.remove('open'); });
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
-Object.assign(window, { guiaIr:guiaIr, abrirGuia:abrirGuia, cmpAtualizar:cmpAtualizar, cmpSet:cmpSet, cmpOcultar:cmpOcultar, verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
+Object.assign(window, { verComprasPorData:verComprasPorData, guiaIr:guiaIr, abrirGuia:abrirGuia, cmpAtualizar:cmpAtualizar, cmpSet:cmpSet, cmpOcultar:cmpOcultar, verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
@@ -6823,6 +6831,51 @@ function lpLojasDoCliente(c, idx){
   [c.nome, c.erpNome, e&&e.n, e&&e.nErp].filter(Boolean).forEach(function(n){ eqNomes(n).forEach(function(k){ ks[k]=1; }); });
   return Object.keys(idx.lojas||{}).filter(function(k){ return eqNomes((idx.lojas[k]||{}).n||'').some(function(x){ return ks[x]; }); });
 }
+/* ---------- pedidos por data (botão "Pedidos por data" na ficha) ----------
+   Junta as compras dia a dia de todos os produtos (comercialLojaProd, campo compras) por DATA: cada dia com
+   nota mostra os produtos, quantidade e valor, e o total do dia. Cliente com várias lojas de mesmo nome:
+   cada loja do dia aparece separada. Voltar reabre a ficha. */
+function verComprasPorData(cid){
+  var c=clientePorId(cid); if(!c) return;
+  var voltar={ txt:'← Voltar', cls:'btn-ghost', fn:function(){ verCliente(cid); } };
+  abrirModal({ titulo:'Pedidos por data', sub:esc(c.nome||'')+' · últimos 90 dias', wide:true, corpo:'<div class="empty">Lendo as compras…</div>', botoes:[voltar] });
+  var corpo=function(h){ var b=document.querySelector('.modal .mbody'); if(b) b.innerHTML=h; };
+  lpIdx().then(function(idx){
+    var lojas=lpLojasDoCliente(c, idx);
+    if(!lojas.length){ corpo('<div class="empty">Este cliente não foi achado na base de compras por loja.</div>'); return; }
+    return Promise.all(lojas.map(function(k){ return LP_DOCS[k] ? Promise.resolve(LP_DOCS[k])
+        : getDoc(doc(db,'comercialLojaProd',k)).then(function(s){ LP_DOCS[k]=s.exists()?(s.data()||{}):{}; return LP_DOCS[k]; }); }))
+      .then(function(docs){
+        var ini=somaDias(hoje(), -89), dias={}, temDia=false, varias=lojas.length>1, nomes=idx.produtos||{};
+        docs.forEach(function(d, j){
+          var info=(idx.lojas||{})[lojas[j]]||{}, rot=[info.b, info.ci].filter(Boolean).join(' · ')||lojas[j];
+          if(d.compras) temDia=true;
+          Object.keys(d.compras||{}).forEach(function(cod){
+            String(d.compras[cod]||'').split(';').forEach(function(t){ if(!t) return; var p=t.split('|'); if(p[0]<ini) return;
+              var chave=p[0]+(varias?'|'+rot:''), o=dias[chave]||(dias[chave]={ d:p[0], loja:rot, itens:[], q:0, v:0 });
+              var q=+p[1]||0, v=+p[2]||0; o.itens.push({ p:nomes[cod]||cod, q:q, v:v }); o.q+=q; o.v+=v; }); });
+        });
+        if(!temDia){ corpo('<div class="alert a-info">ⓘ As compras por data aparecem quando o robô do ERP gravar a versão nova da base por loja (com a data de cada compra).</div>'); return; }
+        var l=Object.keys(dias).map(function(k){ return dias[k]; }).sort(function(a,b){ return a.d<b.d?1:a.d>b.d?-1:(a.loja<b.loja?-1:1); });
+        if(!l.length){ corpo('<div class="empty">Sem compras nos últimos 90 dias.</div>'); return; }
+        var qf=function(n){ return (Math.round(n*1000)/1000).toLocaleString('pt-BR'); };
+        var tq=0, tv=0; l.forEach(function(o){ tq+=o.q; tv+=o.v; });
+        var intervalo='';
+        if(l.length>1){ var ds=l.map(function(o){ return o.d; }).filter(function(x,i,a){ return a.indexOf(x)===i; }).sort();
+          if(ds.length>1){ var soma=0; for(var i=1;i<ds.length;i++) soma+=difDias(ds[i-1], ds[i]); intervalo=' · compra a cada '+Math.round(soma/(ds.length-1))+' dia(s), em média'; } }
+        corpo('<div class="mini" style="margin-bottom:10px">'+l.length+' pedido'+(l.length>1?'s':'')+' · '+qf(tq)+' un. · '+fmtRS(tv)+intervalo
+            + (varias?' · '+lojas.length+' lojas com este nome':'')+'</div>'
+          + l.map(function(o){
+              o.itens.sort(function(a,b){ return b.v-a.v; });
+              return '<div class="pd-dia"><div class="pd-cab"><b>'+fmtDia(o.d)+'</b> <span class="mini">'+DIAS_SEM[new Date(o.d+'T12:00:00').getDay()].toLowerCase()+'</span>'
+                + (varias?' <span class="mini">· '+esc(o.loja)+'</span>':'')
+                + '<span class="pd-tot">'+o.itens.length+' produto'+(o.itens.length>1?'s':'')+' · '+qf(o.q)+' un. · <b>'+fmtRS(o.v)+'</b></span></div>'
+                + '<table class="tb pd-tb">'+o.itens.map(function(x){ return '<tr><td>'+esc(x.p)+'</td><td class="r" style="width:90px">'+qf(x.q)+'</td><td class="r" style="width:110px">'+fmtRS(x.v)+'</td></tr>'; }).join('')+'</table></div>';
+            }).join('')
+          + '<div class="mini" style="margin-top:8px">Cada bloco é um dia com nota (as notas do mesmo dia somadas). Fonte: compras por loja do ERP.</div>');
+      });
+  }).catch(function(e){ corpo('<div class="empty">'+(e&&e.code==='permission-denied'?'Sem permissão para ler a base de compras por loja.':'Não foi possível ler as compras ('+esc(e&&e.message||e)+').')+'</div>'); });
+}
 function verCompraProduto(cid, i){
   var c=clientePorId(cid), nome=(CP_NOMES[cid]||[])[i]; if(!c || !nome) return;
   var voltar={ txt:'← Voltar', cls:'btn-ghost', fn:function(){ verCliente(cid); } };
@@ -6903,7 +6956,9 @@ function comprasRecentesHtml(c){
   if(c.situacao==='prospect') return '';
   var r=compras90(c), ms=r.meses;
   var per=ms.length ? nomeMes(ms[0])+' a '+nomeMes(ms[ms.length-1])+' (até hoje)' : '';
-  var tit='<div class="det-sec">Compras dos últimos 90 dias <span class="mini" style="text-transform:none;letter-spacing:0">'+per+'</span></div>';
+  var tit='<div class="det-sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Compras dos últimos 90 dias <span class="mini" style="text-transform:none;letter-spacing:0">'+per+'</span>'
+    + ((U.gestor||U.ngTodas) && c.erpId ? '<button class="btn btn-sm btn-ghost" style="margin-left:auto;text-transform:none;letter-spacing:0" onclick="verComprasPorData(\''+c.id+'\')">📅 Pedidos por data</button>' : '')
+    + '</div>';
   if(!r.l) return !c.erpId ? '' : tit+'<div class="mini" style="margin-bottom:13px">'+(U.gestor
       ? (fatErp===false?'Sem acesso ao faturamento do ERP.':'Carregando…')
       : 'Aguardando o resumo de vendas — ele é atualizado quando a diretoria ou um gerente abre o app.')+'</div>';
