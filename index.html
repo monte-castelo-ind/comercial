@@ -110,8 +110,17 @@ html[data-theme="light"] .side:hover:not(.pin){box-shadow:14px 0 40px rgba(20,20
 .side:not(.pin):not(:hover) .navbtn .lbl{display:none}
 .side:not(.pin):not(:hover) .nbadge{position:absolute;top:3px;right:5px;margin:0;font-size:9.5px;padding:0 4px;line-height:15px}
 .side-ico{display:inline-block;width:22px;flex:0 0 22px;text-align:center;font-size:15px}
-.cnt{margin-left:auto;background:var(--amber);color:#1a1400;font-size:10.5px;font-weight:700;min-width:18px;height:18px;
-     line-height:18px;border-radius:9px;padding:0 5px;text-align:center}
+.cnt{margin-left:auto;background:var(--amber);color:#1a1400;font-size:10.5px;font-weight:700;min-width:20px;height:20px;
+     border-radius:10px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+     font-variant-numeric:tabular-nums;line-height:1;box-sizing:border-box}
+/* contador do menu: o nome do item quebra em duas linhas se precisar, para o número caber dentro do botão, longe da borda */
+@media(min-width:901px){
+  .side .navbtn .lbl{flex:1 1 auto;min-width:0;line-height:1.2;white-space:normal!important}
+  .side.pin .navbtn .cnt,.side:hover .navbtn .cnt{margin-left:0}
+  .side.pin .navbtn:has(.cnt:not([hidden])),.side:hover .navbtn:has(.cnt:not([hidden])){padding-right:7px}
+}
+/* no item ativo (fundo vermelho) o número fica em branco com o texto vermelho: lê melhor e não briga com o vermelho */
+.side .navbtn.on .cnt{background:#fff;color:var(--primary)}
 .cnt[hidden]{display:none}
 .side:not(.pin):not(:hover) .cnt{position:absolute;top:3px;right:5px;min-width:15px;height:15px;line-height:15px;font-size:9.5px;padding:0 3px}
 .subnav{display:none;flex-direction:column;gap:2px;margin:2px 0 6px 23px;padding-left:10px;border-left:1px solid var(--border)}
