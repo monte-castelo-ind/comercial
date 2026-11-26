@@ -559,6 +559,7 @@ details.mais[open]{padding-bottom:4px}
 .rel-abc.b{background:color-mix(in srgb,var(--blue) 18%,transparent);color:var(--blue)}
 .rel-abc.c{background:var(--card-2);color:var(--muted)}
 .rel-neg{color:var(--red);font-weight:600}
+.ct-com{color:var(--red);font-size:12.5px;margin-left:5px;vertical-align:baseline}
 .rel-pos{color:var(--green);font-weight:600}
 .rel-med2{color:var(--amber);font-weight:700}
 
@@ -1616,6 +1617,27 @@ function eqConfCelula(d, it){
     + (a&&a.confEm?'<div class="mini">'+(a.conf==='ok'?'conferido':'não achado')+' em '+fmtDia(String(a.confEm).slice(0,10))+'</div>':'')+'</td>';
 }
 /* ficha do cliente: equipamentos dele (pelo vínculo gravado na importação) */
+/* estrela vermelha ★ ao lado do nome: este cliente tem equipamento nosso em comodato.
+   Sai da mesma lista da aba Equipamentos; enquanto ela não carrega, a estrela não aparece. */
+var EQ_IDX=null, EQ_IDXN=-1, EQ_TENTOU=false;
+function eqComIdx(){
+  if(!EQ.docs) return null;
+  if(EQ_IDX && EQ_IDXN===EQ.docs.length) return EQ_IDX;
+  var m={}; EQ.docs.forEach(function(d){ if(d.clienteId && (d.itens||[]).length) m[d.clienteId]=1; });
+  EQ_IDX=m; EQ_IDXN=EQ.docs.length; return m;
+}
+function estrelaComodato(c){
+  try{ var m=eqComIdx(); return (m && c && m[c.id]) ? '<span class="ct-com" title="Tem equipamento em comodato">★</span>' : ''; }
+  catch(e){ console.warn('estrela de comodato:', e); return ''; }
+}
+/* lê a lista de equipamentos uma vez, sem poder derrubar a tela que chamou */
+function eqGarantirLista(depois){
+  if(EQ.docs || EQ.lendo || EQ_TENTOU) return;
+  EQ_TENTOU=true;
+  try{ carregarEquip().then(function(){ if(EQ.docs && typeof depois==='function') depois(); })
+        .catch(function(e){ console.warn('equipamentos:', e); }); }
+  catch(e){ console.warn('equipamentos:', e); }
+}
 function eqFichaPreencher(c){
   EQ.fichaCli=c;
   var mostra=function(lista){
@@ -4346,7 +4368,6 @@ function selRegiao(lista){
   return el.value;
 }
 function renderCarteira(){
-  eqGarantirLista(function(){ if(pagina==='carteira') renderCarteira(); });
   var vend=selVendedor('c-vend', clientes);
   var baseV=(vend==='#sem' ? clientes.filter(function(c){ return !c.donoUid; }) : (vend ? clientes.filter(function(c){ return c.donoUid===vend; }) : clientes));
   /* rota e cidade se cruzam: cada lista mostra só o que existe com o outro filtro escolhido */
@@ -4398,6 +4419,7 @@ function renderCarteira(){
   var mais=l.length>LIM?'<div style="text-align:center;margin:12px 0 20px"><button class="btn btn-ghost" onclick="'+(_ctModo==='cel'?'ctLimCel+=40':'ctLim+=300')+';renderCarteira()">Mostrar mais ('
     +(l.length-LIM).toLocaleString('pt-BR')+' clientes)</button></div>':'';
   if(!l.length){ $('c-lista').innerHTML=vazio; return; }
+  eqGarantirLista(function(){ if(pagina==='carteira') renderCarteira(); });
   if(_ctModo==='cel'){ $('c-lista').innerHTML=l.slice(0,LIM).map(cartaoCliente).join('')+mais; return; }
   var colVend=!!U.ver;
   window._ctRel={ l:l, val:val, pf:pf, deQuem:deQuem, vend:vend, tot:tot, compraram:compraram };
@@ -4595,7 +4617,7 @@ function linhaCliente(c, vf, colVend){
   return '<tr class="'+borda+(CT_SEL[c.id]?' ct-sel':'')+'" onclick="verCliente(\''+c.id+'\')">'
     +(U.gestor?'<td class="ct-chk" onclick="event.stopPropagation()"><input type="checkbox" aria-label="Selecionar '+esc(c.nome||'')+'"'+(CT_SEL[c.id]?' checked':'')
       +' onchange="ctSel(\''+c.id+'\', this.checked)"></td>':'')
-    +'<td><div class="ct-nome">'+esc(c.nome||'(sem nome)')+(cidadeDe(c)?'<span class="ct-cid"> - '+esc(cidadeBonita(cidadeDe(c)))+'</span>':'')+'</div>'
+    +'<td><div class="ct-nome">'+esc(c.nome||'(sem nome)')+estrelaComodato(c)+(cidadeDe(c)?'<span class="ct-cid"> - '+esc(cidadeBonita(cidadeDe(c)))+'</span>':'')+'</div>'
       +(tags.length?'<div class="ct-tags">'+tags.join('')+'</div>':'')+'</td>'
     +'<td>'+(rotaDe(c)?esc(rotaDe(c)):'<span class="ct-mut">—</span>')+'</td>'
     +(colVend?'<td>'+(c.donoNome?esc(c.donoNome):'<span class="ct-mut">'+(c.donoUid?'—':'sem vendedor')+'</span>')+'</td>':'')
@@ -6501,9 +6523,11 @@ var resumoRodando=false, fatAss='';
 /* assinatura da carteira: muda sempre que um cliente troca de dono, entra ou sai.
    Sem isso, trocar um cliente de carteira só aparecia para o vendedor até 12 horas depois. */
 function cartAssinatura(){
+  try{
   var t=clientes.filter(function(c){ return c.donoUid; }).map(function(c){ return c.id+':'+c.donoUid; }).sort().join('|');
   var h=5381; for(var i=0;i<t.length;i++){ h=((h*33)^t.charCodeAt(i))>>>0; }
   return clientes.length+'-'+h.toString(36);
+  }catch(e){ console.warn('assinatura da carteira:', e); return ''; }
 }
 function autoResumo(){
   if(!U.gestor || !fatErp || !clientesOk || resumoMeta===null || resumoMeta.erro || resumoRodando) return;
