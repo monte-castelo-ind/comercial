@@ -4148,7 +4148,7 @@ function cartaoCliente(c){
   var vf=(c.situacao==='prospect')?null:valorPeriodo(c), pf=perAtual();
   var fatHtml=(vf==null||!pf)?'':'<div class="it-fat'+(vf?'':' zero')+'">'+(vf?fmtRS0(vf):'R$ 0')+'<small>'+esc(pf.curto)+'</small></div>';
   return '<div class="it'+borda+(c.situacao==='inativo'?' b-muted':'')+'" onclick="verCliente(\''+c.id+'\')">'
-    +'<div class="it-top" style="align-items:flex-start"><span class="it-ini c'+cliCor(c.nome)+'">'+esc(cliIniciais(c.nome))+'</span><div class="it-tit">'+esc(c.nome||'(sem nome)')+'</div>'+fatHtml+'</div>'
+    +'<div class="it-top" style="align-items:flex-start"><span class="it-ini c'+cliCor(c.nome)+'">'+esc(cliIniciais(c.nome))+'</span><div class="it-tit">'+esc(c.nome||'(sem nome)')+estrelaComodato(c)+'</div>'+fatHtml+'</div>'
     +(meta?'<div class="it-meta">'+esc(meta)+'</div>':'')
     +'<div class="it-tags">'+tags.join('')+'</div></div>';
 }
@@ -4346,6 +4346,7 @@ function selRegiao(lista){
   return el.value;
 }
 function renderCarteira(){
+  eqGarantirLista(function(){ if(pagina==='carteira') renderCarteira(); });
   var vend=selVendedor('c-vend', clientes);
   var baseV=(vend==='#sem' ? clientes.filter(function(c){ return !c.donoUid; }) : (vend ? clientes.filter(function(c){ return c.donoUid===vend; }) : clientes));
   /* rota e cidade se cruzam: cada lista mostra só o que existe com o outro filtro escolhido */
