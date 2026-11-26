@@ -1422,7 +1422,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
    o vendedor consulta só o que é dele (where donoUid), o gestor consulta tudo.
    ===================================================================== */
 
-var U={ uid:'', email:'', nome:'', admin:false, gestor:false, comercial:false, comodato:false, veSol:false, cmGerencia:false, ngTodas:false };
+var U={ uid:'', email:'', nome:'', admin:false, gestor:false, analista:false, ver:false, comercial:false, comodato:false, veSol:false, cmGerencia:false, ngTodas:false };
 var CFG={ respondem:{}, diasAlerta:30 }, cfgExiste=false, cfgLido=false;
 var meusTipos=[];                 /* tipos de solicitação que esta pessoa responde */
 var clientes=[], visitas=[], concorrentes=[];
@@ -2525,7 +2525,7 @@ function ngClientes(n){
 function ngNomeCurto(n){ var x=(n.clientesExtra||[]).length; return (n.clienteNome||'—')+(x?' + '+x+' cliente'+(x>1?'s':''):''); }
 function ngFatFonte(x){
   var c=x.clienteId?clientePorId(x.clienteId):null, f=c?fatCliente(c):null;
-  if(!f && (U.gestor||U.ngTodas) && fatErp){ var e=x.erpId?erp[x.erpId]:null;
+  if(!f && (U.ver||U.ngTodas) && fatErp){ var e=x.erpId?erp[x.erpId]:null;
     [x.nome, e&&e.n, e&&e.nErp].filter(Boolean).some(function(nm){ return eqNomes(nm).some(function(k){ if(fatErp[k]){ f=fatErp[k]; return true; } return false; }); }); }
   return f||null;
 }
@@ -2573,14 +2573,14 @@ function ngCardHtml(n){
     + '<div class="ng-meta">'
     + (ngAndando(n) ? (n.proxPasso||n.prazo ? '→ '+esc(n.proxPasso||'próximo passo')+(n.prazo?' · <span class="'+(venc?'ng-venc':'')+'">'+(venc?'atrasado desde ':'até ')+fmtDia(n.prazo)+'</span>':'') : '<span class="ng-venc">sem próximo passo definido</span>')
                     : (n.etapa==='perdida' && n.motivo ? 'motivo: '+esc(n.motivo) : (n.resultado?esc(n.resultado):''))+(n.fechadaEm?' · '+fmtDia(String(n.fechadaEm).slice(0,10)):''))
-    + '<br>'+(U.gestor?esc(n.donoNome||'sem vendedor')+' · ':'')+'aberta há '+difDias(String(n.criadoEm||hoje()).slice(0,10), h)+' dia(s)'
+    + '<br>'+(U.ver?esc(n.donoNome||'sem vendedor')+' · ':'')+'aberta há '+difDias(String(n.criadoEm||hoje()).slice(0,10), h)+' dia(s)'
     + '</div></div>';
 }
 function renderNegoc(){
   var lista=$('ng-lista'); if(!lista) return;
   document.querySelectorAll('.ngtodas-vis').forEach(function(b){ if(U.gestor||U.ngTodas) b.style.display=''; });
   if(negocsErro){ lista.innerHTML='<div class="alert a-err">⚠ '+esc(negocsErro)+'</div>'; return; }
-  var sv=$('ng-vend'); if(sv) sv.style.display=(U.gestor||U.ngTodas)?'':'none';
+  var sv=$('ng-vend'); if(sv) sv.style.display=(U.ver||U.ngTodas)?'':'none';
   var vend=selVendedor('ng-vend', negocs, U.ngTodas);
   var st=$('ng-tipo'), at=st.value;
   st.innerHTML='<option value="">Todos os tipos</option>'+Object.keys(NG_TIPOS).map(function(k){ return '<option value="'+k+'">'+NG_TIPOS[k]+'</option>'; }).join(''); st.value=at;
@@ -2603,7 +2603,7 @@ function renderNegoc(){
     + '<div class="card kpi" onclick="NG.ord=\'prazo\';ngSeg(\'and\')"><div class="klabel">Próximo passo atrasado</div><div class="kval" style="color:'+(venc?'var(--red)':'inherit')+'">'+venc+'</div><div class="khint">'+(semPasso?semPasso+' sem próximo passo':'todas com próximo passo')+'</div></div>'
     + '<div class="card kpi" onclick="ngSeg(\'ganha\')"><div class="klabel">Ganhas no mês</div><div class="kval" style="color:var(--green)">'+gMes.length+'</div><div class="khint">'+fmtRS0(gMes.reduce(function(t,n){ return t+(+n.valor||0); },0))+'/mês</div></div>'
     + '<div class="card"><div class="klabel">Taxa de ganho</div><div class="kval">'+((g90+p90)?Math.round(100*g90/(g90+p90))+'%':'—')+'</div><div class="khint">últimos 90 dias · '+g90+' ganhas, '+p90+' perdidas</div></div>';
-  var b=$('ng-badge'); if(b){ var meus=negocs.filter(function(n){ return ngAndando(n) && n.prazo && n.prazo<h && (!U.gestor || n.donoUid===U.uid); }).length; b.style.display=meus?'':'none'; b.textContent=meus; }
+  var b=$('ng-badge'); if(b){ var meus=negocs.filter(function(n){ return ngAndando(n) && n.prazo && n.prazo<h && (!U.ver || n.donoUid===U.uid); }).length; b.style.display=meus?'':'none'; b.textContent=meus; }
   var ord=NG.ord=($('ng-ord')||{}).value||NG.ord;
   var srt=function(a,b){
     if(ord==='valor') return (+b.valor||0)-(+a.valor||0);
@@ -2640,12 +2640,12 @@ function ngAcordosHtml(base){
   var tb=0, tq={}; l.forEach(function(n){ if(ngVigente(n, m)){ var c=ngCalc(n, m); if(!c.ben) return;
     if(n.acordo.benTipo==='qtd'){ var u=n.acordo.un||'pacotes'; tq[u]=(tq[u]||0)+c.ben; } else tb+=c.ben; } });
   var tqTxt=Object.keys(tq).map(function(u){ return tq[u]+' '+u; }).join(', ');
-  lista.innerHTML=seg+'<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) '+(ver==='enc'?'encerrado(s) · tocar abre o histórico':'em vigor'+((U.gestor||U.ngTodas)?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios'+(tqTxt?' + <b>'+tqTxt+'</b> em produto':''):''))+'</div>'
+  lista.innerHTML=seg+'<div class="mini" style="margin-bottom:8px">'+l.length+' acordo(s) '+(ver==='enc'?'encerrado(s) · tocar abre o histórico':'em vigor'+((U.ver||U.ngTodas)?' · se o mês fechasse hoje: <b>'+fmtRS0(tb)+'</b> em benefícios'+(tqTxt?' + <b>'+tqTxt+'</b> em produto':''):''))+'</div>'
     + '<div class="card" style="padding:0;overflow:hidden"><div class="tscroll" style="max-height:none;border:none"><table class="eq-tab eq-corr"><thead><tr><th>Cliente</th><th>Acordo</th>'
-    + ((U.gestor||U.ngTodas)?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
+    + ((U.ver||U.ngTodas)?'<th>Vendedor</th>':'')+'<th>'+nomeMes(m)+' (até hoje)</th><th>'+nomeMes(ma)+'</th></tr></thead><tbody>'
     + l.map(function(n){ var a=n.acordo, c=ngCalc(n, m), pr=c.pct!=null?Math.min(1,c.pct):null;
         return '<tr style="cursor:pointer" onclick="verNegoc(\''+n.id+'\')"><td class="eq-loja"><div class="nm">'+esc(ngNomeCurto(n))+'</div><div class="eq-end">'+esc(n.titulo||'')+'</div></td>'
-          + '<td data-l="Acordo" style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+((U.gestor||U.ngTodas)?'<td data-l="Vendedor">'+esc(nomeVend(n.donoNome))+'</td>':'')
+          + '<td data-l="Acordo" style="white-space:normal;min-width:220px">'+esc(ngAcTxt(a))+'</td>'+((U.ver||U.ngTodas)?'<td data-l="Vendedor">'+esc(nomeVend(n.donoNome))+'</td>':'')
           + '<td data-l="'+nomeMes(m)+' (até hoje)">'+(!ngVigente(n, m)?'<span class="mini">encerrado</span>':a.tipo==='fixo'?ngBenVal(c.ben, a)+' <span class="mini">fixo</span>'
               : !(+a.meta>0) ? '<span class="mini">meta em produto · conferir no fim do mês</span>'
               : (c.fat==null?'<span class="mini">sem faturamento</span>':fmtRS0(c.fat)+' <span class="mini">de '+fmtRS0(a.meta)+' ('+Math.round(c.pct*100)+'%)</span>'
@@ -3045,7 +3045,7 @@ function ngReabrir(id){
 var REL={ aba:'cli', meses:[], cm:{}, rel:{}, lendo:false, lido:false, erro:'', fonte:'', cobertura:null,
           med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', colunas:'tipo', T:null };
 var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['risco','Clientes em risco'],['opo','Oportunidades por produto'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos']];
-function relPode(){ return !!(U.gestor || U.ngTodas); }
+function relPode(){ return !!(U.ver || U.ngTodas); }
 function fmtKg(v){ return (Math.round(v||0)).toLocaleString('pt-BR')+' kg'; }
 function relFmt(v){ return REL.med==='kg' ? fmtKg(v) : fmtRS0(v); }
 var REL_TIPO_NOME={ PAO_FRANCES:'Pão francês', MIUDEZA:'Miudeza', CUCAS:'Cucas', PAO_DE_QUEIJO:'Pão de queijo', MASSA_FOLHADA:'Massa folhada',
@@ -3237,7 +3237,7 @@ function guiaIr(id){
 /* celular: o avatar do topo abre a conta (tema claro/escuro e sair) */
 function abrirConta(){
   var esc_=document.documentElement.getAttribute('data-theme')==='dark';
-  abrirModal({ titulo:esc(U.nome||U.email||'Sua conta'), sub:esc(U.email||'')+(U.admin?' · diretoria':U.gestor?' · gerente':' · vendedor'),
+  abrirModal({ titulo:esc(U.nome||U.email||'Sua conta'), sub:esc(U.email||'')+(U.admin?' · diretoria':U.gestor?' · gerente':U.analista?' · analista':' · vendedor'),
     corpo:'<div class="conta-l">'
       + '<button class="conta-b" onclick="toggleTema();fecharModal();">'+(esc_?'☀ Modo claro':'☾ Modo escuro')+'</button>'
       + '<button class="conta-b" onclick="fecharModal();nav(\'guia\')">📘 Guia do app</button>'
@@ -3342,7 +3342,7 @@ function relGrp(){
 }
 /* ---------- 4) visitas e contatos por vendedor (últimos 3 meses carregados) ---------- */
 function relVis(){
-  if(!U.gestor) return { titulo:'Visitas e contatos', cols:[], linhas:[], aviso:'Este relatório é da diretoria e dos gerentes.' };
+  if(!U.ver) return { titulo:'Visitas e contatos', cols:[], linhas:[], aviso:'Este relatório é da diretoria e dos gerentes.' };
   var p=REL.visPer, m0=mesAtual(), m1=mesAnterior();
   var l=(visitas||[]).filter(function(v){ return p==='mes'?v.mes===m0 : p==='ant'?v.mes===m1 : true; });
   var g={};
@@ -3415,7 +3415,7 @@ function relFiltrosHtml(){
       +Object.keys(vs2).sort().map(function(v){ return '<option'+(v===REL.vend?' selected':'')+'>'+esc(v)+'</option>'; }).join('')+'</select>'
       +'<input type="search" placeholder="Buscar cliente, cidade…" value="'+esc(REL.busca)+'" oninput="REL.busca=this.value;clearTimeout(window._relT);window._relT=setTimeout(relPintar,250)">';
   }
-  h+='<span class="rel-bts"><button class="btn btn-sm btn-ghost" onclick="relExcel()">⤓ Excel</button><button class="btn btn-sm btn-ghost" onclick="relPdf()">⎙ PDF</button></span>';
+  if(!U.analista) h+='<span class="rel-bts"><button class="btn btn-sm btn-ghost" onclick="relExcel()">⤓ Excel</button><button class="btn btn-sm btn-ghost" onclick="relPdf()">⎙ PDF</button></span>';
   return h;
 }
 /* ---------- 6) clientes em risco ----------
@@ -3515,7 +3515,7 @@ function relCalc(){ return ({ cli:relCli, cmp:relCmp, grp:relGrp, vis:relVis, be
 function renderRel(){
   var box=$('page-rel'); if(!box) return;
   if(!relPode()){ box.innerHTML='<div class="empty">Os relatórios são da diretoria e dos gerentes.</div>'; return; }
-  $('rel-abas').innerHTML=REL_ABAS.filter(function(x){ return x[0]!=='vis' || U.gestor; })
+  $('rel-abas').innerHTML=REL_ABAS.filter(function(x){ return x[0]!=='vis' || U.ver; })
     .map(function(x){ return '<button class="'+(REL.aba===x[0]?'on':'')+'" onclick="relSet(\'aba\',\''+x[0]+'\')">'+x[1]+'</button>'; }).join('');
   if(!REL.lido){ $('rel-fil').innerHTML=''; $('rel-res').innerHTML=''; $('rel-tab').innerHTML='<div class="empty">'+(REL.erro?'Não foi possível ler as vendas: '+esc(REL.erro):'Lendo as vendas do ERP…')+'</div>'; relCarregar(); return; }
   $('rel-fil').innerHTML=relFiltrosHtml();
@@ -3571,6 +3571,7 @@ function relFiltrosTxt(){
 }
 function relTxt(h){ var d=document.createElement('div'); d.innerHTML=String(h==null?'':h); return d.textContent; }
 function relExcel(){
+  if(U.analista){ toast('Baixar relatório em Excel não está liberado para o seu acesso.', true); return; }
   var T=REL.T; if(!T || !T.linhas.length){ toast('Nada para exportar.', true); return; }
   carregarXLSX().then(function(){
     var aoa=[[T.titulo+' — '+relFiltrosTxt()], [], T.cols.map(function(c){ return c.t; })]
@@ -3582,6 +3583,7 @@ function relExcel(){
   }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
 }
 function relPdf(){
+  if(U.analista){ toast('Imprimir relatório em PDF não está liberado para o seu acesso.', true); return; }
   var T=REL.T; if(!T || !T.linhas.length){ toast('Nada para imprimir.', true); return; }
   $('eq-print').innerHTML='<h1>'+esc(T.titulo)+'</h1>'
     + '<div class="sub">Panificadora Monte Castelo · gerado em '+new Date().toLocaleString('pt-BR')+' por '+esc(U.nome||U.email)+' · '+esc(relFiltrosTxt())+'</div>'
@@ -3618,7 +3620,7 @@ function buscaPintar(){
   var pr=((catalogo&&catalogo.produtos)||[]).filter(function(p){ return ok(norm([p.nome,p.linha,p.codigo].join(' '))); }).slice(0,6);
   var h='';
   if(cl.length) h+='<div class="bg-sec">Clientes</div>'+cl.map(function(c){ return '<button class="bg-it" onclick="fecharModal();verCliente(\''+c.id+'\')"><span class="bg-av">'+esc(ini(c.nome))+'</span>'
-      + '<span style="min-width:0"><b>'+esc(c.nome)+'</b><small>'+esc([c.cidade, rotaDe(c), U.gestor&&c.donoNome?'carteira de '+c.donoNome:''].filter(Boolean).join(' · '))+'</small></span></button>'; }).join('');
+      + '<span style="min-width:0"><b>'+esc(c.nome)+'</b><small>'+esc([c.cidade, rotaDe(c), U.ver&&c.donoNome?'carteira de '+c.donoNome:''].filter(Boolean).join(' · '))+'</small></span></button>'; }).join('');
   if(ng.length) h+='<div class="bg-sec">Negociações</div>'+ng.map(function(n){ return '<button class="bg-it" onclick="fecharModal();nav(\'negoc\');verNegoc(\''+n.id+'\')"><span class="bg-av">'+svgIco(IC.troca,15)+'</span>'
       + '<span style="min-width:0"><b>'+esc(n.titulo||'')+'</b><small>'+esc((n.clienteNome||'')+' · '+(NG_NOME[n.etapa||'aberta']||''))+'</small></span></button>'; }).join('');
   if(pr.length) h+='<div class="bg-sec">Produtos</div>'+pr.map(function(p){ return '<button class="bg-it" onclick="fecharModal();verProduto('+JSON.stringify(p.ordem).replace(/"/g,'&quot;')+')"><span class="bg-av">'+svgIco(IC.pacote,15)+'</span>'
@@ -3717,6 +3719,12 @@ onAuthStateChanged(auth, async function(u){
   U.admin=U.dono || (d.comercial===true && d.comercialAdmin===true);
   U.comercial=U.admin || d.comercial===true;
   U.gestor=U.admin || (d.comercial===true && d.comercialGestor===true);
+  /* chave "Ver todos os clientes" (ex.: Jeferson, analista comercial): VÊ tudo do Comercial (clientes, visitas,
+     negociações, pedidos, faturamento, relatórios e mapa) só para consultar. Não altera nada de outros vendedores,
+     não vê Equipe nem metas, não gerencia promoções, não avalia acordos e não baixa relatórios em Excel/PDF.
+     U.ver = quem lê tudo (gerente, diretoria ou analista); U.gestor continua sendo só quem GERE. */
+  U.analista=!U.gestor && d.comercial===true && d.comercialVerTodos===true;
+  U.ver=U.gestor || U.analista;
   /* pedido de equipamento: desde 18/11/2026 TODO o comercial pede direto na lista Remessa Comodato /
      Manutenção Externa (coleção comodatoSolicitacoes), em vez de abrir uma Solicitação. Quem gerencia
      (comodatoGerencia, ex.: Jeferson) prioriza, corrige ou exclui na própria lista. */
@@ -3730,7 +3738,7 @@ onAuthStateChanged(auth, async function(u){
   /* chave "Acordos de todos" (ex.: Mariana, analista): vê as negociações e os acordos de todos os vendedores,
      com o faturado do mês, só para consultar — conceder e marcar pago continua com gerente e diretoria */
   U.ngTodas=U.gestor || (U.comercial && d.comercialAcordos===true);
-  document.querySelectorAll('.rel-vis').forEach(function(el){ el.style.display=(U.gestor||U.ngTodas)?'':'none'; });
+  document.querySelectorAll('.rel-vis').forEach(function(el){ el.style.display=(U.ver||U.ngTodas)?'':'none'; });
   try{ var c=await getDoc(doc(db,'comConfig','app')); cfgExiste=c.exists(); aplicarCfg(c.exists()?c.data():{}); }
   catch(e){ console.warn('comConfig:',e); aplicarCfg({}); }
   if(!U.comercial && !meusTipos.length){ negar('Sua conta não tem acesso ao app Comercial. Fale com a diretoria.'); return; }
@@ -3739,11 +3747,12 @@ onAuthStateChanged(auth, async function(u){
   $('uav').textContent=(U.nome[0]||'?').toUpperCase();
   $('unome').textContent=U.nome;
   pintarOlho();
-  $('upapel').textContent=U.dono?'Diretoria · admin':U.admin?'Diretoria do Comercial':(U.gestor?'Gerente':(U.comercial?'Vendedor':'Responde solicitações'));
+  $('upapel').textContent=U.dono?'Diretoria · admin':U.admin?'Diretoria do Comercial':(U.gestor?'Gerente':(U.analista?'Analista comercial':(U.comercial?'Vendedor':'Responde solicitações')));
   document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display=U.admin?'':'none'; });
   document.querySelectorAll('.dono-only').forEach(function(el){ el.style.display=U.dono?'':'none'; });
   document.querySelectorAll('.com-only').forEach(function(el){ el.style.display=U.comercial?'':'none'; });
   document.querySelectorAll('.gestor-only').forEach(function(el){ el.style.display=U.gestor?'':'none'; });
+  if(U.analista) ['c-vend','c-reg','v-vend','ng-vend'].forEach(function(id){ var e=$(id); if(e) e.style.display=''; });   /* só os filtros de leitura */
   document.querySelectorAll('.cm-only').forEach(function(el){ el.style.display=(U.comodato||U.cmGerencia||U.comercial)?'':'none'; });
   segSol=U.comercial?'minhas':'responder';
   ouvir();
@@ -3792,18 +3801,18 @@ function ouvir(){
 
   if(U.comercial){
     var cc=collection(db,'comClientes');
-    subs.push(onSnapshot(U.gestor ? query(cc, limit(3000)) : query(cc, where('donoUid','==',U.uid)),
+    subs.push(onSnapshot(U.ver ? query(cc, limit(3000)) : query(cc, where('donoUid','==',U.uid)),
       function(s){ delete erros.clientes; clientes=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); clientesOk=true; _vendIdx=null; render(); autoResumo(); tentarSyncCarteira(); syncDonos(); },
       erroLeitura('clientes')));
     /* visitas dos últimos 3 meses: "mes" com in dispensa índice composto */
     var cv=collection(db,'comVisitas'), m3=mesesAtras(3);
-    subs.push(onSnapshot(U.gestor ? query(cv, where('mes','in',m3)) : query(cv, where('donoUid','==',U.uid), where('mes','in',m3)),
+    subs.push(onSnapshot(U.ver ? query(cv, where('mes','in',m3)) : query(cv, where('donoUid','==',U.uid), where('mes','in',m3)),
       function(s){ delete erros.visitas; visitas=s.docs.map(function(x){ return Object.assign({id:x.id}, x.data()); }); render(); },
       erroLeitura('visitas')));
     /* negociações: o vendedor vê as dele; gerentes e diretoria, todas */
     var cng=collection(db,'comNegociacoes');
     var ngErro=function(e){ console.warn('comNegociacoes:', e); negocsErro=(e&&e.code==='permission-denied')?'Sem permissão para ler as negociações (regra do Firestore publicada?).':'Não foi possível ler as negociações.'; render(); };
-    if(U.gestor || U.ngTodas){
+    if(U.ver || U.ngTodas){
       subs.push(onSnapshot(query(cng, limit(3000)), function(s){ negocs=s.docs.map(function(x){ return Object.assign({ id:x.id }, x.data()); }); render(); syncDonos(); }, ngErro));
     }else{
       /* vendedor: as que ele abriu e as dos clientes da carteira dele (vendUid), mesmo abertas por outra pessoa */
@@ -3852,7 +3861,7 @@ function ouvir(){
     }
     lerErp();
     ouvirMetas(); ouvirFichas();
-    if(!U.gestor && U.ngTodas) lerFaturamento();      /* faturado do mês dos acordos de todos (só leitura) */
+    if(!U.gestor && (U.ngTodas || U.analista)) lerFaturamento();      /* faturado do mês dos acordos de todos (só leitura) */
     if(U.gestor){
       lerFaturamento();
       subs.push(onSnapshot(doc(db,'comVendResumo','_meta'), function(s){ resumoMeta=s.exists()?s.data():{}; autoResumo(); render(); },
@@ -3987,7 +3996,7 @@ function fabAcao(){ var a=(ACAO[pagina]||[])[1]; if(a==='cliente') abrirCliente(
 function render(){
   if(!U.uid) return;
   var sub=TITULOS[pagina][1];
-  if(pagina==='carteira') sub=clientes.length+' cliente'+(clientes.length===1?'':'s')+(U.gestor?' em todas as carteiras':' na sua carteira');
+  if(pagina==='carteira') sub=clientes.length+' cliente'+(clientes.length===1?'':'s')+(U.ver?' em todas as carteiras':' na sua carteira');
   $('psub').textContent=sub;
   var av=Object.keys(erros).map(function(k){ return '<div class="alert a-err">⚠ '+esc(erros[k])+'</div>'; });
   if(U.admin && !cfgExiste) av.push('<div class="alert a-info">ⓘ Configurações ainda não salvas: por enquanto a diretoria e os gerentes respondem todos os tipos de solicitação. Ajuste em Configurações.</div>');
@@ -4032,8 +4041,8 @@ function diagnosticos(){
   var ativos=clientes.filter(function(c){ return c.situacao!=='inativo'; });
   var atras=ativos.filter(contatoAtrasado).length;
   if(atras) out.push({ sev:'warn', titulo:atras+' contato'+(atras>1?'s':'')+' atrasado'+(atras>1?'s':''),
-    sub:'Clientes com a data do próximo contato vencida'+(U.gestor?' (todas as carteiras).':'.'), ir:function(){ filtroCart='agenda'; nav('carteira'); } });
-  var ngV=negocs.filter(function(n){ return ngAndando(n) && n.prazo && n.prazo<h && (!U.gestor || n.donoUid===U.uid); }).length;
+    sub:'Clientes com a data do próximo contato vencida'+(U.ver?' (todas as carteiras).':'.'), ir:function(){ filtroCart='agenda'; nav('carteira'); } });
+  var ngV=negocs.filter(function(n){ return ngAndando(n) && n.prazo && n.prazo<h && (!U.ver || n.donoUid===U.uid); }).length;
   if(U.gestor){ var mAv=mesAnterior(), ngA=negocs.filter(function(n){ return ngVigente(n, mAv) && !(n.avaliacoes||{})[mAv]; }).length;
     if(ngA) out.push({ sev:'warn', titulo:ngA+' acordo'+(ngA>1?'s':'')+' para avaliar em '+nomeMes(mAv),
       sub:'Conferir se bateu a meta e conceder o benefício.', ir:function(){ NG.seg='aval'; NG.mesAval=mAv; nav('negoc'); setTimeout(function(){ ngSeg('aval'); }, 30); } }); }
@@ -4097,7 +4106,7 @@ function cartaoCliente(c){
   if(c.fornecedor) tags.push('<span class="tag">Compra de: '+esc(c.fornecedor)+'</span>');
   if(emAlerta(c) || contatoAtrasado(c) || qd) borda=' b-red'; else if(contatoHoje(c)) borda=' b-amber';
   else if(c.situacao==='prospect') borda=' b-blue';
-  var meta=[c.cidade, rotaDe(c)?'rota '+rotaDe(c):'', (U.gestor&&c.donoNome)?'carteira de '+c.donoNome:((U.gestor&&!c.donoUid)?'sem vendedor':'')].filter(Boolean).join(' · ');
+  var meta=[c.cidade, rotaDe(c)?'rota '+rotaDe(c):'', (U.ver&&c.donoNome)?'carteira de '+c.donoNome:((U.ver&&!c.donoUid)?'sem vendedor':'')].filter(Boolean).join(' · ');
   var vf=(c.situacao==='prospect')?null:valorPeriodo(c), pf=perAtual();
   var fatHtml=(vf==null||!pf)?'':'<div class="it-fat'+(vf?'':' zero')+'">'+(vf?fmtRS0(vf):'R$ 0')+'<small>'+esc(pf.curto)+'</small></div>';
   return '<div class="it'+borda+(c.situacao==='inativo'?' b-muted':'')+'" onclick="verCliente(\''+c.id+'\')">'
@@ -4109,7 +4118,7 @@ function cartaoVisita(v){
   var c=clientePorId(v.clienteId);
   return '<div class="it" onclick="verVisita(\''+v.id+'\')">'
     +'<div class="it-top"><div class="it-tit">'+esc(v.clienteNome||(c&&c.nome)||'—')+'</div><span class="tag">'+esc(CONTATO[v.tipo]||v.tipo)+'</span></div>'
-    +'<div class="it-meta">'+fmtDia(v.data)+(U.gestor&&v.donoNome?' · '+esc(v.donoNome):'')+(v.fotos?' · 📷 '+v.fotos:'')+(v.lat!=null?' · 📍':'')+'</div>'
+    +'<div class="it-meta">'+fmtDia(v.data)+(U.ver&&v.donoNome?' · '+esc(v.donoNome):'')+(v.fotos?' · 📷 '+v.fotos:'')+(v.lat!=null?' · 📍':'')+'</div>'
     +(function(){ var d=distVisita(v); return (d!=null && d>LONGE_KM) ? '<div class="it-tags"><span class="tag t-amber">📍 a '+fmtKm(d)+' do cliente</span></div>' : ''; })()
     +(v.resumo?'<div class="it-txt">'+esc(v.resumo)+'</div>':'')+'</div>';
 }
@@ -4177,7 +4186,7 @@ function hjOrigemHtml(){
     +   '<div class="hj-leg">'+segs.map(function(x){ return '<button'+(x.id?' onclick="verCliente(\''+x.id+'\')"':' disabled')+'><i style="background:'+x.cor+'"></i>'
           + '<span class="nm">'+esc(x.nome)+'</span><span class="vl">'+fmtRS0(x.v)+'</span><span class="pc">'+pc(x.v)+'</span></button>'; }).join('')+'</div>'
     + '</div>'
-    + '<p class="hj-frase">O maior faturamento de '+nomeMes(r.m)+' veio de <b>'+esc(maior.c.nome)+'</b>: '+fmtRS0(maior.v)+', <b>'+pc(maior.v)+'</b> do total'+(U.gestor?'':' da sua carteira')
+    + '<p class="hj-frase">O maior faturamento de '+nomeMes(r.m)+' veio de <b>'+esc(maior.c.nome)+'</b>: '+fmtRS0(maior.v)+', <b>'+pc(maior.v)+'</b> do total'+(U.ver?'':' da sua carteira')
     + (top.length>1?'. Os '+top.length+' maiores somam <b>'+pc(st)+'</b>.':'.')+'</p>';
 }
 /* para fazer hoje: as mesmas pendências do aviso do topo, em lista */
@@ -4237,7 +4246,7 @@ function kpi(rot, val, dica, acao, cor){
 /* ---- CARTEIRA ---- */
 var FILTROS=[['todos','Todos'],['agenda','Contato atrasado/hoje'],['alerta','Sem comprar'],['queda','Comprou menos'],['semctt','Sem próximo contato'],['prospect','Prospects'],['semerp','Sem vínculo ERP'],['inativo','Inativos']];
 function selVendedor(id, lista, forca){
-  var el=$(id); if(!el || !(U.gestor||forca)) return '';
+  var el=$(id); if(!el || !(U.ver||forca)) return '';
   var nomes={}; lista.forEach(function(x){ if(x.donoUid) nomes[x.donoUid]=(x.donoNome||x.donoEmail||'?')+(String(x.donoUid).indexOf('erp:')===0?' (sem login)':''); });
   var atual=el.value, ids=Object.keys(nomes).sort(function(a,b){ return String(nomes[a]).localeCompare(String(nomes[b]),'pt-BR'); });
   var nSem=lista.filter(function(x){ return !x.donoUid && x.situacao!=='inativo'; }).length;
@@ -4277,7 +4286,7 @@ function selCidade(lista){
    em que ele aparece. Só para quem lê esse relatório (gerentes e diretoria). */
 var _reg={ docs:null, mapa:{} };
 function regiaoDe(c){
-  if(!U.gestor || !cmDocs.length) return '';
+  if(!U.ver || !cmDocs.length) return '';
   if(_reg.docs!==cmDocs){                            /* refaz o índice quando o relatório foi relido */
     var m={}; cmDocs.forEach(function(d){ var cs=d.clientes||{}; Object.keys(cs).forEach(function(k){ var x=cs[k]||{}, r=String(x.reg||'').replace(/\s+/g,' ').trim().toUpperCase();
       if(r) eqNomes(x.nome||k).forEach(function(n){ m[n]=r; }); }); });
@@ -4289,7 +4298,7 @@ function regiaoDe(c){
 }
 function selRegiao(lista){
   var el=$('c-reg'); if(!el) return '';
-  if(!U.gestor){ el.style.display='none'; return ''; }
+  if(!U.ver){ el.style.display='none'; return ''; }
   var cont={}, sem=0;
   lista.forEach(function(c){ if(c.situacao==='inativo') return; var r=regiaoDe(c); if(r) cont[r]=(cont[r]||0)+1; else sem++; });
   var atual=el.value, rs=Object.keys(cont).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
@@ -4331,7 +4340,7 @@ function renderCarteira(){
   l.sort(function(a,b){
     if(ord!=='nome' && pf){ var x=val[a.id]||0, y=val[b.id]||0; if(x!==y) return ord==='fatd' ? y-x : x-y; }
     return String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'); });
-  var deQuem=U.gestor ? (vend==='#sem' ? 'clientes sem vendedor' : vend ? 'carteira de '+(($('c-vend').selectedOptions[0]||{}).textContent||'') : 'todas as carteiras') : 'sua carteira';
+  var deQuem=U.ver ? (vend==='#sem' ? 'clientes sem vendedor' : vend ? 'carteira de '+(($('c-vend').selectedOptions[0]||{}).textContent||'') : 'todas as carteiras') : 'sua carteira';
   if(rotaSel) deQuem+=' · '+(rotaSel==='#sem' ? 'sem rota' : 'rota '+rotaSel);
   if(regSel) deQuem+=' · '+(regSel==='#sem' ? 'sem região' : regSel.charAt(0)+regSel.slice(1).toLowerCase());
   if(cidSel) deQuem+=' · '+(cidSel==='#sem' ? 'sem cidade' : ((($('c-cid').selectedOptions[0]||{}).textContent||'').replace(/\s*\(\d+\)$/,'')));
@@ -4351,7 +4360,7 @@ function renderCarteira(){
     +(l.length-LIM).toLocaleString('pt-BR')+' clientes)</button></div>':'';
   if(!l.length){ $('c-lista').innerHTML=vazio; return; }
   if(_ctModo==='cel'){ $('c-lista').innerHTML=l.slice(0,LIM).map(cartaoCliente).join('')+mais; return; }
-  var colVend=!!U.gestor;
+  var colVend=!!U.ver;
   window._ctRel={ l:l, val:val, pf:pf, deQuem:deQuem, vend:vend, tot:tot, compraram:compraram };
   var vis=l.slice(0,ctLim).map(function(c){ return c.id; }); window._ctVis=vis;
   var podeSel=!!U.gestor; if(!podeSel) CT_SEL={};
@@ -4478,7 +4487,7 @@ function ctRelatorio(){
       + '<td>'+(c.proxContato?fmtDiaCurto(c.proxContato):'')+'</td>'
       + '<td class="r">'+(v==null?'—':fmtRS0(v))+'</td></tr>'; };
   var corpo='';
-  if(!R.vend && U.gestor){
+  if(!R.vend && U.ver){
     var g={}; R.l.forEach(function(c){ var k=c.donoNome||(c.donoUid?'—':'Sem vendedor'); (g[k]=g[k]||[]).push(c); });
     Object.keys(g).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).forEach(function(k){
       var st=g[k].reduce(function(t,c){ return t+(R.val[c.id]||0); },0);
@@ -4537,7 +4546,7 @@ function perOpcoes(){
   if(ms.length>=4){ var f3=ms.slice(0,3);
     o.push({ v:'u3', txt:'Faturamento dos 3 meses fechados', curto:nomeMes(f3[0])+'–'+nomeMes(f3[2]), longo:nomeMes(f3[0])+' a '+nomeMes(f3[2]), meses:f3 }); }
   Object.keys(fatExtra).sort().reverse().forEach(function(m){ if(ms.indexOf(m)<0) o.push({ v:m, txt:'Faturamento de '+nomeMes(m), curto:nomeMes(m), longo:nomeMes(m), meses:[m], extra:true }); });
-  if(U.gestor) o.push({ v:'outro', txt:'Outro mês…' });
+  if(U.ver) o.push({ v:'outro', txt:'Outro mês…' });
   return o;
 }
 function perAtual(){
@@ -4559,7 +4568,7 @@ function setPerFat(v){
 }
 /* gestor: busca um mês fora dos 4 carregados, só quando pedido */
 function carregarMesExtra(ym){
-  if(!ym || !U.gestor) return;
+  if(!ym || !U.ver) return;
   if(fatExtra[ym] || fatMeses.indexOf(ym)>=0){ perFat=ym; $('c-mes').style.display='none'; renderCarteira(); return; }
   if(mesExtraLendo) return; mesExtraLendo=ym;
   getDoc(doc(db,'comercialClienteMes',ym)).then(function(s){
@@ -4742,7 +4751,7 @@ function endErpTxt(e){ return e && e.e ? String(e.e).trim() : ''; }
 function pkEnd(x){ var e=x.erpId?erp[x.erpId]:null; return [endErpTxt(e), x.cidade].filter(Boolean).join(' · '); }
 function pkDesc(x){
   var e=x.erpId?erp[x.erpId]:null;
-  return [x.rota?'rota '+x.rota:'', (e&&e.u)?'última compra '+fmtDia(e.u):'', (U.gestor&&x.dono)?'carteira de '+x.dono:''].filter(Boolean).join(' · ');
+  return [x.rota?'rota '+x.rota:'', (e&&e.u)?'última compra '+fmtDia(e.u):'', (U.ver&&x.dono)?'carteira de '+x.dono:''].filter(Boolean).join(' · ');
 }
 function pkLinhas(x, extra){
   var end=pkEnd(x), inf=[pkDesc(x), extra].filter(Boolean).join(' · ');
@@ -4836,7 +4845,7 @@ function verCliente(id){
       +'<div><span>Última compra</span><b'+(emAlerta(c)?' style="color:var(--red)"':'')+'>'+(u?fmtDia(u)+' · '+d+' dia'+(d===1?'':'s'):(erpEstado==='ok'?'nenhuma registrada':'…'))+'</b></div>';
     var fc2=fatCliente(c), ms=mesesFat();
     if(fc2 && ms.length) ms.forEach(function(m, i){ corpo+='<div><span>'+(i===ms.length-1?nomeMes(m)+' (até hoje)':'Comprou em '+nomeMes(m))+'</span><b class="mono">'+(fc2[m]?fmtRS(fc2[m]):'—')+'</b></div>'; });
-    else if(U.gestor) corpo+='<div><span>Valor comprado</span><b class="mini">'+(fatErp===false?'sem acesso ao faturamento (regra)':(fatErp?'nome não encontrado no faturamento':'lendo…'))+'</b></div>';
+    else if(U.ver) corpo+='<div><span>Valor comprado</span><b class="mini">'+(fatErp===false?'sem acesso ao faturamento (regra)':(fatErp?'nome não encontrado no faturamento':'lendo…'))+'</b></div>';
     else corpo+='<div><span>Valor comprado</span><b class="mini">'+(fatVend?'sem compras nos últimos meses':'aguardando o resumo de vendas')+'</b></div>';
     corpo+='</div>';
     var qd=queda(c);
@@ -4848,7 +4857,7 @@ function verCliente(id){
     +'<div><span>Cidade · rota</span><b>'+esc([c.cidade, c.rota?'rota '+c.rota:''].filter(Boolean).join(' · ')||'—')+'</b></div>'
     +'<div><span>Pessoa de contato</span><b>'+esc(c.contato||'—')+'</b></div>'
     +'<div><span>Telefone</span><b>'+(c.telefone?telLink(c.telefone):'—')+'</b></div>'
-    +(U.gestor?'<div><span>Carteira de</span><b>'+esc(c.donoNome||(c.donoUid?'—':'sem vendedor'))+'</b></div>':'')+'</div>';
+    +(U.ver?'<div><span>Carteira de</span><b>'+esc(c.donoNome||(c.donoUid?'—':'sem vendedor'))+'</b></div>':'')+'</div>';
   corpo+='<div class="det-sec">Hoje compra de</div>';
   var pr=(c.precos||[]).filter(function(p){ return p.p; });
   corpo+='<div class="det"><div><span>Fornecedor atual</span><b>'+esc(c.fornecedor||'—')+'</b></div>'
@@ -4874,7 +4883,7 @@ function verCliente(id){
   eqFichaPreencher(c);
   /* todo o histórico: pela ficha e, se ligado ao ERP, também os contatos
      feitos quando o cliente ainda não estava na carteira */
-  var cv=collection(db,'comVisitas'), dono=U.gestor?[]:[where('donoUid','==',U.uid)];
+  var cv=collection(db,'comVisitas'), dono=U.ver?[]:[where('donoUid','==',U.uid)];
   var qs=[ query.apply(null, [cv, where('clienteId','==',c.id)].concat(dono)) ];
   if(c.erpId) qs.push(query.apply(null, [cv, where('clienteErpId','==',c.erpId)].concat(dono)));
   Promise.all(qs.map(function(q){ return getDocs(q); })).then(function(rs){
@@ -5300,7 +5309,7 @@ function verVisita(id){
     botoes:[{ txt:'Abrir cliente', cls:'btn-ghost', fn:function(){ if(clientePorId(v.clienteId)) verCliente(v.clienteId); else toast('Este cliente não está na sua carteira.', true); } }] });
   if(v.fotos){
     var cf=collection(db,'comVisitaFotos');
-    var q=U.gestor ? query(cf, where('visitaId','==',v.id)) : query(cf, where('visitaId','==',v.id), where('donoUid','==',U.uid));
+    var q=U.ver ? query(cf, where('visitaId','==',v.id)) : query(cf, where('visitaId','==',v.id), where('donoUid','==',U.uid));
     getDocs(q).then(function(r){ var el=$('vv-fotos'); if(!el) return;
       el.innerHTML=r.docs.map(function(d){ return '<img src="'+d.data().img+'" onclick="zoom(this.src)">'; }).join('')||'<span class="mini">Sem fotos.</span>'; })
       .catch(function(e){ var el=$('vv-fotos'); if(el) el.innerHTML='<span class="mini" style="color:var(--red)">Não foi possível ler as fotos: '+esc(e.code||e.message)+'</span>'; });
@@ -6366,9 +6375,9 @@ Object.defineProperty(window,'segSol',{ get:function(){ return segSol; }, set:fu
    vendedor vê só os próprios clientes. O resumo é refeito sozinho quando
    um gestor abre o app e o último tem mais de 12 horas.
    ===================================================================== */
-function mesesFat(){ return U.gestor ? (fatErp ? fatMeses : []) : ((fatVend&&fatVend.meses)||[]); }
+function mesesFat(){ return U.ver ? (fatErp ? fatMeses : []) : ((fatVend&&fatVend.meses)||[]); }
 function fatCliente(c){
-  if(U.gestor) return fatDe(c);
+  if(U.ver) return fatDe(c);
   if(fatVend && fatVend.cli && fatVend.cli[c.id]){ var o={}, a=fatVend.cli[c.id]; fatVend.meses.forEach(function(m,i){ o[m]=a[i]||0; }); return o; }
   return null;
 }
@@ -6476,7 +6485,7 @@ function cmpVendErp(e, rp, nomeUid){
 function cmpPontos(){
   var corte=somaDias(hoje(), -CMP.dias), porErp={}, pts=[], semPos=0, total=0, rp=cmpRepPorNome(), nomeUid={};
   clientes.forEach(function(c){ if(c.erpId) porErp[c.erpId]=c; if(c.donoUid && c.donoNome && String(c.donoUid).indexOf('erp:')!==0) nomeUid[c.donoUid]=c.donoNome; });
-  (U.gestor ? Object.keys(erp) : Object.keys(porErp)).forEach(function(k){
+  (U.ver ? Object.keys(erp) : Object.keys(porErp)).forEach(function(k){
     var e=erp[k]; if(!e) return;
     var u=String(e.u||'').slice(0,10); if(!u || u<corte) return;
     var c=porErp[k]||null, vend=c ? (c.donoNome||'') : '', viaErp=false, rota=String(e.r||(c&&c.rota)||'').replace(/\s+/g,' ').trim();
@@ -6509,7 +6518,7 @@ function renderCMapa(){
   var vends={}, rotas={}; base.pts.forEach(function(p){ vends[p.vend]=1; if(p.rota) rotas[p.rota]=1; });
   $('cmp-fil').innerHTML='<button class="btn btn-sm btn-ghost" id="cmp-atu" onclick="cmpAtualizar(this)" title="Lê de novo a base do ERP'+(U.admin?' e atualiza as carteiras pelos representantes':'')+'">↻ Atualizar</button>'
     + '<div class="seg">'+[30,60,90].map(function(d){ return '<button class="'+(CMP.dias===d?'on':'')+'" onclick="cmpSet(\'dias\','+d+')">'+d+' dias</button>'; }).join('')+'</div>'
-    + (U.gestor ? '<select onchange="cmpSet(\'vend\',this.value)"><option value="">Todos os vendedores</option>'
+    + (U.ver ? '<select onchange="cmpSet(\'vend\',this.value)"><option value="">Todos os vendedores</option>'
         + Object.keys(vends).sort().map(function(v){ return '<option'+(v===CMP.vend?' selected':'')+'>'+esc(v)+'</option>'; }).join('')+'</select>' : '')
     + '<select onchange="cmpSet(\'rota\',this.value)"><option value="">Todas as rotas</option>'
     + Object.keys(rotas).sort().map(function(r){ return '<option'+(r===CMP.rota?' selected':'')+'>'+esc(r)+'</option>'; }).join('')+'</select>';
@@ -6655,14 +6664,14 @@ function desenharMapa(l){
       }
       L.circleMarker(pos, { radius:8, color:'#ffffff', weight:2, fillColor:cor, fillOpacity:.95 })
         .bindPopup('<b>'+esc(v.clienteNome||'—')+'</b><br>'+fmtDia(v.data)+' · '+esc(CONTATO[v.tipo]||v.tipo)
-          +(U.gestor?'<br>'+esc(v.donoNome||''):'')
+          +(U.ver?'<br>'+esc(v.donoNome||''):'')
           +(d!=null?'<br>'+(d>LONGE_KM?'⚠ a '+fmtKm(d)+' do cliente':'✓ no cliente'):'')
           +'<br><a href="#" onclick="verVisita(\''+v.id+'\');return false">Ver o contato</a>')
         .addTo(camada);
       pts.push(pos);
     });
     if(pts.length) mapa.fitBounds(pts, { padding:[30,30], maxZoom:15 });
-    $('v-leg').innerHTML=(U.gestor?Object.keys(vendes).map(function(k){ return '<span><i style="background:'+vendes[k].cor+'"></i>'+esc(vendes[k].nome)+'</span>'; }).join(''):'')
+    $('v-leg').innerHTML=(U.ver?Object.keys(vendes).map(function(k){ return '<span><i style="background:'+vendes[k].cor+'"></i>'+esc(vendes[k].nome)+'</span>'; }).join(''):'')
       +'<span>· ponto cinza = endereço do cliente no ERP, ligado à visita pela linha tracejada</span>'
       +(longe?'<span style="color:var(--amber)">· '+longe+' visita'+(longe>1?'s':'')+' a mais de '+fmtKm(LONGE_KM)+' do cliente</span>':'')
       +(semLoc?'<span>· '+semLoc+' contato'+(semLoc>1?'s':'')+' sem localização (ligação, WhatsApp ou localização bloqueada)</span>':'')
@@ -6967,7 +6976,7 @@ function prodDe(c){
 var CP_NOMES={}, LP_IDX=null, LP_DOCS={};
 function lpIdx(){
   if(LP_IDX) return Promise.resolve(LP_IDX);
-  if(U.gestor || U.ngTodas)
+  if(U.ver || U.ngTodas)
     return getDoc(doc(db,'comercialLojaProd','_idx')).then(function(s){ LP_IDX=s.exists()?(s.data()||{}):{ lojas:{}, produtos:{} }; return LP_IDX; });
   /* vendedor: só as lojas dele (o robô marca vend:[uid] pelo representante do ERP); monta o índice com elas */
   return getDocs(query(collection(db,'comercialLojaProd'), where('vend','array-contains',U.uid))).then(function(s){
@@ -7020,7 +7029,7 @@ function verComprasPorData(cid){
   lpIdx().then(function(idx){
     var lojas=lpLojasDoCliente(c, idx);
     if(!lojas.length){ corpo('<div class="empty">Este cliente não foi achado na base de compras por loja'
-      + ((U.gestor||U.ngTodas)?'.':' das suas lojas (o robô liga cada loja ao vendedor pelo representante do ERP; se o cliente está com outro representante lá, fale com o gerente).')+'</div>'); return; }
+      + ((U.ver||U.ngTodas)?'.':' das suas lojas (o robô liga cada loja ao vendedor pelo representante do ERP; se o cliente está com outro representante lá, fale com o gerente).')+'</div>'); return; }
     return Promise.all(lojas.map(function(k){ return LP_DOCS[k] ? Promise.resolve(LP_DOCS[k])
         : getDoc(doc(db,'comercialLojaProd',k)).then(function(s){ LP_DOCS[k]=s.exists()?(s.data()||{}):{}; return LP_DOCS[k]; }); }))
       .then(function(docs){
@@ -7054,7 +7063,7 @@ function verCompraProduto(cid, i){
     var cods=Object.keys(idx.produtos||{}).filter(function(k){ return norm(idx.produtos[k])===np || norm(k)===np; });
     if(!cods.length) cods=[nome];
     if(!lojas.length){ corpo('<div class="empty">Este cliente não foi achado na base de compras por loja'
-      + ((U.gestor||U.ngTodas)?'.':' das suas lojas (o robô liga cada loja ao vendedor pelo representante do ERP; se o cliente está com outro representante lá, fale com o gerente).')+'</div>'); return; }
+      + ((U.ver||U.ngTodas)?'.':' das suas lojas (o robô liga cada loja ao vendedor pelo representante do ERP; se o cliente está com outro representante lá, fale com o gerente).')+'</div>'); return; }
     return Promise.all(lojas.map(function(k){ return LP_DOCS[k] ? Promise.resolve(LP_DOCS[k])
         : getDoc(doc(db,'comercialLojaProd',k)).then(function(s){ LP_DOCS[k]=s.exists()?(s.data()||{}):{}; return LP_DOCS[k]; }); }))
       .then(function(docs){
@@ -7115,7 +7124,7 @@ function caberNoDoc(d){
   d.cortado=true; return true;
 }
 function compras90(c){
-  if(U.gestor){ var ms=meses90(fatMeses); return { meses:ms, l:fatErp ? somaCompras(prodDe(c), ms) : null }; }
+  if(U.ver){ var ms=meses90(fatMeses); return { meses:ms, l:fatErp ? somaCompras(prodDe(c), ms) : null }; }
   if(!fatVend || !fatVend.c90) return { meses:[], l:null };
   var o=fatVend.c90[c.id]||{}, mv=fatVend.m90||[];
   return { meses:mv, l:Object.keys(o).map(function(p){ var a=o[p]; return { p:p, v:a[0]||0, q:a[1]||0, ult:a[2] }; })
@@ -7128,7 +7137,7 @@ function comprasRecentesHtml(c){
   var tit='<div class="det-sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Compras dos últimos 90 dias <span class="mini" style="text-transform:none;letter-spacing:0">'+per+'</span>'
     + ((U.gestor||U.ngTodas||U.comercial) && c.erpId ? '<button class="btn btn-sm btn-ghost" style="margin-left:auto;text-transform:none;letter-spacing:0" onclick="verComprasPorData(\''+c.id+'\')">📅 Pedidos por data</button>' : '')
     + '</div>';
-  if(!r.l) return !c.erpId ? '' : tit+'<div class="mini" style="margin-bottom:13px">'+(U.gestor
+  if(!r.l) return !c.erpId ? '' : tit+'<div class="mini" style="margin-bottom:13px">'+(U.ver
       ? (fatErp===false?'Sem acesso ao faturamento do ERP.':'Carregando…')
       : 'Aguardando o resumo de vendas — ele é atualizado quando a diretoria ou um gerente abre o app.')+'</div>';
   if(!r.l.length) return c.erpId ? tit+'<div class="mini" style="margin-bottom:13px">Sem compras nesse período.</div>' : '';
@@ -7422,7 +7431,7 @@ function sugestoesCalc(pr){
 }
 function sugestoesDe(c){
   if(c.situacao==='prospect') return null;
-  if(U.gestor) return sugestoesCalc(prodDe(c));
+  if(U.ver) return sugestoesCalc(prodDe(c));
   return (fatVend && fatVend.sug && fatVend.sug[c.id]) || null;
 }
 function oportunidadesHtml(c){
