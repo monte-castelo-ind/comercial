@@ -4529,7 +4529,7 @@ function ctBulkCarteira(){
       var pare=ocupado(el), b=writeBatch(db), agora=agoraISO();
       l.forEach(function(c){ b.update(doc(db,'comClientes',c.id), { donoUid:u.uid, donoNome:u.nome||u.email, donoEmail:u.email||'',
         donoFixo:true, donoFixoRep:'', donoFixoEm:agora, donoFixoPor:U.email, atualizadoEm:agora, atualizadoPor:U.email }); });
-      b.commit().then(function(){ fecharModal(); CT_SEL={}; toast(l.length+' cliente(s) passaram para '+(u.nome||u.email)+'.'); renderCarteira(); })
+      b.commit().then(function(){ fecharModal(); CT_SEL={}; toast(l.length+' cliente(s) passaram para '+(u.nome||u.email)+'. Atualizando os valores dele…'); renderCarteira(); setTimeout(function(){ gerarResumo(false); }, 800); })
         .catch(function(e){ pare(); falha('passar os clientes de carteira')(e); });
     } }] });
   carregarUsuarios().then(function(lista){
@@ -5126,7 +5126,9 @@ function salvarCliente(el){
     d.criadoEm=agoraISO(); d.ultimoContato='';
     p=setDoc(doc(collection(db,'comClientes')), d);
   }
-  p.then(function(){ toast(fc.id?'Cliente atualizado.':'Cliente cadastrado.'); fecharModal(); })
+  var trocouDono=!!(novoDono && (!antes || antes.donoUid!==novoDono.uid));
+  p.then(function(){ toast(fc.id?'Cliente atualizado.':'Cliente cadastrado.'); fecharModal();
+      if(trocouDono) setTimeout(function(){ gerarResumo(false); }, 800); })
    .catch(function(e){ pare(); falha('salvar o cliente')(e); });
 }
 
@@ -6495,6 +6497,13 @@ function queda(c){
   return null;
 }
 var resumoRodando=false, fatAss='';
+/* assinatura da carteira: muda sempre que um cliente troca de dono, entra ou sai.
+   Sem isso, trocar um cliente de carteira só aparecia para o vendedor até 12 horas depois. */
+function cartAssinatura(){
+  var t=clientes.filter(function(c){ return c.donoUid; }).map(function(c){ return c.id+':'+c.donoUid; }).sort().join('|');
+  var h=5381; for(var i=0;i<t.length;i++){ h=((h*33)^t.charCodeAt(i))>>>0; }
+  return clientes.length+'-'+h.toString(36);
+}
 function autoResumo(){
   if(!U.gestor || !fatErp || !clientesOk || resumoMeta===null || resumoMeta.erro || resumoRodando) return;
   var t=Date.parse(resumoMeta.atualizadoEm||'');
@@ -6502,7 +6511,9 @@ function autoResumo(){
   var temNovo=clientes.some(function(c){ return c.donoUid && (resumoMeta.uids||[]).indexOf(c.donoUid)<0; });
   /* faturamento do ERP mudou desde o último resumo: refaz (antes esperava até 12 horas e a tela do vendedor ficava atrás) */
   var fatMudou=!!fatAss && resumoMeta.assinatura!==fatAss;
-  if(!temNovo && !fatMudou && t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===5) return;
+  /* alguém trocou de carteira: refaz na hora, senão o vendedor novo fica com os valores zerados */
+  var cartMudou=resumoMeta.assinaturaCart!==cartAssinatura();
+  if(!temNovo && !fatMudou && !cartMudou && t && Date.now()-t < 12*3600*1000 && resumoMeta.versao===5) return;
   gerarResumo(false);
 }
 function gerarResumo(manual, el){
@@ -6532,7 +6543,8 @@ function gerarResumo(manual, el){
   var pare=el?ocupado(el,'Atualizando…'):function(){};
   var prox=function(){
     if(i>=uids.length){
-      return setDoc(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:5, falhas:falhas.length, assinatura:fatAss });
+      return setDoc(doc(db,'comVendResumo','_meta'), { atualizadoEm:agora, por:U.email, uids:uids, meses:fatMeses, versao:5, falhas:falhas.length,
+        assinatura:fatAss, assinaturaCart:cartAssinatura() });
     }
     var u=uids[i++];
     var d={ meses:fatMeses, cli:por[u], m90:m90, c90:prodPor[u]||{}, sug:sug[u]||{},
@@ -6802,7 +6814,7 @@ function trocaDecidir(cliId, acao, el){
     if(!u){ pare(); toast('Não achei o login de '+p.erpVend+' em Usuários e níveis.', true); return; }
     return updateDoc(doc(db,'comClientes',cliId), { donoUid:u.uid, donoNome:u.nome||u.email, donoEmail:u.email||'',
         donoFixo:false, donoFixoRep:'', atualizadoEm:agora, atualizadoPor:U.email })
-      .then(function(){ fim('✓ <b>'+esc(p.c.nome||'')+'</b> passou para '+esc(u.nome||u.email)+'.'); });
+      .then(function(){ fim('✓ <b>'+esc(p.c.nome||'')+'</b> passou para '+esc(u.nome||u.email)+'.'); setTimeout(function(){ gerarResumo(false); }, 800); });
   }).catch(function(e){ pare(); falha('trocar o cliente de carteira')(e); });
 }
 function cmpSet(k, v){ CMP[k]=v; CMP.ajustou=false; renderCMapa(); }
