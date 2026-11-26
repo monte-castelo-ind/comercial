@@ -6097,13 +6097,21 @@ function linhasErpAtivas(){
   Object.keys(erp).forEach(function(id){ var e=erp[id]; if(!e.u) return;
     [e.n, e.nErp].forEach(function(n){ n=normEmp(n); if(n && (!uPorNome[n] || e.u>uPorNome[n])) uPorNome[n]=String(e.u).slice(0,10); }); });
   var mesAtual=hoje().slice(0,7), docAtual=cmDocs.filter(function(d){ return d.mes===mesAtual; })[0], diaHoje=+hoje().slice(8,10);
+  /* já está na carteira de alguém: acompanha o representante do ERP mesmo tendo comprado há mais de
+     DIAS_ATIVO dias (só transfere quem já existe; cliente NOVO continua entrando só se estiver ativo) */
+  var naCart={};
+  clientes.forEach(function(c){ if(!c.donoUid) return; [c.nome, c.erpNome].forEach(function(n){ n=normEmp(n); if(n) naCart[n]=1; }); });
+  var porCarteira=0;
   var ativos=comCampo.filter(function(k){
     var u=uPorNome[normEmp(ult[k].nome)];
-    if(u) return u>=limite;
+    if(u && u>=limite) return true;
     var c=docAtual&&docAtual.clientes[k];
-    return !!(c && (c.fat||0)>0 && diaHoje<=DIAS_ATIVO);
+    if(c && (c.fat||0)>0 && diaHoje<=DIAS_ATIVO) return true;
+    if(naCart[normEmp(ult[k].nome)]){ porCarteira++; return true; }
+    return false;
   });
-  return { linhas:ativos.map(function(k){ return [ult[k].nome, ult[k].quem]; }), semCampo:0,
+  if(porCarteira) console.log('carteira pelo ERP: +'+porCarteira+' cliente(s) já na carteira e com compra fora dos '+DIAS_ATIVO+' dias');
+  return { linhas:ativos.map(function(k){ return [ult[k].nome, ult[k].quem]; }), semCampo:0, porCarteira:porCarteira,
            semVendedor:ativos.filter(function(k){ return !ult[k].quem; }).length, parados:comCampo.length-ativos.length };
 }
 function impDoErp(el){
@@ -6483,17 +6491,20 @@ function cmpVendErp(e, rp, nomeUid){
   return (uid && nomeUid[uid]) || v;
 }
 function cmpPontos(){
-  var corte=somaDias(hoje(), -CMP.dias), porErp={}, pts=[], semPos=0, total=0, rp=cmpRepPorNome(), nomeUid={};
+  var corte=somaDias(hoje(), -CMP.dias), porErp={}, pts=[], semPos=0, total=0, nDif=0, rp=cmpRepPorNome(), nomeUid={};
   clientes.forEach(function(c){ if(c.erpId) porErp[c.erpId]=c; if(c.donoUid && c.donoNome && String(c.donoUid).indexOf('erp:')!==0) nomeUid[c.donoUid]=c.donoNome; });
   (U.ver ? Object.keys(erp) : Object.keys(porErp)).forEach(function(k){
     var e=erp[k]; if(!e) return;
     var u=String(e.u||'').slice(0,10); if(!u || u<corte) return;
     var c=porErp[k]||null, vend=c ? (c.donoNome||'') : '', viaErp=false, rota=String(e.r||(c&&c.rota)||'').replace(/\s+/g,' ').trim();
-    if(!vend || norm(vend)==='sem vendedor'){ var ve=cmpVendErp(e, rp, nomeUid); if(ve){ vend=ve; viaErp=true; } }
+    var ve=cmpVendErp(e, rp, nomeUid);
+    if(!vend || norm(vend)==='sem vendedor'){ if(ve){ vend=ve; viaErp=true; } }
     if(!vend) vend='Sem vendedor';
+    /* rede de segurança: carteira do app diferente do representante do ERP (o ERP manda; a carteira ainda não acompanhou) */
+    var dif=!!(ve && !viaErp && vend!=='Sem vendedor' && norm(ve)!==norm(vend));
     if(CMP.vend && vend!==CMP.vend) return;
     if(CMP.rota && rota!==CMP.rota) return;
-    total++;
+    total++; if(dif) nDif++;
     if(e.la==null || e.lo==null || ['ok','aprox','cidade'].indexOf(e.p)<0){ semPos++; return; }
     var la=+e.la, lo=+e.lo;
     if(e.p==='cidade'){                      /* todos os da cidade caem no mesmo ponto: espalha um pouco (sempre igual para o mesmo cliente) */
@@ -6501,9 +6512,9 @@ function cmpPontos(){
       var ang=(Math.abs(h)%360)*Math.PI/180, r=0.004+(Math.abs(h>>8)%100)/100*0.008;
       la+=Math.sin(ang)*r; lo+=Math.cos(ang)*r;
     }
-    pts.push({ k:k, e:e, c:c, vend:vend, rota:rota, u:u, la:la, lo:lo, prec:e.p, viaErp:viaErp });
+    pts.push({ k:k, e:e, c:c, vend:vend, rota:rota, u:u, la:la, lo:lo, prec:e.p, viaErp:viaErp, erpVend:ve, dif:dif });
   });
-  return { pts:pts, semPos:semPos, total:total };
+  return { pts:pts, semPos:semPos, total:total, nDif:nDif };
 }
 function cmpCores(pts){
   var tot={}; pts.forEach(function(p){ tot[p.vend]=(tot[p.vend]||0)+1; });
@@ -6527,7 +6538,9 @@ function renderCMapa(){
   var nCid=P.pts.filter(function(p){ return p.prec==='cidade'; }).length;
   $('cmp-res').innerHTML='<div class="mini" style="margin:0 0 10px">'+P.total.toLocaleString('pt-BR')+' cliente'+(P.total===1?'':'s')+' compraram nos últimos '+CMP.dias+' dias'
     + ' · '+P.pts.length.toLocaleString('pt-BR')+' no mapa'+(nCid?' ('+nCid+' no centro da cidade, ponto vazado: o robô ainda não achou a rua)':'')
-    + (P.semPos?' · '+P.semPos+' sem localização':'')+'</div>';
+    + (P.semPos?' · '+P.semPos+' sem localização':'')
+    + (P.nDif?' · <b style="color:var(--amber)" title="A carteira do app ainda está com o vendedor antigo. Use ↻ Atualizar; quem continuar diferente é porque o ERP ainda não registrou uma compra com o representante novo.">'
+        + P.nDif+' com vendedor diferente do ERP</b>':'')+'</div>';
   $('cmp-leg').innerHTML=C.ordem.map(function(v){ return '<button class="cmp-li'+(CMP.ocultos[v]?' off':'')+'" onclick="cmpOcultar(\''+esc(v).replace(/'/g,"\\'")+'\')" title="Clique para esconder ou mostrar">'
       + '<i style="background:'+C.cor[v]+'"></i>'+esc(v)+' <b>'+C.tot[v]+'</b></button>'; }).join('')
     + (C.ordem.length>1?'<span class="mini">Clique num vendedor para esconder ou mostrar.</span>':'');
@@ -6539,6 +6552,7 @@ function cmpPopup(p, C){
   return '<div style="font:13px/1.45 Archivo,Arial,sans-serif;color:#1b1c21;min-width:180px"><b>'+esc(e.n||(c&&c.nome)||'—')+'</b><br>'+esc([e.c, p.rota].filter(Boolean).join(' · '))
     + '<br><span style="color:'+C.cor[p.vend]+';font-weight:700">●</span> '+esc(p.vend)
     + (p.viaErp?'<br><span style="color:#5a5d67">vendedor pelo ERP — ainda fora da carteira dele no app</span>':'')
+    + (p.dif?'<br><span style="color:#9a6b00">No ERP: '+esc(p.erpVend)+' — a carteira do app ainda não acompanhou</span>':'')
     + '<br>Última compra: '+fmtDia(p.u)+(fm?'<br>'+nomeMes(mesAtual())+': '+fmtRS0(fm):'')
     + (p.prec==='cidade'?'<br><span style="color:#5a5d67">Posição aproximada: centro da cidade</span>':p.prec==='aprox'?'<br><span style="color:#5a5d67">Posição pela rua (sem o número)</span>':'')
     + (c?'<br><a href="#" style="color:#c4232f;font-weight:600" onclick="verCliente(\''+c.id+'\');return false">Abrir a ficha</a>':'')+'</div>';
