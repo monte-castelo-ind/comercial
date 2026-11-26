@@ -1276,6 +1276,54 @@ main{min-width:0;overflow-x:clip}
   .navbtn.on .side-ico{color:var(--primary)}
   .navbtn .side-ico svg{width:22px;height:22px}
 }
+
+/* ===== DESKTOP · formato novo da tela Hoje (lote 1) =====
+   Só vale acima de 900px e só na tela Hoje (body[data-pg="hoje"]). O celular não é afetado.
+   Reaproveita o mesmo bloco .acoes-cel do celular (aba da carteira + ações em bolinhas). */
+@media(min-width:901px){
+  body[data-pg="hoje"]{
+    background:radial-gradient(70% 380px at 62% -90px, rgba(224,48,61,.26) 0%, rgba(224,48,61,.08) 50%, rgba(224,48,61,0) 78%) no-repeat, var(--bg);
+  }
+  html[data-theme="light"] body[data-pg="hoje"]{
+    background:radial-gradient(70% 380px at 62% -90px, rgba(200,32,47,.13) 0%, rgba(200,32,47,0) 75%) no-repeat, var(--bg);
+  }
+  /* topo: saudação grande à esquerda, ferramentas numa pílula só à direita */
+  body[data-pg="hoje"] .topbar h1{font-size:34px;font-weight:800;letter-spacing:-.9px}
+  body[data-pg="hoje"] .topbar .h1sub{font-size:14px}
+  body[data-pg="hoje"] .topbar .top-r{display:flex;align-items:center;gap:2px;height:46px;padding:0 6px;border-radius:23px;border:1px solid var(--border);background:var(--card)}
+  body[data-pg="hoje"] .topbar .top-r .busca-top{border:0;background:transparent;height:36px}
+  body[data-pg="hoje"] .topbar .top-r .luabtn,body[data-pg="hoje"] .topbar .top-r .warnbtn{width:36px;height:36px;border:0!important;background:transparent!important;box-shadow:none!important;border-radius:50%}
+  body[data-pg="hoje"] .topbar .top-r .luabtn:hover,body[data-pg="hoje"] .topbar .top-r .warnbtn:hover{background:var(--card-2)!important}
+  /* ações: sai a fileira de botões, entra o cartão com bolinhas (o mesmo do celular) */
+  body[data-pg="hoje"] #page-hoje .acoes-pc{display:none}
+  body[data-pg="hoje"] #page-hoje .acoes-cel{display:block;margin:4px 0 18px}
+  body[data-pg="hoje"] .ac-aba{display:flex;justify-content:space-between;align-items:flex-start;width:calc(100% - 24px);margin:0 12px;height:50px;padding:13px 18px 0;
+     border-radius:18px 18px 0 0;border:1px solid var(--border);border-bottom:0;background:var(--card-2);box-shadow:inset 0 2px 0 var(--primary);
+     color:var(--text);font:600 14.5px 'Archivo',sans-serif;cursor:pointer}
+  body[data-pg="hoje"] .ac-aba span:last-child{color:var(--muted);font-weight:600}
+  body[data-pg="hoje"] .ac-card{display:flex;justify-content:space-around;margin-top:-14px;position:relative;border-radius:22px;background:var(--card);border:1px solid var(--border);padding:17px 6px 15px;box-shadow:var(--shadow)}
+  body[data-pg="hoje"] .ac-b{display:flex;flex-direction:column;align-items:center;gap:9px;background:none;border:0;color:var(--text);font:600 13px 'Archivo',sans-serif;cursor:pointer;width:92px;padding:0}
+  body[data-pg="hoje"] .ac-b i{width:58px;height:58px;border-radius:50%;background:var(--card-2);display:flex;align-items:center;justify-content:center;color:var(--text);transition:transform .12s}
+  body[data-pg="hoje"] .ac-b:hover i{transform:translateY(-2px)}
+  body[data-pg="hoje"] .ac-b.p i{background:var(--primary);color:#fff;box-shadow:0 8px 20px var(--prim-sombra)}
+  /* cartões mais arredondados, como no celular */
+  body[data-pg="hoje"] .card,body[data-pg="hoje"] .it{border-radius:20px}
+  body[data-pg="hoje"] .hj-card{padding:20px 22px}
+  body[data-pg="hoje"] .hj-tit{font-size:16.5px}
+  body[data-pg="hoje"] .hj-tit a{color:var(--primary)}
+  /* duas colunas no alto: ações e promoções à esquerda, meta do mês à direita; o resto desce em largura total */
+  body[data-pg="hoje"] #page-hoje.on{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:22px;align-items:start}
+  body[data-pg="hoje"] #page-hoje > *{grid-column:1 / -1;min-width:0}
+  body[data-pg="hoje"] #page-hoje > .acoes-cel{grid-column:1;grid-row:1}
+  body[data-pg="hoje"] #page-hoje > #h-promos{grid-column:1 / -1;grid-row:2}
+  body[data-pg="hoje"] #page-hoje > #h-meta{grid-column:2;grid-row:1;align-self:stretch;margin:4px 0 18px;display:flex;flex-direction:column;gap:12px}
+  body[data-pg="hoje"] #h-meta .meta-card{margin:0;flex:1;display:flex;flex-direction:column;justify-content:center}
+  body[data-pg="hoje"] #page-hoje:has(#h-meta:empty) > .acoes-cel{grid-column:1 / -1}
+  body[data-pg="hoje"] #page-hoje .sect{margin-top:26px}
+  body[data-pg="hoje"] .topbar .top-r .warnbtn{color:var(--amber)}
+  /* "Para fazer hoje" passa para a esquerda; "De onde veio o faturamento" fica à direita */
+  body[data-pg="hoje"] #h-fazer{order:-1}
+}
 </style>
 
 <script type="module">
