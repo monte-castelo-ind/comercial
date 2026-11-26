@@ -3048,7 +3048,7 @@ function ngReabrir(id){
    ===================================================================== */
 var REL={ aba:'cli', meses:[], cm:{}, rel:{}, lendo:false, lido:false, erro:'', fonte:'', cobertura:null,
           med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', colunas:'tipo', T:null };
-var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['risco','Clientes em risco'],['opo','Oportunidades por produto'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos']];
+var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['risco','Clientes em risco'],['opo','Oportunidades por produto'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos'],['cart','Carteira × ERP']];
 function relPode(){ return !!(U.ver || U.ngTodas); }
 function fmtKg(v){ return (Math.round(v||0)).toLocaleString('pt-BR')+' kg'; }
 function relFmt(v){ return REL.med==='kg' ? fmtKg(v) : fmtRS0(v); }
@@ -3515,7 +3515,40 @@ function relOpo(){
     nota:'Período: '+nomeMes(ms[0])+' a '+nomeMes(ms[ms.length-1])+'. Entram os clientes que compraram R$ 900 ou mais nos 3 meses (R$ 300/mês). '
       + '"Já comprou" = comprou este produto antes, no último ano: é reativação, a conversa mais fácil. O potencial usa a média de quem já compra o produto.' };
 }
-function relCalc(){ return ({ cli:relCli, cmp:relCmp, grp:relGrp, vis:relVis, ben:relBen, risco:relRisco, opo:relOpo })[REL.aba](); }
+/* ---------- 8) Carteira × ERP ----------
+   Quem a diretoria escolheu na mão (🔒 travado) e quem está com o representante
+   diferente do ERP. Serve para conferir as trocas feitas por aqui. */
+function relCarteira(){
+  var rp=cmpRepPorNome(), nomeUid={};
+  clientes.forEach(function(c){ if(c.donoUid && c.donoNome) nomeUid[c.donoUid]=c.donoNome; });
+  var l=clientes.map(function(c){
+    var R=cmpRepErp({ n:c.nome, nErp:c.erpNome }, rp, nomeUid);
+    var temDono=!!(c.donoUid && String(c.donoUid).indexOf('erp:')!==0);
+    var dif=!!(R.rep && temDono && ((R.uid && R.uid!==c.donoUid) || (!R.uid && normEmp(R.nome)!==normEmp(c.donoNome||''))));
+    var travado=c.donoFixo===true;
+    if(!travado && !dif) return null;
+    return { id:c.id, nome:c.nome||'—', cid:c.cidade||'', rota:c.rota||'', vendTxt:c.donoNome||'sem vendedor',
+             erp:R.nome||'—', rep:R.rep||'', dif:dif, travado:travado,
+             quando:travado&&c.donoFixoEm?String(c.donoFixoEm).slice(0,10):'', quem:c.donoFixoPor||'' };
+  }).filter(Boolean);
+  l=relFiltra(l).sort(function(a,b){ return (b.dif?1:0)-(a.dif?1:0) || String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
+  var nT=l.filter(function(x){ return x.travado; }).length, nD=l.filter(function(x){ return x.dif; }).length;
+  var nTD=l.filter(function(x){ return x.travado && x.dif; }).length;
+  return { titulo:'Carteira × ERP',
+    aviso:(cmDocs&&cmDocs.length?'':'O faturamento por cliente ainda não foi lido (abra a Carteira uma vez e volte).'),
+    cols:[{t:'Cliente'},{t:'Rota'},{t:'Carteira (app)'},{t:'Representante (ERP)'},{t:'Situação'},{t:'Travado em'},{t:'Travado por'}],
+    linhas:l.map(function(x){ return { id:x.id,
+      cels:[relCliCel(x), esc(x.rota||'—'), '<b>'+esc(x.vendTxt)+'</b>'+(x.travado?' <span class="mini">🔒</span>':''), esc(x.erp),
+            x.dif?'<span class="rel-neg">Diferente do ERP</span>':'<span class="mini">Igual ao ERP</span>',
+            x.quando?fmtDia(x.quando):'—', '<span class="mini">'+esc(x.quem||'—')+'</span>'],
+      xls:[x.nome+(x.cid?' - '+cidadeBonita(x.cid):''), x.rota, x.vendTxt+(x.travado?' (travado)':''), x.erp,
+           x.dif?'Diferente do ERP':'Igual ao ERP', x.quando?fmtDia(x.quando):'', x.quem] }; }),
+    resumo:[['Travados na mão', String(nT)], ['Diferentes do ERP', String(nD)], ['Travados e diferentes', String(nTD)]],
+    nota:'🔒 = carteira escolhida por aqui (ficha, lote ou "Manter" na revisão do mapa): a atualização pelo ERP não mexe nesses clientes. '
+      + '"Diferente do ERP" = o representante que vem do ERP não é o vendedor da carteira. Quem não está travado e está diferente aparece no Mapa de clientes para aprovar. '
+      + 'Clique no cliente para abrir a ficha.' };
+}
+function relCalc(){ return ({ cli:relCli, cmp:relCmp, grp:relGrp, vis:relVis, ben:relBen, risco:relRisco, opo:relOpo, cart:relCarteira })[REL.aba](); }
 function renderRel(){
   var box=$('page-rel'); if(!box) return;
   if(!relPode()){ box.innerHTML='<div class="empty">Os relatórios são da diretoria e dos gerentes.</div>'; return; }
@@ -3541,7 +3574,7 @@ function relPintar(){
     + '<div class="mini" style="margin-top:8px">'+(T.nota?esc(T.nota)+' ':'')+relFonte()+'</div>';
 }
 function relFonte(){
-  if(REL.aba==='vis' || REL.aba==='ben' || REL.aba==='risco' || REL.aba==='opo') return '';
+  if(REL.aba==='vis' || REL.aba==='ben' || REL.aba==='risco' || REL.aba==='opo' || REL.aba==='cart') return '';
   var ms=REL.aba==='cmp'?[REL.mA,REL.mB]:relPeriodo(), d=null;
   if(relTemRel(ms)) ms.forEach(function(m){ var a=(REL.rel[m]||{}).atualizadoEm; if(a && (!d||a>d)) d=a; });
   if(REL.fonte==='resumo' && relTemRel(ms)){
