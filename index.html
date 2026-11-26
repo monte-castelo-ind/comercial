@@ -841,6 +841,7 @@ main{min-width:0;overflow-x:clip}
     <button class="navbtn com-only" data-p="visitas" onclick="nav('visitas')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg></span><span class="lbl lab-d">Visitas e contatos</span><span class="lab-m">Visitas</span></button>
     <button class="navbtn com-only" data-p="negoc" onclick="navMenu('negoc')"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span><span class="lbl lab-d">Negociações</span><span class="lab-m">Negoc.</span><span class="nbadge" id="ng-badge" style="display:none"></span></button>
     <button class="navbtn com-only" data-p="produtos" onclick="navProd()"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl lab-d">Produtos</span><span class="lab-m">Produtos</span></button>
+    <button class="navbtn ver-only so-desk" data-p="perdas" onclick="nav('perdas')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/></svg></span><span class="lbl">Aberturas e perdas</span></button>
     <button class="navbtn gestor-only so-desk" data-p="equipe" onclick="nav('equipe')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM20 20v-1.5a3.5 3.5 0 0 0-2.5-3.35M15.5 4.2a3.5 3.5 0 0 1 0 6.6"/></svg></span><span class="lbl lab-d">Equipe</span><span class="lab-m">Equipe</span></button>
     <button class="navbtn rel-vis so-desk" data-p="rel" onclick="nav('rel')" style="display:none"><span class="side-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg></span><span class="lbl">Relatórios</span></button>
     <div class="side-sec lbl com-only so-desk">Equipamentos</div>
@@ -1079,6 +1080,24 @@ main{min-width:0;overflow-x:clip}
     </div>
 
     <!-- EQUIPE (gestor) -->
+    <div class="page" id="page-perdas">
+      <div class="tools">
+        <select id="pd-per" onchange="renderPerdas()">
+          <option value="3">Últimos 3 meses</option>
+          <option value="6" selected>Últimos 6 meses</option>
+          <option value="12">Últimos 12 meses</option>
+        </select>
+        <select id="pd-vend" onchange="renderPerdas()"></select>
+        <input type="search" id="pd-busca" placeholder="Buscar cliente, cidade, rota…" oninput="renderPerdas()">
+        <button class="btn btn-sm btn-ghost" onclick="pdExcel()">⤓ Excel</button>
+      </div>
+      <div id="pd-kpis" class="kpis"></div>
+      <div id="pd-aviso"></div>
+      <div class="sect">Perdemos <span class="mini" style="font-weight:500">recolhemos todos os equipamentos ou foi marcado como perdido</span></div>
+      <div id="pd-perdidos"></div>
+      <div class="sect">Abrimos <span class="mini" style="font-weight:500">primeira compra no ERP</span></div>
+      <div id="pd-abertos"></div>
+    </div>
     <div class="page" id="page-equipe">
       <div class="tools">
         <select id="eq-per" onchange="renderEquipe()">
@@ -3070,7 +3089,7 @@ function ngReabrir(id){
    ===================================================================== */
 var REL={ aba:'cli', meses:[], cm:{}, rel:{}, lendo:false, lido:false, erro:'', fonte:'', cobertura:null,
           med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', colunas:'tipo', T:null };
-var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['risco','Clientes em risco'],['opo','Oportunidades por produto'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos'],['cart','Carteira × ERP']];
+var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['risco','Clientes em risco'],['opo','Oportunidades por produto'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos'],['cart','Carteira × ERP'],['perdas','Aberturas e perdas']];
 function relPode(){ return !!(U.ver || U.ngTodas); }
 function fmtKg(v){ return (Math.round(v||0)).toLocaleString('pt-BR')+' kg'; }
 function relFmt(v){ return REL.med==='kg' ? fmtKg(v) : fmtRS0(v); }
@@ -3570,7 +3589,32 @@ function relCarteira(){
       + '"Diferente do ERP" = o representante que vem do ERP não é o vendedor da carteira. Quem não está travado e está diferente aparece no Mapa de clientes para aprovar. '
       + 'Clique no cliente para abrir a ficha.' };
 }
-function relCalc(){ return ({ cli:relCli, cmp:relCmp, grp:relGrp, vis:relVis, ben:relBen, risco:relRisco, opo:relOpo, cart:relCarteira })[REL.aba](); }
+/* ---------- 9) Aberturas e perdas ---------- (mesma conta da tela, com Excel e PDF) */
+function relPerdasAberturas(){
+  lerPrimeiras(function(){ if(pagina==='rel' && REL.aba==='perdas') relPintar(); });
+  if(!EQ.docs && !EQ.lendo) eqGarantirLista(function(){ if(pagina==='rel' && REL.aba==='perdas') relPintar(); });
+  var d=new Date(); d.setMonth(d.getMonth()-11);
+  var de=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  var A=aberturasNoPeriodo(de);
+  var l=relFiltra(perdasNoPeriodo(de).map(function(r){ return Object.assign({ tipo:'Perda' }, r); })
+    .concat(A.l.map(function(r){ return Object.assign({ tipo:'Abertura', motivo:'', obs:'' }, r); })))
+    .sort(function(a,b){ return String(b.quando).localeCompare(String(a.quando)); });
+  var nP=l.filter(function(x){ return x.tipo==='Perda'; }).length, nA=l.length-nP;
+  return { titulo:'Aberturas e perdas',
+    aviso:(A.temPri?'':'A lista de aberturas aparece quando o robô gravar o mês da primeira compra de cada cliente'+(PRI_ERRO?' ('+PRI_ERRO+')':'')+'.'),
+    cols:[{t:'Tipo'},{t:'Cliente'},{t:'Rota'},{t:'Vendedor'},{t:'Quando'},{t:'Motivo'}],
+    linhas:l.map(function(x){ return { id:x.id,
+      cels:['<span class="'+(x.tipo==='Perda'?'rel-neg':'')+'">'+x.tipo+'</span>', relCliCel(x), esc(x.rota||'—'), esc(x.vendTxt),
+            esc(x.tipo==='Perda'?fmtDia(x.quando):nomeMes(x.quando)),
+            esc(x.motivo||'—')+(x.obs?'<div class="mini">'+esc(x.obs)+'</div>':'')],
+      xls:[x.tipo, x.nome+(x.cid?' - '+cidadeBonita(x.cid):''), x.rota, x.vendTxt,
+           x.tipo==='Perda'?fmtDia(x.quando):nomeMes(x.quando), x.motivo||''] }; }),
+    resumo:[['Perdas (12 meses)', String(nP)], ['Aberturas (12 meses)', A.temPri?String(nA):'—'],
+            ['Saldo', A.temPri?((nA-nP>0?'+':'')+(nA-nP)):'—']],
+    nota:'Perda = recolhemos todos os equipamentos do cliente ou alguém marcou na mão, com motivo, na ficha. '
+      + 'Abertura = primeira compra no ERP. Clique no cliente para abrir a ficha.' };
+}
+function relCalc(){ return ({ cli:relCli, cmp:relCmp, grp:relGrp, vis:relVis, ben:relBen, risco:relRisco, opo:relOpo, cart:relCarteira, perdas:relPerdasAberturas })[REL.aba](); }
 function renderRel(){
   var box=$('page-rel'); if(!box) return;
   if(!relPode()){ box.innerHTML='<div class="empty">Os relatórios são da diretoria e dos gerentes.</div>'; return; }
@@ -3596,7 +3640,7 @@ function relPintar(){
     + '<div class="mini" style="margin-top:8px">'+(T.nota?esc(T.nota)+' ':'')+relFonte()+'</div>';
 }
 function relFonte(){
-  if(REL.aba==='vis' || REL.aba==='ben' || REL.aba==='risco' || REL.aba==='opo' || REL.aba==='cart') return '';
+  if(REL.aba==='vis' || REL.aba==='ben' || REL.aba==='risco' || REL.aba==='opo' || REL.aba==='cart' || REL.aba==='perdas') return '';
   var ms=REL.aba==='cmp'?[REL.mA,REL.mB]:relPeriodo(), d=null;
   if(relTemRel(ms)) ms.forEach(function(m){ var a=(REL.rel[m]||{}).atualizadoEm; if(a && (!d||a>d)) d=a; });
   if(REL.fonte==='resumo' && relTemRel(ms)){
@@ -3811,6 +3855,7 @@ onAuthStateChanged(auth, async function(u){
   document.querySelectorAll('.dono-only').forEach(function(el){ el.style.display=U.dono?'':'none'; });
   document.querySelectorAll('.com-only').forEach(function(el){ el.style.display=U.comercial?'':'none'; });
   document.querySelectorAll('.gestor-only').forEach(function(el){ el.style.display=U.gestor?'':'none'; });
+  document.querySelectorAll('.ver-only').forEach(function(el){ el.style.display=U.ver?'':'none'; });
   if(U.analista) ['c-vend','c-reg','v-vend','ng-vend'].forEach(function(id){ var e=$(id); if(e) e.style.display=''; });   /* só os filtros de leitura */
   document.querySelectorAll('.cm-only').forEach(function(el){ el.style.display=(U.comodato||U.cmGerencia||U.comercial)?'':'none'; });
   segSol=U.comercial?'minhas':'responder';
@@ -4015,6 +4060,7 @@ var TITULOS={ hoje:['Hoje','O que precisa de atenção na carteira'], carteira:[
   config:['Configurações','Só a diretoria vê esta tela'],
   importar:['Carteira pelo ERP','A carteira segue o representante cadastrado no ERP'],
   equipe:['Equipe','Acompanhamento da carteira de cada vendedor'],
+  perdas:['Aberturas e perdas','Clientes que começaram a comprar e clientes que deixamos de atender'],
   usuarios:['Usuários e níveis','Quem entra no Comercial e com qual nível'],
   produtos:['Fichas técnicas','Fichas técnicas dos produtos e o catálogo para enviar ao cliente'],
   rel:['Relatórios','Vendas do ERP, comparativos e acompanhamento da equipe'],
@@ -4067,6 +4113,7 @@ function render(){
   else if(pagina==='solic') renderSolic();
   else if(pagina==='config') renderConfig();
   else if(pagina==='equipe') renderEquipe();
+  else if(pagina==='perdas') renderPerdas();
   else if(pagina==='rel') renderRel();
   else if(pagina==='cmapa') renderCMapa();
   else if(pagina==='guia') renderGuia();
@@ -4599,6 +4646,7 @@ function linhaCliente(c, vf, colVend){
   var u=ultimaCompra(c), d=diasSemComprar(c), qd=queda(c), tags=[], borda='';
   if(c.situacao==='prospect') tags.push('<span class="tag t-blue">Prospect · '+funilNome(funilDe(c))+'</span>');
   if(c.situacao==='inativo') tags.push('<span class="tag">Inativo</span>');
+  if(c.perdido===true) tags.push('<span class="tag t-red">Perdido · '+esc(motivoNome(c.perdidoMotivo))+'</span>');
   if(qd) tags.push('<span class="tag t-red">↓ '+qd.pct+'% em '+nomeMes(qd.mes)+'</span>');
   if(c.proxContato){
     var cls=contatoAtrasado(c)?' t-red':(contatoHoje(c)?' t-amber':'');
@@ -4966,7 +5014,8 @@ function verCliente(id){
   corpo+='<div class="det-sec">Histórico de contatos</div><div id="cli-hist"><div class="empty">Carregando…</div></div>';
 
   abrirModal({ titulo:esc(c.nome), sub:esc([c.cidade, c.situacao==='prospect'?'prospect':''].filter(Boolean).join(' · '))+'<span id="cli-tarja"></span>', wide:true, corpo:corpo,
-    botoes:[].concat(podeEditar(c)?[{ txt:'✎ Editar', cls:'btn-ghost', fn:function(){ abrirCliente(c.id); } }]:[], [
+    botoes:[].concat(podeEditar(c)?[{ txt:'✎ Editar', cls:'btn-ghost', fn:function(){ abrirCliente(c.id); } },
+        { txt:(c.perdido===true?'↺ Reativar':'⊗ Perdido'), cls:'btn-ghost', fn:function(){ marcarPerdido(c.id); } }]:[], [
       { txt:'✉ Solicitação', cls:'btn-ghost', fn:function(){ abrirSolic(null, c.id); } },
       { txt:'⌖ Registrar contato', fn:function(){ abrirVisita(c.id); } }
     ])});
@@ -6842,6 +6891,59 @@ function trocaDecidir(cliId, acao, el){
       .then(function(){ fim('✓ <b>'+esc(p.c.nome||'')+'</b> passou para '+esc(u.nome||u.email)+'.'); setTimeout(function(){ gerarResumo(false); }, 800); });
   }).catch(function(e){ pare(); falha('trocar o cliente de carteira')(e); });
 }
+/* =====================================================================
+   ABERTURAS E PERDAS
+   Perdido = recolhemos TODOS os equipamentos do cliente, ou alguém marcou
+   na mão com um motivo. Aberto = primeira compra no ERP (o robô grava o mês
+   em comercialLojaProd/_idx; sem isso, a lista de aberturas fica vazia).
+   ===================================================================== */
+var MOTIVOS_PERDA=[['fechou','Fechou / encerrou as atividades'],['concorrente','Foi para o concorrente'],['preco','Preço'],
+  ['qualidade','Qualidade ou atendimento'],['inadimplencia','Inadimplência'],['semgiro','Sem giro do produto'],['outro','Outro']];
+function motivoNome(k){ for(var i=0;i<MOTIVOS_PERDA.length;i++){ if(MOTIVOS_PERDA[i][0]===k) return MOTIVOS_PERDA[i][1]; } return k||'não informado'; }
+/* cliente que tinha equipamento e hoje não tem mais nenhum: a data é a da última recolha */
+function recolhaTotal(cliId){
+  try{
+    var docs=(EQ.docs||[]).filter(function(d){ return d.clienteId===cliId; });
+    if(!docs.length) return null;
+    var tinha=0, tem=0, data='';
+    docs.forEach(function(d){
+      tinha+=((d._orig&&d._orig.itens)||d.itens||[]).length;
+      tem+=(d.itens||[]).length;
+      (d._recolhidos||[]).forEach(function(r){ if(!r.parcial && r.data>data) data=r.data; });
+    });
+    return (tinha && !tem && data) ? { data:data } : null;
+  }catch(e){ console.warn('recolha total:', e); return null; }
+}
+/* como este cliente foi perdido (ou null) */
+function perdaDe(c){
+  if(c.perdido===true) return { data:c.perdidoEm||'', motivo:c.perdidoMotivo||'', obs:c.perdidoObs||'', quem:c.perdidoPor||'', naMao:true };
+  var r=recolhaTotal(c.id);
+  return r ? { data:r.data, motivo:'recolha', obs:'', quem:'', naMao:false } : null;
+}
+function marcarPerdido(cliId){
+  var c=clientePorId(cliId); if(!c || !podeEditar(c)) return;
+  if(c.perdido===true){
+    if(!confirm('Reativar '+(c.nome||'este cliente')+'? Ele sai da lista de perdidos.')) return;
+    updateDoc(doc(db,'comClientes',cliId), { perdido:false, perdidoEm:'', perdidoMotivo:'', perdidoObs:'',
+        atualizadoEm:agoraISO(), atualizadoPor:U.email })
+      .then(function(){ toast('Cliente reativado.'); fecharModal(); }).catch(falha('reativar o cliente'));
+    return;
+  }
+  abrirModal({ titulo:'Marcar como perdido', sub:esc(c.nome||''),
+    corpo:'<div class="fld"><label>Motivo</label><select id="pd-mot">'
+        + MOTIVOS_PERDA.map(function(m){ return '<option value="'+m[0]+'">'+m[1]+'</option>'; }).join('')+'</select></div>'
+      +'<div class="fld"><label>Desde quando</label><input type="date" id="pd-data" value="'+hoje()+'"></div>'
+      +'<div class="fld"><label>Observação (opcional)</label><textarea id="pd-obs" placeholder="o que aconteceu, com quem falamos…"></textarea></div>'
+      +'<div class="mini">O cliente continua na carteira e no histórico. Ele só passa a contar como perda no mês escolhido.</div>',
+    botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Marcar como perdido', fn:function(el){
+      var d=($('pd-data')||{}).value||hoje(), m=($('pd-mot')||{}).value||'outro', o=($('pd-obs')||{}).value||'';
+      var pare=ocupado(el);
+      updateDoc(doc(db,'comClientes',cliId), { perdido:true, perdidoEm:d, perdidoMotivo:m, perdidoObs:o, perdidoPor:U.email,
+          atualizadoEm:agoraISO(), atualizadoPor:U.email })
+        .then(function(){ fecharModal(); toast('Cliente marcado como perdido.'); })
+        .catch(function(e){ pare(); falha('marcar o cliente como perdido')(e); });
+    } }] });
+}
 function cmpSet(k, v){ CMP[k]=v; CMP.ajustou=false; renderCMapa(); }
 function cmpOcultar(v){ CMP.ocultos[v]=!CMP.ocultos[v]; renderCMapa(); }
 
@@ -6902,6 +7004,124 @@ function fmtHoras(h){ if(h==null) return '—'; return h<24 ? Math.max(1,Math.ro
 function primeiraResposta(s){
   var h=(s.historico||[]); for(var i=1;i<h.length;i++){ if(h[i].por && h[i].por!==s.donoEmail) return h[i].em; } return null;
 }
+/* primeira compra de cada cliente (robô: comercialLojaProd/_idx, campo pr).
+   Lido uma vez; sem ele, a lista de aberturas fica vazia e a tela explica. */
+var PRI=null, PRI_ERRO='', PRI_LENDO=false;
+function lerPrimeiras(depois){
+  if(PRI || PRI_LENDO) return;
+  PRI_LENDO=true;
+  getDoc(doc(db,'comercialLojaProd','_idx')).then(function(sn){
+    PRI_LENDO=false;
+    if(!sn.exists()){ PRI_ERRO='o robô ainda não gravou a base de lojas'; PRI={ lojas:{} }; }
+    else PRI=sn.data()||{ lojas:{} };
+    if(typeof depois==='function') depois();
+  }).catch(function(e){ PRI_LENDO=false; PRI={ lojas:{} };
+    PRI_ERRO=(e&&e.code==='permission-denied')?'sem permissão para ler a base de lojas (comercialLojaProd)':'não foi possível ler a base de lojas';
+    console.warn('comercialLojaProd/_idx:', e); if(typeof depois==='function') depois(); });
+}
+/* lista de aberturas no período: cliente cuja PRIMEIRA compra caiu dentro dele */
+function aberturasNoPeriodo(de){
+  if(!PRI || !PRI.lojas) return { l:[], temPri:false, antigos:0 };
+  var porNome={}, temPri=false, antigos=0, l=[];
+  clientes.forEach(function(c){ [c.nome, c.erpNome].forEach(function(n){ n=normEmp(n); if(n && !porNome[n]) porNome[n]=c; }); });
+  var lj=PRI.lojas, prim=(PRI.primeiroMes||'');
+  Object.keys(lj).forEach(function(k){
+    var x=lj[k]||{}, pr=x.pr||'';
+    if(pr) temPri=true; else return;
+    if(prim && pr<=prim){ antigos++; return; }          /* começou antes da planilha: não é abertura nova */
+    if(pr<de) return;
+    var c=porNome[normEmp(x.n||'')]||null;
+    l.push({ id:(c&&c.id)||'', nome:x.n||k, cid:x.ci||(c&&c.cidade)||'', rota:x.r||(c&&c.rota)||'',
+             vendTxt:(c&&c.donoNome)||x.p||'—', quando:pr, ult:x.u||'' });
+  });
+  l.sort(function(a,b){ return String(b.quando).localeCompare(String(a.quando)) || String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
+  return { l:l, temPri:temPri, antigos:antigos };
+}
+/* lista de perdas no período */
+function perdasNoPeriodo(de){
+  var l=[];
+  clientes.forEach(function(c){
+    var p=perdaDe(c); if(!p) return;
+    var q=String(p.data||'').slice(0,7); if(!q || q<de) return;
+    l.push({ id:c.id, nome:c.nome||'—', cid:c.cidade||'', rota:rotaDe(c)||'', vendTxt:c.donoNome||'sem vendedor',
+             quando:String(p.data||'').slice(0,10), motivo:p.naMao?motivoNome(p.motivo):'Recolhemos os equipamentos',
+             obs:p.obs||'', quem:p.quem||'', naMao:p.naMao });
+  });
+  l.sort(function(a,b){ return String(b.quando).localeCompare(String(a.quando)) || String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
+  return l;
+}
+function pdDe(){
+  var n=+(($('pd-per')||{}).value||6);
+  var d=new Date(); d.setMonth(d.getMonth()-(n-1));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function pdFiltra(l){
+  var v=(($('pd-vend')||{}).value||''), q=norm((($('pd-busca')||{}).value||'')).split(' ').filter(Boolean);
+  return l.filter(function(r){
+    if(v && r.vendTxt!==v) return false;
+    if(q.length){ var t=norm([r.nome, r.cid, r.rota, r.vendTxt].join(' ')); if(!q.every(function(w){ return t.indexOf(w)>=0; })) return false; }
+    return true; });
+}
+function pdTabela(l, tipo){
+  if(!l.length) return '<div class="empty">'+(tipo==='perda'?'Nenhuma perda neste período.':'Nenhuma abertura neste período.')+'</div>';
+  return '<div class="card" style="padding:0;overflow:clip"><div class="tscroll"><table class="tb rel-tb"><thead><tr>'
+    +'<th>Cliente</th><th>Rota</th><th>Vendedor</th><th>'+(tipo==='perda'?'Perdemos em':'Primeira compra')+'</th>'
+    +(tipo==='perda'?'<th>Motivo</th>':'<th>Última compra</th>')+'</tr></thead><tbody>'
+    + l.map(function(r){ return '<tr'+(r.id?' style="cursor:pointer" onclick="verCliente(\''+r.id+'\')"':'')+'>'
+        +'<td><b>'+esc(r.nome)+'</b>'+(r.cid?'<span class="ct-cid"> - '+esc(cidadeBonita(r.cid))+'</span>':'')+'</td>'
+        +'<td>'+esc(r.rota||'—')+'</td><td>'+esc(r.vendTxt)+'</td>'
+        +'<td>'+esc(tipo==='perda'?fmtDia(r.quando):nomeMes(r.quando))+'</td>'
+        +(tipo==='perda'
+          ? '<td>'+esc(r.motivo)+(r.obs?'<div class="mini">'+esc(r.obs)+'</div>':'')+'</td>'
+          : '<td>'+(r.ult?esc(nomeMes(r.ult)):'<span class="mini">—</span>')+'</td>')
+        +'</tr>'; }).join('')
+    +'</tbody></table></div></div>';
+}
+function renderPerdas(){
+  if(!U.ver) return;
+  lerPrimeiras(function(){ if(pagina==='perdas') renderPerdas(); });
+  eqGarantirLista(function(){ if(pagina==='perdas') renderPerdas(); });
+  var de=pdDe();
+  var P=pdFiltra(perdasNoPeriodo(de)), A=aberturasNoPeriodo(de), AB=pdFiltra(A.l);
+  /* filtro de vendedor, montado com quem aparece nas duas listas */
+  var sel=$('pd-vend');
+  if(sel){
+    var nomes={}; perdasNoPeriodo(de).concat(A.l).forEach(function(r){ if(r.vendTxt) nomes[r.vendTxt]=1; });
+    var ns=Object.keys(nomes).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }), atual=sel.value;
+    if(sel.dataset.n!==String(ns.length)){
+      sel.innerHTML='<option value="">Todos os vendedores</option>'+ns.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+      sel.dataset.n=String(ns.length); sel.value=atual;
+    }
+  }
+  var naMao=P.filter(function(r){ return r.naMao; }).length;
+  $('pd-kpis').innerHTML=[
+    kpiEq('Perdemos no período', String(P.length), naMao+' marcado'+(naMao===1?'':'s')+' na mão · '+(P.length-naMao)+' por recolha', P.length?'var(--red)':''),
+    kpiEq('Abrimos no período', A.temPri?String(AB.length):'—', A.temPri?'primeira compra no ERP':'aguardando o robô', AB.length?'var(--green)':''),
+    kpiEq('Saldo', A.temPri?((AB.length-P.length>0?'+':'')+(AB.length-P.length)):'—', 'aberturas menos perdas', (AB.length-P.length)<0?'var(--red)':''),
+    kpiEq('Equipamentos recolhidos', String(P.filter(function(r){ return !r.naMao; }).length), 'clientes sem nenhum equipamento nosso', '')
+  ].join('');
+  var av=[];
+  if(!A.temPri) av.push('<div class="alert a-info">ⓘ A lista de aberturas aparece quando o robô gravar o mês da primeira compra de cada cliente'+(PRI_ERRO?' ('+esc(PRI_ERRO)+')':'')+'.</div>');
+  else if(A.antigos) av.push('<div class="alert a-info">ⓘ '+A.antigos+' cliente(s) já compravam antes do começo da planilha do ERP e ficam de fora das aberturas.</div>');
+  if(!EQ.docs) av.push('<div class="alert a-info">ⓘ Lendo os equipamentos para achar quem teve tudo recolhido…</div>');
+  $('pd-aviso').innerHTML=av.join('');
+  $('pd-perdidos').innerHTML=pdTabela(P, 'perda');
+  $('pd-abertos').innerHTML=A.temPri?pdTabela(AB, 'abertura'):'';
+  window._pdRel={ P:P, A:AB };
+}
+function pdExcel(){
+  var R=window._pdRel; if(!R) return;
+  var aoa=[['Tipo','Cliente','Cidade','Rota','Vendedor','Quando','Motivo / última compra','Observação']];
+  R.P.forEach(function(r){ aoa.push(['Perda', r.nome, r.cid, r.rota, r.vendTxt, r.quando, r.motivo, r.obs]); });
+  R.A.forEach(function(r){ aoa.push(['Abertura', r.nome, r.cid, r.rota, r.vendTxt, r.quando, r.ult, '']); });
+  if(aoa.length===1){ toast('Nada para exportar neste filtro.', true); return; }
+  if(U.analista){ toast('Baixar em Excel não está liberado para o seu acesso.', true); return; }
+  carregarXLSX().then(function(){
+    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:10},{wch:38},{wch:18},{wch:18},{wch:18},{wch:12},{wch:30},{wch:30}];
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Aberturas e perdas');
+    XLSX.writeFile(wb, 'aberturas-e-perdas-'+hoje()+'.xlsx');
+  }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
+}
 function renderEquipe(){
   if(!U.gestor) return;
   var dias=+($('eq-per').value||30), desde=somaDias(hoje(), -dias), desdeISO=new Date(Date.now()-dias*86400000).toISOString();
@@ -6918,7 +7138,10 @@ function renderEquipe(){
   /* valor vendido por representante, direto do faturamento do ERP (todos os clientes
      dele, mesmo os que não estão na carteira do app) */
   var vd=vendasPorRep(), ms=fatMeses, mA=ms[ms.length-1], m1=ms[ms.length-2], m2=ms[ms.length-3];
-  if(vd) Object.keys(vd.por).forEach(function(uid){ var x=v(uid, vd.nomes[uid]); if(x) x.vendas=vd.por[uid]; });
+  if(vd) Object.keys(vd.por).forEach(function(uid){ var x=v(uid, vd.nomes[uid]); if(x) x.erpVendas=vd.por[uid]; });
+  var vc=vendasPorCarteira();
+  if(vc) Object.keys(vc).forEach(function(uid){ var x=v(uid); if(x) x.vendas=vc[uid]; });
+  if(!vc) Object.keys(V).forEach(function(k){ V[k].vendas=V[k].erpVendas; });
   var lista=Object.keys(V).map(function(k){ return V[k]; }).sort(function(a,b){
     var fa=(a.vendas&&a.vendas[mA])||0, fb=(b.vendas&&b.vendas[mA])||0;
     return fb-fa || b.cart-a.cart || String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
@@ -6945,7 +7168,7 @@ function renderEquipe(){
     kpiEq('Resposta média', fmtHoras(media(todasH)), tot.abertas+' solicitaç'+(tot.abertas===1?'ão':'ões')+' em aberto', '')
   ].join('');
   $('eq-tab').innerHTML=lista.length ? '<table class="tb eq-tab"><tr><th>Vendedor</th>'
-    +(vd?'<th class="r">Vendido em '+nomeMes(mA)+'<br><span class="mini">até hoje</span></th><th class="r">Meta '+nomeMes(mA)+(U.admin?'<br><span class="mini">toque para definir</span>':'')+'</th><th class="r">% da meta</th><th class="r">Vendido em '+nomeMes(m1)+'</th><th class="r">'+nomeMes(m1)+' × '+nomeMes(m2)+'</th>':'')
+    +(vd?'<th class="r">Vendido em '+nomeMes(mA)+'<br><span class="mini">'+(vc?'carteira do app · até hoje':'até hoje')+'</span></th><th class="r">Meta '+nomeMes(mA)+(U.admin?'<br><span class="mini">toque para definir</span>':'')+'</th><th class="r">% da meta</th><th class="r">Vendido em '+nomeMes(m1)+'</th><th class="r">'+nomeMes(m1)+' × '+nomeMes(m2)+'</th>':'')
     +'<th class="r">Carteira</th><th class="r">Contatos</th><th class="r">Visitas</th><th>Clientes contatados</th>'
     +'<th class="r">Contato atrasado</th><th class="r">Sem comprar</th><th class="r">Comprou menos</th><th class="r">Visita longe</th><th class="r">Pedidos abertos</th></tr>'
     +lista.map(function(x){ var cob=Object.keys(x.cli).length, pc=x.cart?Math.round(cob/x.cart*100):0;
@@ -6989,6 +7212,19 @@ function uidDoRep(rep, porNomeDono){
   if(!m && porNomeDono && porNomeDono[k]) return porNomeDono[k];      /* sem ligação guardada: dono da carteira com o mesmo nome */
   return 'erp:'+k.replace(/ /g,'_');
 }
+/* vendido por CARTEIRA do app: soma o faturamento dos clientes que são de cada vendedor hoje.
+   É o que acompanha as trocas de carteira na hora (o do ERP só muda quando o ERP muda). */
+function vendasPorCarteira(){
+  if(!fatErp) return null;
+  var por={};
+  clientes.forEach(function(c){
+    if(!c.donoUid) return;
+    var f=fatDe(c); if(!f) return;
+    var p=por[c.donoUid]=por[c.donoUid]||{};
+    fatMeses.forEach(function(m){ if(f[m]) p[m]=(p[m]||0)+f[m]; });
+  });
+  return por;
+}
 function vendasPorRep(){
   if(!cmDocs.length) return null;
   var por={}, nomes={}, semRep={}, porNomeDono={};
@@ -7005,7 +7241,10 @@ function colVendas(vv, mA, m1, m2, x){
   var mt=metas[x.uid]||0, pm=mt?Math.round(a/mt*100):null;
   var metaTd='<td class="r"'+(U.admin?' style="cursor:pointer" onclick="event.stopPropagation();editarMeta(\''+x.uid+'\',\''+esc(x.nome).replace(/'/g,'')+'\')"':'')+'>'+(mt?fmtRS0(mt):'<span class="mini">'+(U.admin?'+ definir':'—')+'</span>')+'</td>';
   var pctTd='<td class="r">'+(pm==null?'<span class="mini">—</span>':'<b style="color:'+(pm>=100?'var(--green)':'var(--text)')+'">'+pm+'%</b>')+'</td>';
-  return '<td class="r"><b>'+(a?fmtRS0(a):'<span class="mini">—</span>')+'</b></td>'+metaTd+pctTd+'<td class="r">'+(b?fmtRS0(b):'<span class="mini">—</span>')+'</td><td class="r">'+var_+'</td>';
+  /* quando o ERP ainda está com outro representante, mostra o número dele embaixo, em cinza */
+  var e=(x.erpVendas&&x.erpVendas[mA])||0;
+  var erpTxt=(x.erpVendas && Math.abs(e-a)>=1) ? '<div class="mini" title="Pelo representante do ERP">ERP: '+(e?fmtRS0(e):'—')+'</div>' : '';
+  return '<td class="r"><b>'+(a?fmtRS0(a):'<span class="mini">—</span>')+'</b>'+erpTxt+'</td>'+metaTd+pctTd+'<td class="r">'+(b?fmtRS0(b):'<span class="mini">—</span>')+'</td><td class="r">'+var_+'</td>';
 }
 function kpiEq(rot, val, dica, cor){ return '<div class="card"><div class="klabel">'+rot+'</div><div class="kval"'+(cor?' style="color:'+cor+'"':'')+'>'+val+'</div><div class="khint">'+dica+'</div></div>'; }
 function verVendedor(uid){ filtroCart='todos'; nav('carteira'); var s=$('c-vend'); if(s){ s.value=uid; renderCarteira(); } }
