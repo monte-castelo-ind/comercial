@@ -559,7 +559,7 @@ details.mais[open]{padding-bottom:4px}
 .rel-abc.b{background:color-mix(in srgb,var(--blue) 18%,transparent);color:var(--blue)}
 .rel-abc.c{background:var(--card-2);color:var(--muted)}
 .rel-neg{color:var(--red);font-weight:600}
-.ct-com{color:var(--red);font-size:12.5px;margin-left:5px;vertical-align:baseline}
+.ct-com{color:var(--red);font:800 12px 'Archivo',sans-serif;margin-left:6px;letter-spacing:.2px;vertical-align:baseline}
 .rel-pos{color:var(--green);font-weight:600}
 .rel-med2{color:var(--amber);font-weight:700}
 
@@ -1636,7 +1636,7 @@ function eqConfCelula(d, it){
     + (a&&a.confEm?'<div class="mini">'+(a.conf==='ok'?'conferido':'não achado')+' em '+fmtDia(String(a.confEm).slice(0,10))+'</div>':'')+'</td>';
 }
 /* ficha do cliente: equipamentos dele (pelo vínculo gravado na importação) */
-/* estrela vermelha ★ ao lado do nome: este cliente tem equipamento nosso em comodato.
+/* "C" vermelho ao lado do nome: este cliente tem equipamento nosso em comodato.
    Sai da mesma lista da aba Equipamentos; enquanto ela não carrega, a estrela não aparece. */
 var EQ_IDX=null, EQ_IDXN=-1, EQ_TENTOU=false;
 function eqComIdx(){
@@ -1646,7 +1646,7 @@ function eqComIdx(){
   EQ_IDX=m; EQ_IDXN=EQ.docs.length; return m;
 }
 function estrelaComodato(c){
-  try{ var m=eqComIdx(); return (m && c && m[c.id]) ? '<span class="ct-com" title="Tem equipamento em comodato">★</span>' : ''; }
+  try{ var m=eqComIdx(); return (m && c && m[c.id]) ? '<span class="ct-com" title="Tem equipamento em comodato">C</span>' : ''; }
   catch(e){ console.warn('estrela de comodato:', e); return ''; }
 }
 /* lê a lista de equipamentos uma vez, sem poder derrubar a tela que chamou */
