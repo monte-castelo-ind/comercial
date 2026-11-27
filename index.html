@@ -3857,6 +3857,8 @@ onAuthStateChanged(auth, async function(u){
   /* chave "Acordos de todos" (ex.: Mariana, analista): vê as negociações e os acordos de todos os vendedores,
      com o faturado do mês, só para consultar — conceder e marcar pago continua com gerente e diretoria */
   U.ngTodas=U.gestor || (U.comercial && d.comercialAcordos===true);
+  /* baixar a planilha de "Produtos por data": diretoria sempre; os outros, só com esta chave */
+  U.baixaProd=U.admin || d.comercialBaixaProd===true;
   document.querySelectorAll('.rel-vis').forEach(function(el){ el.style.display=(U.ver||U.ngTodas)?'':'none'; });
   try{ var c=await getDoc(doc(db,'comConfig','app')); cfgExiste=c.exists(); aplicarCfg(c.exists()?c.data():{}); }
   catch(e){ console.warn('comConfig:',e); aplicarCfg({}); }
@@ -6187,6 +6189,15 @@ function cmGerMudar(uid, cb){
     toast((u.nome||u.email)+(cb.checked?' agora gerencia':' não gerencia mais')+' os pedidos de equipamento. Vale na próxima vez que abrir o app.');
   }).catch(function(e){ cb.disabled=false; cb.checked=!cb.checked; falha('mudar a chave')(e); });
 }
+/* ---------- chave "Baixar Produtos por data" (Usuários e níveis) ---------- */
+function baixaProdMudar(uid, cb){
+  var u=(usuariosLista||[]).filter(function(x){ return x.uid===uid; })[0]; if(!u) return;
+  cb.disabled=true;
+  updateDoc(doc(db,'usuarios',uid), { comercialBaixaProd:cb.checked }).then(function(){
+    u.baixaProd=cb.checked; cb.disabled=false;
+    toast((u.nome||u.email)+(cb.checked?' agora baixa':' não baixa mais')+' a planilha de Produtos por data. Vale na próxima vez que abrir o app (Ctrl+Shift+R).');
+  }).catch(function(e){ cb.disabled=false; cb.checked=!cb.checked; falha('mudar a chave')(e); });
+}
 /* ---------- chave "Acordos de todos" (Usuários e níveis) ---------- */
 function ngTodasMudar(uid, cb){
   var u=(usuariosLista||[]).filter(function(x){ return x.uid===uid; })[0]; if(!u) return;
@@ -6196,7 +6207,7 @@ function ngTodasMudar(uid, cb){
     toast((u.nome||u.email)+(cb.checked?' agora vê':' não vê mais')+' os acordos de todos os vendedores. Vale na próxima vez que abrir o app (Ctrl+Shift+R).');
   }).catch(function(e){ cb.disabled=false; cb.checked=!cb.checked; falha('mudar a chave')(e); });
 }
-Object.assign(window, { cmNovo:cmNovo, cmEditar:cmEditar, cmExcluir:cmExcluir, cmGerMudar:cmGerMudar, ngTodasMudar:ngTodasMudar });
+Object.assign(window, { cmNovo:cmNovo, cmEditar:cmEditar, cmExcluir:cmExcluir, cmGerMudar:cmGerMudar, ngTodasMudar:ngTodasMudar, baixaProdMudar:baixaProdMudar });
 
 
 
@@ -7352,7 +7363,8 @@ function carregarUsuarios(forcar){
   usuariosLendo=getDocs(collection(db,'usuarios')).then(function(r){
     usuariosLista=r.docs.map(function(d){ var x=d.data()||{};
       return { uid:d.id, nome:x.nome||'', email:x.email||'', ativo:x.ativo===true, admin:x.role==='admin',
-               comercial:x.comercial===true, gerente:x.comercialGestor===true, cmGer:x.comodatoGerencia===true, ngTodas:x.comercialAcordos===true };
+               comercial:x.comercial===true, gerente:x.comercialGestor===true, cmGer:x.comodatoGerencia===true, ngTodas:x.comercialAcordos===true,
+               baixaProd:x.comercialBaixaProd===true };
     }).sort(function(a,b){ return String(a.nome||a.email).localeCompare(String(b.nome||b.email),'pt-BR'); });
     usuariosLendo=null; return usuariosLista;
   }, function(e){ usuariosLendo=null; throw e; });
@@ -7384,16 +7396,17 @@ function renderUsuarios(){
       +'<td>'+nivel+'</td>'
       +'<td>'+(u.admin?'<span class="mini">sempre (diretoria)</span>':'<label class="chk" style="margin:0"><input type="checkbox"'+(u.cmGer?' checked':'')+' onchange="cmGerMudar(\''+u.uid+'\',this)"> Gerencia</label>')+'</td>'
       +'<td>'+(u.admin||u.gerente?'<span class="mini">já vê (nível)</span>':'<label class="chk" style="margin:0"><input type="checkbox"'+(u.ngTodas?' checked':'')+' onchange="ngTodasMudar(\''+u.uid+'\',this)"> Vê todos</label>')+'</td>'
+      +'<td>'+(u.admin?'<span class="mini">sempre (diretoria)</span>':'<label class="chk" style="margin:0"><input type="checkbox"'+(u.baixaProd?' checked':'')+' onchange="baixaProdMudar(\''+u.uid+'\',this)"> Pode baixar</label>')+'</td>'
       +'<td class="r">'+(cart[u.uid]||'<span class="mini">0</span>')+'</td></tr>';
   };
   var linhaInativo=function(u){
     return '<tr><td><b>'+esc(u.nome||'(sem nome)')+'</b> <button class="pr-x" style="font-size:13px" title="Mudar o nome" onclick="mudarNome(\''+u.uid+'\')">✎</button>'
       +'<br><span class="mini">'+esc(u.email||u.uid)+'</span></td>'
       +'<td><select onchange="liberarConta(\''+u.uid+'\',this)" style="min-width:170px"><option value="">Liberar como…</option>'
-      +'<option value="vendedor">Vendedor</option><option value="gerente">Gerente</option></select></td><td></td><td></td><td></td></tr>';
+      +'<option value="vendedor">Vendedor</option><option value="gerente">Gerente</option></select></td><td></td><td></td><td></td><td></td></tr>';
   };
-  box.innerHTML='<table class="tb"><tr><th>Pessoa</th><th>Nível no Comercial</th><th title="Edita, exclui e muda a prioridade dos pedidos de equipamento (Remessa Comodato e Manutenção Externa)">Pedidos de equipamento</th><th title="Vê as negociações e os acordos de todos os vendedores, com o faturado do mês (só consulta)">Acordos de todos</th><th class="r">Clientes na carteira</th></tr>'
-    +(ativos.length?ativos.map(linha).join(''):'<tr><td colspan="5" class="mini">Ninguém com esse nome.</td></tr>')+'</table>'
+  box.innerHTML='<table class="tb"><tr><th>Pessoa</th><th>Nível no Comercial</th><th title="Edita, exclui e muda a prioridade dos pedidos de equipamento (Remessa Comodato e Manutenção Externa)">Pedidos de equipamento</th><th title="Vê as negociações e os acordos de todos os vendedores, com o faturado do mês (só consulta)">Acordos de todos</th><th title="Baixar em Excel a tela Produtos por data, na ficha do cliente">Baixar Produtos por data</th><th class="r">Clientes na carteira</th></tr>'
+    +(ativos.length?ativos.map(linha).join(''):'<tr><td colspan="6" class="mini">Ninguém com esse nome.</td></tr>')+'</table>'
     +(inativos.length?'<div class="sect" style="margin:18px 8px 6px">Esperando liberação ('+inativos.length+')</div>'
       +'<p class="mini" style="margin:0 8px 8px">Entraram uma vez e o cadastro nasceu bloqueado. Liberar aqui ativa a conta e dá o nível no Comercial. Atenção: conta ativa também enxerga o que hoje é aberto a qualquer conta ativa (Manut. Comodato em leitura e o app Campo, que ainda está com as regras temporárias).</p>'
       +'<table class="tb">'+inativos.map(linhaInativo).join('')+'</table>':'');
@@ -7585,7 +7598,7 @@ function verProdutosPorData(cid){
           + '<button class="btn btn-sm" id="pm-v" onclick="pmModo(\'v\')">R$</button>'
           + '<button class="btn btn-sm btn-ghost" id="pm-q" onclick="pmModo(\'q\')">Quantidade</button>'
           + '<input type="search" id="pm-busca" placeholder="Buscar produto…" oninput="pmPintar()" autocomplete="off" style="flex:1;min-width:150px">'
-          + '<button class="btn btn-sm btn-ghost" onclick="pmExcel()">⤓ Excel</button></div>'
+          + (U.baixaProd?'<button class="btn btn-sm btn-ghost" onclick="pmExcel()">⤓ Excel</button>':'')+'</div>'
           + (lojas.length>1?'<div class="mini" style="margin-bottom:8px">Somando '+lojas.length+' lojas deste cliente.</div>':'')
           + '<div id="pm-tab"></div><div class="mini" id="pm-nota" style="margin-top:9px"></div>');
         pmEscala(PM.esc);
@@ -7657,7 +7670,7 @@ function pmPintar(){
   $('pm-tab').innerHTML=h;
 }
 function pmExcel(){
-  if(U.analista){ toast('Baixar em Excel não está liberado para o seu acesso.', true); return; }
+  if(!U.baixaProd){ toast('Baixar esta planilha não está liberado para o seu acesso.', true); return; }
   var A=pmAtual(), c=clientePorId(PM.cid)||{};
   if(!A.cols.length){ toast('Nada para exportar nesta visão.', true); return; }
   var l=A.linhas.slice().sort(function(a,b){ return b.tv-a.tv; });
