@@ -263,6 +263,7 @@ h1{margin:0;font-size:21px;font-weight:700;letter-spacing:-.4px}
 .modal{background:var(--card);border:1px solid var(--border);border-radius:18px;width:100%;
        max-width:520px;max-height:90vh;display:flex;flex-direction:column;box-shadow:var(--sombra-pop)}
 .modal.wide{max-width:800px}
+.modal.xwide{max-width:min(1200px,96vw)}
 .mhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
        padding:18px 20px 12px;border-bottom:1px solid var(--border)}
 .mtitle{font-size:16.5px;font-weight:800}
@@ -576,7 +577,10 @@ details.mais[open]{padding-bottom:4px}
 
 /* pedidos por data */
 .pd-busca{width:100%;margin-bottom:12px}
-.pm-tb th,.pm-tb td{white-space:nowrap}
+.pm-tb th,.pm-tb td{white-space:nowrap;padding-left:9px;padding-right:9px}
+.pm-tb .pm-ord{cursor:pointer;user-select:none}
+.pm-tb .pm-ord:hover{color:var(--text)}
+.pm-seta{color:var(--primary);margin-left:4px;font-size:10px}
 .pm-tb .pm-fix{position:sticky;left:0;background:var(--card);max-width:260px;overflow:hidden;text-overflow:ellipsis}
 .pm-tb thead .pm-fix{z-index:2}
 .pd-dia{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden}
@@ -3091,7 +3095,7 @@ function ngReabrir(id){
    tela, Excel e PDF — o mesmo conteúdo nos três.
    ===================================================================== */
 var REL={ aba:'cli', meses:[], cm:{}, rel:{}, lendo:false, lido:false, erro:'', fonte:'', cobertura:null,
-          med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', colunas:'tipo', T:null };
+          med:'rs', tipo:'', vend:'', de:'', ate:'', busca:'', mA:'', mB:'', cmpF:'todos', grp:'vend', visPer:'3m', colunas:'tipo', agr:'rede', T:null };
 var REL_ABAS=[['cli','Vendas por cliente'],['cmp','Comparativo de meses'],['grp','Por vendedor, rota ou tipo'],['risco','Clientes em risco'],['opo','Oportunidades por produto'],['vis','Visitas e contatos'],['ben','Benefícios dos acordos'],['cart','Carteira × ERP'],['perdas','Aberturas e perdas']];
 function relPode(){ return !!(U.ver || U.ngTodas); }
 function fmtKg(v){ return (Math.round(v||0)).toLocaleString('pt-BR')+' kg'; }
@@ -3211,7 +3215,10 @@ function relLinhas(ms, semTipo){
       Object.keys(cs).forEach(function(k){ var c=cs[k]||{}, t=c.t||{}, v=0;
         Object.keys(t).forEach(function(tp){ if(tipo && tp!==tipo) return; v+=(t[tp]||[])[med]||0; });
         if(!v) return;
-        var r=idx[k]||(idx[k]={ k:k, nome:c.n||k, cid:c.ci||'', rota:c.ro||'', rep:c.r||'', porMes:{}, total:0, tipos:{} });
+        /* rede = junta as lojas com a mesma razão social; loja = cada loja na sua linha */
+        var key=(REL.agr==='loja') ? k : normEmp(c.n||k);
+        var r=idx[key]||(idx[key]={ k:key, nome:c.n||k, cid:c.ci||'', rota:c.ro||'', rep:c.r||'', porMes:{}, total:0, tipos:{}, lojas:{} });
+        r.lojas[k]=1;
         Object.keys(t).forEach(function(tp){ if(tipo && tp!==tipo) return; r.tipos[tp]=(r.tipos[tp]||0)+((t[tp]||[])[med]||0); });
         r.porMes[m]=(r.porMes[m]||0)+v; r.total+=v; });
     } else if(!med && !tipo){
@@ -3223,6 +3230,7 @@ function relLinhas(ms, semTipo){
     }
   });
   return Object.keys(idx).map(function(k){ var r=idx[k], cc=cliDaCarteira({ nome:r.nome });
+    r.nLojas=r.lojas?Object.keys(r.lojas).length:1;
     r.vend=cc ? (cc.donoNome||'') : '';
     if(cc){ if(!r.cid) r.cid=cidadeDe(cc)||''; if(!r.rota) r.rota=rotaDe(cc)||''; r.cliId=cc.id; }
     r.vendTxt=r.vend || (r.rep ? r.rep+' (ERP)' : 'Sem vendedor');
@@ -3235,7 +3243,8 @@ function relFiltra(l){
     if(q.length){ var t=norm([r.nome, r.cid, r.rota, r.vendTxt].join(' ')); if(!q.every(function(w){ return t.indexOf(w)>=0; })) return false; }
     return true; });
 }
-function relCliCel(r){ return '<b>'+esc(r.nome)+'</b>'+(r.cid?'<span class="ct-cid"> - '+esc(cidadeBonita(r.cid))+'</span>':''); }
+function relCliCel(r){ return '<b>'+esc(r.nome)+'</b>'+(r.cid?'<span class="ct-cid"> - '+esc(cidadeBonita(r.cid))+'</span>':'')
+  + ((r.nLojas>1 && REL.agr==='rede')?'<span class="mini"> · '+r.nLojas+' lojas</span>':''); }
 /* diz exatamente por que o kg / o tipo não aparecem */
 function relSemDados(ms){
   if(!ms.length) return 'Escolha o período.';
@@ -3335,7 +3344,10 @@ function relCli(){
     total:{ cels:['','<b>Total</b>',''].concat(extras.map(function(e){ return '<b>'+relFmt(l.reduce(function(s,r){ return s+(porTipo?(r.tipos[e.k]||0):(r.porMes[e.k]||0)); },0))+'</b>'; })).concat(['<b>'+relFmt(sub)+'</b>', tot?(sub/tot*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'', '']) },
     resumo:[['Total no período', relFmt(tot)], ['Clientes que compraram', base.length.toLocaleString('pt-BR')],
             ['Média por cliente', base.length?relFmt(tot/base.length):'—'], ['Curva A', nA+' cliente'+(nA===1?'':'s')+' = 80% do total']],
-    nota:'Curva ABC: A = clientes que somam os primeiros 80% do total; B = os 15% seguintes; C = o resto. Clique no cliente para abrir a ficha.' };
+    nota:'Curva ABC: A = clientes que somam os primeiros 80% do total; B = os 15% seguintes; C = o resto. '
+      + (REL.agr==='rede' ? 'As lojas com a mesma razão social estão somadas numa linha só (Por rede) — use <b>Por loja</b> para separá-las. '
+                          : 'Cada loja aparece na sua linha (Por loja) — use <b>Por rede</b> para somar as da mesma razão social. ')
+      + 'Clique no cliente para abrir a ficha.' };
 }
 /* ---------- 2) comparativo entre dois meses ---------- */
 function relCmp(){
@@ -3443,6 +3455,7 @@ function relFiltrosHtml(){
   if(a==='cli' || a==='cmp' || a==='grp'){
     var ms=a==='cmp'?[REL.mA,REL.mB]:relPeriodo(), tipos=relTipos(ms);
     h+='<div class="seg rel-med" title="Medida"><button class="'+(REL.med==='rs'?'on':'')+'" onclick="relSet(\'med\',\'rs\')">R$</button><button class="'+(REL.med==='kg'?'on':'')+'" onclick="relSet(\'med\',\'kg\')">kg</button></div>'
+      +'<div class="seg rel-med" title="Redes com a mesma razão social: juntas ou loja por loja"><button class="'+(REL.agr==='rede'?'on':'')+'" onclick="relSet(\'agr\',\'rede\')">Por rede</button><button class="'+(REL.agr==='loja'?'on':'')+'" onclick="relSet(\'agr\',\'loja\')">Por loja</button></div>'
       +(a==='grp' && REL.grp==='tipo' ? '' : '<select onchange="relSet(\'tipo\',this.value)" title="Tipo de produto"><option value="">Todos os tipos de produto</option>'
       +tipos.map(function(t){ return '<option value="'+esc(t)+'"'+(t===REL.tipo?' selected':'')+'>'+esc(relTipoNome(t))+'</option>'; }).join('')+'</select>');
     if(a==='cli') h+='<div class="seg rel-med" title="O que vai nas colunas"><button class="'+(REL.colunas==='tipo'?'on':'')+'" onclick="relSet(\'colunas\',\'tipo\')">Por tipo</button><button class="'+(REL.colunas==='mes'?'on':'')+'" onclick="relSet(\'colunas\',\'mes\')">Por mês</button></div>';
@@ -3742,7 +3755,7 @@ var MB=[];
 function abrirModal(o){
   MB=[]; cmAbertoId=null;   /* outra janela por cima: a folha não se redesenha mais */
   var bts=(o.botoes||[]).map(function(b){ MB.push(b.fn); return '<button class="btn '+(b.cls||'')+'" onclick="mbClick('+(MB.length-1)+',this)">'+b.txt+'</button>'; }).join('');
-  $('modal-host').innerHTML='<div class="mask" onclick="if(event.target===this)fecharModal()"><div class="modal'+(o.wide?' wide':'')+'">'
+  $('modal-host').innerHTML='<div class="mask" onclick="if(event.target===this)fecharModal()"><div class="modal'+(o.wide?' wide':'')+(o.xwide?' xwide':'')+'">'
     +'<div class="mhead"><div style="min-width:0"><div class="mtitle">'+o.titulo+'</div>'+(o.sub?'<div class="msub">'+o.sub+'</div>':'')+'</div>'
     +'<button class="x" onclick="fecharModal()" aria-label="Fechar">×</button></div>'
     +'<div class="mbody">'+o.corpo+'</div>'
@@ -4188,7 +4201,7 @@ Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
 Object.assign(window, { abrirConta:abrirConta, pdPintar:pdPintar, verComprasPorData:verComprasPorData, guiaIr:guiaIr, abrirGuia:abrirGuia, cmpAtualizar:cmpAtualizar, cmpSet:cmpSet, cmpOcultar:cmpOcultar, verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio,
   revisarTrocas:revisarTrocas, trocaDecidir:trocaDecidir, ctBulkCarteira:ctBulkCarteira, fcDonoMarcar:fcDonoMarcar,
-  verProdutosPorMes:verProdutosPorMes, pmModo:pmModo, pmPintar:pmPintar, pmExcel:pmExcel, marcarPerdido:marcarPerdido, renderPerdas:renderPerdas, apExcel:apExcel });
+  verProdutosPorData:verProdutosPorData, pmModo:pmModo, pmOrd:pmOrd, pmEscala:pmEscala, pmPintar:pmPintar, pmExcel:pmExcel, marcarPerdido:marcarPerdido, renderPerdas:renderPerdas, apExcel:apExcel });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
 Object.assign(window, { ngSeg:ngSeg, renderNegoc:renderNegoc, abrirNegoc:abrirNegoc, verNegoc:verNegoc, ngEtapa:ngEtapa, chipUnicoNg:chipUnicoNg,
@@ -7451,7 +7464,7 @@ function lpLojasDoCliente(c, idx){
   [c.nome, c.erpNome, e&&e.n, e&&e.nErp].filter(Boolean).forEach(function(n){ eqNomes(n).forEach(function(k){ ks[k]=1; }); });
   return Object.keys(idx.lojas||{}).filter(function(k){ return eqNomes((idx.lojas[k]||{}).n||'').some(function(x){ return ks[x]; }); });
 }
-/* ---------- pedidos por data (botão "Pedidos por data" na ficha) ----------
+/* ---------- pedidos por lista (botão "Pedidos por lista" na ficha) ----------
    Junta as compras dia a dia de todos os produtos (comercialLojaProd, campo compras) por DATA: cada dia com
    nota mostra os produtos, quantidade e valor, e o total do dia. Cliente com várias lojas de mesmo nome:
    cada loja do dia aparece separada. Voltar reabre a ficha. */
@@ -7483,7 +7496,7 @@ function pdPintar(){
 function verComprasPorData(cid){
   var c=clientePorId(cid); if(!c) return;
   var voltar={ txt:'← Voltar', cls:'btn-ghost', fn:function(){ verCliente(cid); } };
-  abrirModal({ titulo:'Pedidos por data', sub:esc(c.nome||'')+' · últimos 90 dias', wide:true, corpo:'<div class="empty">Lendo as compras…</div>', botoes:[voltar] });
+  abrirModal({ titulo:'Pedidos por lista', sub:esc(c.nome||'')+' · últimos 90 dias', wide:true, corpo:'<div class="empty">Lendo as compras…</div>', botoes:[voltar] });
   var corpo=function(h){ var b=document.querySelector('.modal .mbody'); if(b) b.innerHTML=h; };
   lpIdx().then(function(idx){
     var lojas=lpLojasDoCliente(c, idx);
@@ -7512,15 +7525,16 @@ function verComprasPorData(cid){
       });
   }).catch(function(e){ corpo('<div class="empty">'+(e&&e.code==='permission-denied'?'Sem permissão para ler a base de compras por loja.':'Não foi possível ler as compras ('+esc(e&&e.message||e)+').')+'</div>'); });
 }
-/* ---------- produtos × meses (botão "Produtos por mês" na ficha) ----------
-   Linhas = produtos, colunas = meses. Vem da mesma base por loja do robô, que
-   guarda os últimos 13 meses fechados de cada loja (por isso não dá dia a dia
-   em 365 dias: o detalhe por dia só existe nos últimos 120). */
-var PM={ cid:'', linhas:[], meses:[], modo:'v', nLojas:1 };
-function verProdutosPorMes(cid){
+/* ---------- produtos × datas (botão "Produtos por data" na ficha) ----------
+   Linhas = produtos, colunas = dias ou meses:
+     Dia  = dia a dia que o robô guarda por loja (hoje, os últimos 120 dias);
+     Mês  = os 13 meses fechados que o robô guarda por loja.
+   Dá para ordenar clicando em qualquer cabeçalho. */
+var PM={ cid:'', esc:'dia', base:{}, modo:'v', nLojas:1, ord:'tot', dir:-1 };
+function verProdutosPorData(cid){
   var c=clientePorId(cid); if(!c) return;
   var voltar={ txt:'← Voltar', cls:'btn-ghost', fn:function(){ verCliente(cid); } };
-  abrirModal({ titulo:'Produtos por mês', sub:esc(c.nome||'')+' · últimos 12 meses', wide:true,
+  abrirModal({ titulo:'Produtos por data', sub:esc(c.nome||'')+' · por dia ou por mês', wide:true, xwide:true,
     corpo:'<div class="empty">Lendo as compras…</div>', botoes:[voltar] });
   var corpo=function(h){ var b=document.querySelector('.modal .mbody'); if(b) b.innerHTML=h; };
   lpIdx().then(function(idx){
@@ -7530,37 +7544,68 @@ function verProdutosPorMes(cid){
     return Promise.all(lojas.map(function(k){ return LP_DOCS[k] ? Promise.resolve(LP_DOCS[k])
         : getDoc(doc(db,'comercialLojaProd',k)).then(function(sn){ LP_DOCS[k]=sn.exists()?(sn.data()||{}):{}; return LP_DOCS[k]; }); }))
       .then(function(docs){
+        var nomes=idx.produtos||{};
+        var LD={}, colD={}, temDia=false, LM={}, colM={};
         var ms=[], d0=new Date();
         for(var i=11;i>=0;i--){ var dd=new Date(d0.getFullYear(), d0.getMonth()-i, 1); ms.push(dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')); }
-        var nomes=idx.produtos||{}, linhas={};
+        var somar=function(L, col, nm, k, v, q){
+          col[k]=1;
+          var x=L[nm]||(L[nm]={ nome:nm, m:{}, tv:0, tq:0 });
+          var o=x.m[k]||(x.m[k]={ v:0, q:0 });
+          o.v+=v||0; o.q+=q||0; x.tv+=v||0; x.tq+=q||0;
+        };
         docs.forEach(function(d){
           var pn=d.pn||{};
+          if(d.compras) temDia=true;
+          Object.keys(d.compras||{}).forEach(function(cod){
+            var nm=nomes[cod]||pn[cod]||cod;
+            String(d.compras[cod]||'').split(';').forEach(function(t){
+              if(!t) return; var p=t.split('|'); if(!p[0]) return;
+              somar(LD, colD, nm, p[0], +p[2]||0, +p[1]||0);
+            });
+          });
           Object.keys(d.meses||{}).forEach(function(ym){
             if(ms.indexOf(ym)<0) return;
             var ps=d.meses[ym]||{};
             Object.keys(ps).forEach(function(cod){
-              var nm=nomes[cod]||pn[cod]||cod;
-              var L=linhas[nm]||(linhas[nm]={ nome:nm, m:{}, tv:0, tq:0 });
-              var a=ps[cod]||[0,0], o=L.m[ym]||(L.m[ym]={ v:0, q:0 });
-              o.v+=a[0]||0; o.q+=a[1]||0; L.tv+=a[0]||0; L.tq+=a[1]||0;
+              var nm=nomes[cod]||pn[cod]||cod, a=ps[cod]||[0,0];
+              somar(LM, colM, nm, ym, a[0]||0, a[1]||0);
             });
           });
         });
-        var l=Object.keys(linhas).map(function(k){ return linhas[k]; }).filter(function(x){ return x.tv>0 || x.tq>0; });
-        if(!l.length){ corpo('<div class="empty">Sem compras nos últimos 12 meses.</div>'); return; }
-        PM={ cid:cid, linhas:l, meses:ms, modo:'v', nLojas:lojas.length };
+        var arr=function(L){ return Object.keys(L).map(function(k){ return L[k]; }).filter(function(x){ return x.tv>0 || x.tq>0; }); };
+        PM={ cid:cid, esc:(temDia?'dia':'mes'), modo:'v', nLojas:lojas.length, ord:'tot', dir:-1,
+             base:{ dia:{ linhas:arr(LD), cols:Object.keys(colD).sort().reverse() },
+                    mes:{ linhas:arr(LM), cols:ms.filter(function(m){ return colM[m]; }).slice().reverse() } } };
+        if(!PM.base.dia.linhas.length && !PM.base.mes.linhas.length){ corpo('<div class="empty">Sem compras no período que o robô guarda.</div>'); return; }
         corpo('<div class="tools" style="margin:0 0 10px">'
+          + '<button class="btn btn-sm" id="pm-e-dia" onclick="pmEscala(\'dia\')">Por dia</button>'
+          + '<button class="btn btn-sm btn-ghost" id="pm-e-mes" onclick="pmEscala(\'mes\')">Por mês</button>'
+          + '<span style="width:1px;height:22px;background:var(--border);margin:0 4px"></span>'
           + '<button class="btn btn-sm" id="pm-v" onclick="pmModo(\'v\')">R$</button>'
           + '<button class="btn btn-sm btn-ghost" id="pm-q" onclick="pmModo(\'q\')">Quantidade</button>'
           + '<input type="search" id="pm-busca" placeholder="Buscar produto…" oninput="pmPintar()" autocomplete="off" style="flex:1;min-width:150px">'
           + '<button class="btn btn-sm btn-ghost" onclick="pmExcel()">⤓ Excel</button></div>'
           + (lojas.length>1?'<div class="mini" style="margin-bottom:8px">Somando '+lojas.length+' lojas deste cliente.</div>':'')
-          + '<div id="pm-tab"></div>'
-          + '<div class="mini" style="margin-top:9px">O ERP soma as vendas por mês: o mês atual entra até hoje. '
-          + 'O robô guarda 13 meses por loja, por isso a tela mostra 12 meses e não o dia a dia do ano todo — para o dia a dia, use <b>Pedidos por data</b> (últimos 90 dias).</div>');
-        pmPintar();
+          + '<div id="pm-tab"></div><div class="mini" id="pm-nota" style="margin-top:9px"></div>');
+        pmEscala(PM.esc);
       });
   }).catch(function(e){ corpo('<div class="empty">'+(e&&e.code==='permission-denied'?'Sem permissão para ler a base de compras por loja.':'Não foi possível ler as compras ('+esc(e&&e.message||e)+').')+'</div>'); });
+}
+function pmAtual(){ return PM.base[PM.esc] || { linhas:[], cols:[] }; }
+function pmEscala(e){
+  PM.esc=e; PM.ord='tot'; PM.dir=-1;
+  var a=$('pm-e-dia'), b=$('pm-e-mes');
+  if(a) a.className='btn btn-sm'+(e==='dia'?'':' btn-ghost');
+  if(b) b.className='btn btn-sm'+(e==='mes'?'':' btn-ghost');
+  var n=$('pm-nota'), A=pmAtual();
+  if(n){
+    n.innerHTML = e==='dia'
+      ? (A.cols.length ? A.cols.length+' dia(s) com compra, de '+fmtDia(A.cols[A.cols.length-1])+' a '+fmtDia(A.cols[0])+'. O robô guarda o dia a dia dos últimos 120 dias de cada loja — para um ano inteiro, use <b>Por mês</b>.'
+                       : 'As compras por dia aparecem quando o robô do ERP gravar a versão nova da base por loja (com a data de cada compra).')
+      : (A.cols.length ? A.cols.length+' mês(es) com compra. O ERP soma por mês: o mês atual entra até hoje.' : 'Sem meses com compra.');
+  }
+  pmPintar();
 }
 function pmModo(m){ PM.modo=m;
   var a=$('pm-v'), b=$('pm-q');
@@ -7571,33 +7616,58 @@ function pmModo(m){ PM.modo=m;
 function pmVal(x){ return PM.modo==='v' ? (x?x.v:0) : (x?x.q:0); }
 function pmTxt(n){ if(!n) return '<span class="mini">—</span>';
   return PM.modo==='v' ? fmtRS0(n) : Math.round(n).toLocaleString('pt-BR'); }
+function pmColTit(k){ if(PM.esc==='mes') return nomeMes(k); var p=String(k).split('-'); return p[2]+'/'+p[1]; }
+function pmColDica(k){ return PM.esc==='mes' ? nomeMes(k) : fmtDia(k); }
+/* clicar no cabeçalho ordena; clicar de novo inverte (nome começa em A→Z, números do maior para o menor) */
+function pmOrd(col){
+  if(PM.ord===col) PM.dir=-PM.dir;
+  else { PM.ord=col; PM.dir=(col==='nome')?1:-1; }
+  pmPintar();
+}
+function pmSeta(col){ return PM.ord===col ? '<span class="pm-seta">'+(PM.dir<0?'▼':'▲')+'</span>' : ''; }
 function pmPintar(){
-  var q=norm(($('pm-busca')||{}).value||'').split(' ').filter(Boolean);
-  var l=PM.linhas.filter(function(x){ if(!q.length) return true; var t=norm(x.nome); return q.every(function(w){ return t.indexOf(w)>=0; }); })
-    .sort(function(a,b){ return (PM.modo==='v'?(b.tv-a.tv):(b.tq-a.tq)) || a.nome.localeCompare(b.nome,'pt-BR'); });
+  var A=pmAtual(), q=norm(($('pm-busca')||{}).value||'').split(' ').filter(Boolean);
+  if(!A.cols.length){ $('pm-tab').innerHTML='<div class="empty">Sem compras nesta visão.</div>'; return; }
+  var l=A.linhas.filter(function(x){ if(!q.length) return true; var t=norm(x.nome); return q.every(function(w){ return t.indexOf(w)>=0; }); });
+  var chave=function(x){
+    if(PM.ord==='nome') return null;
+    if(PM.ord==='tot') return PM.modo==='v'?x.tv:x.tq;
+    return pmVal(x.m[PM.ord]);
+  };
+  l.sort(function(a,b){
+    if(PM.ord==='nome') return a.nome.localeCompare(b.nome,'pt-BR')*PM.dir;
+    var d=(chave(b)-chave(a))*(PM.dir<0?1:-1);
+    return d || a.nome.localeCompare(b.nome,'pt-BR');
+  });
   if(!l.length){ $('pm-tab').innerHTML='<div class="empty">Nenhum produto com esse nome.</div>'; return; }
   var tot={}, totG=0;
-  l.forEach(function(x){ PM.meses.forEach(function(m){ var v=pmVal(x.m[m]); tot[m]=(tot[m]||0)+v; totG+=v; }); });
-  var h='<div class="tscroll" style="max-height:60vh"><table class="tb pm-tb"><thead><tr><th class="pm-fix">Produto</th>'
-    + PM.meses.map(function(m){ return '<th class="r">'+esc(nomeMes(m))+'</th>'; }).join('')
-    + '<th class="r">Total</th></tr></thead><tbody>'
+  l.forEach(function(x){ A.cols.forEach(function(m){ var v=pmVal(x.m[m]); tot[m]=(tot[m]||0)+v; totG+=v; }); });
+  var h='<div class="tscroll" style="max-height:66vh"><table class="tb pm-tb"><thead><tr>'
+    + '<th class="pm-fix pm-ord" onclick="pmOrd(\'nome\')" title="Ordenar por nome">Produto'+pmSeta('nome')+'</th>'
+    + '<th class="r pm-ord" onclick="pmOrd(\'tot\')" title="Ordenar pelo total">Total'+pmSeta('tot')+'</th>'
+    + A.cols.map(function(m){ return '<th class="r pm-ord" onclick="pmOrd(\''+m+'\')" title="'+esc(pmColDica(m))+' — clique para ordenar por esta coluna">'
+        + esc(pmColTit(m))+pmSeta(m)+'</th>'; }).join('')
+    + '</tr></thead><tbody>'
     + l.map(function(x){ return '<tr><td class="pm-fix">'+esc(x.nome)+'</td>'
-        + PM.meses.map(function(m){ return '<td class="r">'+pmTxt(pmVal(x.m[m]))+'</td>'; }).join('')
-        + '<td class="r"><b>'+pmTxt(PM.modo==='v'?x.tv:x.tq)+'</b></td></tr>'; }).join('')
+        + '<td class="r"><b>'+pmTxt(PM.modo==='v'?x.tv:x.tq)+'</b></td>'
+        + A.cols.map(function(m){ return '<td class="r">'+pmTxt(pmVal(x.m[m]))+'</td>'; }).join('')+'</tr>'; }).join('')
     + '</tbody><tfoot><tr><td class="pm-fix"><b>Total ('+l.length+')</b></td>'
-    + PM.meses.map(function(m){ return '<td class="r"><b>'+pmTxt(tot[m])+'</b></td>'; }).join('')
-    + '<td class="r"><b>'+pmTxt(totG)+'</b></td></tr></tfoot></table></div>';
+    + '<td class="r"><b>'+pmTxt(totG)+'</b></td>'
+    + A.cols.map(function(m){ return '<td class="r"><b>'+pmTxt(tot[m])+'</b></td>'; }).join('')+'</tr></tfoot></table></div>';
   $('pm-tab').innerHTML=h;
 }
 function pmExcel(){
   if(U.analista){ toast('Baixar em Excel não está liberado para o seu acesso.', true); return; }
-  var c=clientePorId(PM.cid)||{}, l=PM.linhas.slice().sort(function(a,b){ return b.tv-a.tv; });
-  var aoa=[['Produto'].concat(PM.meses.map(nomeMes)).concat(['Total R$','Total qtd'])];
-  l.forEach(function(x){ aoa.push([x.nome].concat(PM.meses.map(function(m){ return Math.round((x.m[m]||{}).v||0); })).concat([Math.round(x.tv), Math.round(x.tq)])); });
+  var A=pmAtual(), c=clientePorId(PM.cid)||{};
+  if(!A.cols.length){ toast('Nada para exportar nesta visão.', true); return; }
+  var l=A.linhas.slice().sort(function(a,b){ return b.tv-a.tv; });
+  var aoa=[['Produto','Total R$','Total qtd'].concat(A.cols.map(pmColDica))];
+  l.forEach(function(x){ aoa.push([x.nome, Math.round(x.tv), Math.round(x.tq)]
+    .concat(A.cols.map(function(m){ return PM.modo==='v' ? Math.round((x.m[m]||{}).v||0) : Math.round((x.m[m]||{}).q||0); }))); });
   carregarXLSX().then(function(){
-    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:40}].concat(PM.meses.map(function(){ return { wch:11 }; })).concat([{wch:12},{wch:11}]);
-    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Produtos por mês');
-    XLSX.writeFile(wb, 'produtos-por-mes-'+norm(c.nome||'cliente').toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+hoje()+'.xlsx');
+    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:40},{wch:12},{wch:11}].concat(A.cols.map(function(){ return { wch:12 }; }));
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, PM.esc==='mes'?'Produtos por mês':'Produtos por data');
+    XLSX.writeFile(wb, 'produtos-por-'+(PM.esc==='mes'?'mes':'data')+'-'+norm(c.nome||'cliente').toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+hoje()+'.xlsx');
   }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
 }
 function verCompraProduto(cid, i){
@@ -7682,8 +7752,8 @@ function comprasRecentesHtml(c){
   var r=compras90(c), ms=r.meses;
   var per=ms.length ? nomeMes(ms[0])+' a '+nomeMes(ms[ms.length-1])+' (até hoje)' : '';
   var tit='<div class="det-sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Compras dos últimos 90 dias <span class="mini" style="text-transform:none;letter-spacing:0">'+per+'</span>'
-    + ((U.gestor||U.ngTodas||U.comercial) && c.erpId ? '<button class="btn btn-sm btn-ghost" style="margin-left:auto;text-transform:none;letter-spacing:0" onclick="verComprasPorData(\''+c.id+'\')">📅 Pedidos por data</button>'
-      + '<button class="btn btn-sm btn-ghost" style="text-transform:none;letter-spacing:0" onclick="verProdutosPorMes(\''+c.id+'\')">▦ Produtos por mês</button>' : '')
+    + ((U.gestor||U.ngTodas||U.comercial) && c.erpId ? '<button class="btn btn-sm btn-ghost" style="margin-left:auto;text-transform:none;letter-spacing:0" onclick="verComprasPorData(\''+c.id+'\')">📋 Pedidos por lista</button>'
+      + '<button class="btn btn-sm btn-ghost" style="text-transform:none;letter-spacing:0" onclick="verProdutosPorData(\''+c.id+'\')">▦ Produtos por data</button>' : '')
     + '</div>';
   if(!r.l) return !c.erpId ? '' : tit+'<div class="mini" style="margin-bottom:13px">'+(U.ver
       ? (fatErp===false?'Sem acesso ao faturamento do ERP.':'Carregando…')
