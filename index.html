@@ -7576,7 +7576,7 @@ function verProdutosPorData(cid){
         var arr=function(L){ return Object.keys(L).map(function(k){ return L[k]; }).filter(function(x){ return x.tv>0 || x.tq>0; }); };
         PM={ cid:cid, esc:(temDia?'dia':'mes'), modo:'v', nLojas:lojas.length, ord:'tot', dir:-1,
              base:{ dia:{ linhas:arr(LD), cols:Object.keys(colD).sort().reverse() },
-                    mes:{ linhas:arr(LM), cols:ms.filter(function(m){ return colM[m]; }).slice().reverse() } } };
+                    mes:{ linhas:arr(LM), cols:ms.slice().reverse(), comCompra:ms.filter(function(m){ return colM[m]; }).length } } };
         if(!PM.base.dia.linhas.length && !PM.base.mes.linhas.length){ corpo('<div class="empty">Sem compras no período que o robô guarda.</div>'); return; }
         corpo('<div class="tools" style="margin:0 0 10px">'
           + '<button class="btn btn-sm" id="pm-e-dia" onclick="pmEscala(\'dia\')">Por dia</button>'
@@ -7603,7 +7603,7 @@ function pmEscala(e){
     n.innerHTML = e==='dia'
       ? (A.cols.length ? A.cols.length+' dia(s) com compra, de '+fmtDia(A.cols[A.cols.length-1])+' a '+fmtDia(A.cols[0])+'. O robô guarda o dia a dia dos últimos 120 dias de cada loja — para um ano inteiro, use <b>Por mês</b>.'
                        : 'As compras por dia aparecem quando o robô do ERP gravar a versão nova da base por loja (com a data de cada compra).')
-      : (A.cols.length ? A.cols.length+' mês(es) com compra. O ERP soma por mês: o mês atual entra até hoje.' : 'Sem meses com compra.');
+      : (A.cols.length ? 'Últimos '+A.cols.length+' meses · comprou em '+(A.comCompra||0)+'. Mês sem compra aparece com um traço. O ERP soma por mês: o mês atual entra até hoje.' : 'Sem meses com compra.');
   }
   pmPintar();
 }
