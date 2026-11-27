@@ -576,6 +576,9 @@ details.mais[open]{padding-bottom:4px}
 
 /* pedidos por data */
 .pd-busca{width:100%;margin-bottom:12px}
+.pm-tb th,.pm-tb td{white-space:nowrap}
+.pm-tb .pm-fix{position:sticky;left:0;background:var(--card);max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.pm-tb thead .pm-fix{z-index:2}
 .pd-dia{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden}
 .pd-cab{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;padding:9px 12px;background:var(--card-2)}
 .pd-tot{margin-left:auto;font-size:12.5px;color:var(--muted)}
@@ -1082,21 +1085,21 @@ main{min-width:0;overflow-x:clip}
     <!-- EQUIPE (gestor) -->
     <div class="page" id="page-perdas">
       <div class="tools">
-        <select id="pd-per" onchange="renderPerdas()">
+        <select id="ap-per" onchange="renderPerdas()">
           <option value="3">Últimos 3 meses</option>
           <option value="6" selected>Últimos 6 meses</option>
           <option value="12">Últimos 12 meses</option>
         </select>
-        <select id="pd-vend" onchange="renderPerdas()"></select>
-        <input type="search" id="pd-busca" placeholder="Buscar cliente, cidade, rota…" oninput="renderPerdas()">
-        <button class="btn btn-sm btn-ghost" onclick="pdExcel()">⤓ Excel</button>
+        <select id="ap-vend" onchange="renderPerdas()"></select>
+        <input type="search" id="ap-busca" placeholder="Buscar cliente, cidade, rota…" oninput="renderPerdas()">
+        <button class="btn btn-sm btn-ghost" onclick="apExcel()">⤓ Excel</button>
       </div>
-      <div id="pd-kpis" class="kpis"></div>
-      <div id="pd-aviso"></div>
+      <div id="ap-kpis" class="kpis"></div>
+      <div id="ap-aviso"></div>
       <div class="sect">Perdemos <span class="mini" style="font-weight:500">recolhemos todos os equipamentos ou foi marcado como perdido</span></div>
-      <div id="pd-perdidos"></div>
+      <div id="ap-perdidos"></div>
       <div class="sect">Abrimos <span class="mini" style="font-weight:500">primeira compra no ERP</span></div>
-      <div id="pd-abertos"></div>
+      <div id="ap-abertos"></div>
     </div>
     <div class="page" id="page-equipe">
       <div class="tools">
@@ -4184,7 +4187,8 @@ document.addEventListener('click', function(e){ var w=$('warnWrap'); if(w && !w.
 Object.assign(window, { irAviso:irAviso, toggleAvisos:toggleAvisos });
 Object.assign(window, { abrirConta:abrirConta, pdPintar:pdPintar, verComprasPorData:verComprasPorData, guiaIr:guiaIr, abrirGuia:abrirGuia, cmpAtualizar:cmpAtualizar, cmpSet:cmpSet, cmpOcultar:cmpOcultar, verCompraProduto:verCompraProduto, cmMov:cmMov, cmRecolhaPintar:cmRecolhaPintar, navMenu:navMenu, ngExtraPintar:ngExtraPintar, editarSolic:editarSolic, abrirBusca:abrirBusca, buscaPintar:buscaPintar, alternarValores:alternarValores, ctSel:ctSel, ctSelTodos:ctSelTodos,
   ctBulkExcel:ctBulkExcel, ctBulkContato:ctBulkContato, ctRelatorio:ctRelatorio,
-  revisarTrocas:revisarTrocas, trocaDecidir:trocaDecidir, ctBulkCarteira:ctBulkCarteira, fcDonoMarcar:fcDonoMarcar });
+  revisarTrocas:revisarTrocas, trocaDecidir:trocaDecidir, ctBulkCarteira:ctBulkCarteira, fcDonoMarcar:fcDonoMarcar,
+  verProdutosPorMes:verProdutosPorMes, pmModo:pmModo, pmPintar:pmPintar, pmExcel:pmExcel, marcarPerdido:marcarPerdido, renderPerdas:renderPerdas, apExcel:apExcel });
 Object.defineProperty(window, 'CT_SEL', { get:function(){ return CT_SEL; }, set:function(v){ CT_SEL=v; } });
 Object.defineProperty(window, 'HJ_FAZER', { get:function(){ return HJ_FAZER; } });
 Object.assign(window, { ngSeg:ngSeg, renderNegoc:renderNegoc, abrirNegoc:abrirNegoc, verNegoc:verNegoc, ngEtapa:ngEtapa, chipUnicoNg:chipUnicoNg,
@@ -6930,13 +6934,13 @@ function marcarPerdido(cliId){
     return;
   }
   abrirModal({ titulo:'Marcar como perdido', sub:esc(c.nome||''),
-    corpo:'<div class="fld"><label>Motivo</label><select id="pd-mot">'
+    corpo:'<div class="fld"><label>Motivo</label><select id="pp-mot">'
         + MOTIVOS_PERDA.map(function(m){ return '<option value="'+m[0]+'">'+m[1]+'</option>'; }).join('')+'</select></div>'
-      +'<div class="fld"><label>Desde quando</label><input type="date" id="pd-data" value="'+hoje()+'"></div>'
-      +'<div class="fld"><label>Observação (opcional)</label><textarea id="pd-obs" placeholder="o que aconteceu, com quem falamos…"></textarea></div>'
+      +'<div class="fld"><label>Desde quando</label><input type="date" id="pp-data" value="'+hoje()+'"></div>'
+      +'<div class="fld"><label>Observação (opcional)</label><textarea id="pp-obs" placeholder="o que aconteceu, com quem falamos…"></textarea></div>'
       +'<div class="mini">O cliente continua na carteira e no histórico. Ele só passa a contar como perda no mês escolhido.</div>',
     botoes:[{ txt:'Cancelar', cls:'btn-ghost', fn:fecharModal }, { txt:'Marcar como perdido', fn:function(el){
-      var d=($('pd-data')||{}).value||hoje(), m=($('pd-mot')||{}).value||'outro', o=($('pd-obs')||{}).value||'';
+      var d=($('pp-data')||{}).value||hoje(), m=($('pp-mot')||{}).value||'outro', o=($('pp-obs')||{}).value||'';
       var pare=ocupado(el);
       updateDoc(doc(db,'comClientes',cliId), { perdido:true, perdidoEm:d, perdidoMotivo:m, perdidoObs:o, perdidoPor:U.email,
           atualizadoEm:agoraISO(), atualizadoPor:U.email })
@@ -7050,19 +7054,19 @@ function perdasNoPeriodo(de){
   l.sort(function(a,b){ return String(b.quando).localeCompare(String(a.quando)) || String(a.nome).localeCompare(String(b.nome),'pt-BR'); });
   return l;
 }
-function pdDe(){
-  var n=+(($('pd-per')||{}).value||6);
+function apDe(){
+  var n=+(($('ap-per')||{}).value||6);
   var d=new Date(); d.setMonth(d.getMonth()-(n-1));
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
-function pdFiltra(l){
-  var v=(($('pd-vend')||{}).value||''), q=norm((($('pd-busca')||{}).value||'')).split(' ').filter(Boolean);
+function apFiltra(l){
+  var v=(($('ap-vend')||{}).value||''), q=norm((($('ap-busca')||{}).value||'')).split(' ').filter(Boolean);
   return l.filter(function(r){
     if(v && r.vendTxt!==v) return false;
     if(q.length){ var t=norm([r.nome, r.cid, r.rota, r.vendTxt].join(' ')); if(!q.every(function(w){ return t.indexOf(w)>=0; })) return false; }
     return true; });
 }
-function pdTabela(l, tipo){
+function apTabela(l, tipo){
   if(!l.length) return '<div class="empty">'+(tipo==='perda'?'Nenhuma perda neste período.':'Nenhuma abertura neste período.')+'</div>';
   return '<div class="card" style="padding:0;overflow:clip"><div class="tscroll"><table class="tb rel-tb"><thead><tr>'
     +'<th>Cliente</th><th>Rota</th><th>Vendedor</th><th>'+(tipo==='perda'?'Perdemos em':'Primeira compra')+'</th>'
@@ -7081,10 +7085,10 @@ function renderPerdas(){
   if(!U.ver) return;
   lerPrimeiras(function(){ if(pagina==='perdas') renderPerdas(); });
   eqGarantirLista(function(){ if(pagina==='perdas') renderPerdas(); });
-  var de=pdDe();
-  var P=pdFiltra(perdasNoPeriodo(de)), A=aberturasNoPeriodo(de), AB=pdFiltra(A.l);
+  var de=apDe();
+  var P=apFiltra(perdasNoPeriodo(de)), A=aberturasNoPeriodo(de), AB=apFiltra(A.l);
   /* filtro de vendedor, montado com quem aparece nas duas listas */
-  var sel=$('pd-vend');
+  var sel=$('ap-vend');
   if(sel){
     var nomes={}; perdasNoPeriodo(de).concat(A.l).forEach(function(r){ if(r.vendTxt) nomes[r.vendTxt]=1; });
     var ns=Object.keys(nomes).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }), atual=sel.value;
@@ -7094,7 +7098,7 @@ function renderPerdas(){
     }
   }
   var naMao=P.filter(function(r){ return r.naMao; }).length;
-  $('pd-kpis').innerHTML=[
+  $('ap-kpis').innerHTML=[
     kpiEq('Perdemos no período', String(P.length), naMao+' marcado'+(naMao===1?'':'s')+' na mão · '+(P.length-naMao)+' por recolha', P.length?'var(--red)':''),
     kpiEq('Abrimos no período', A.temPri?String(AB.length):'—', A.temPri?'primeira compra no ERP':'aguardando o robô', AB.length?'var(--green)':''),
     kpiEq('Saldo', A.temPri?((AB.length-P.length>0?'+':'')+(AB.length-P.length)):'—', 'aberturas menos perdas', (AB.length-P.length)<0?'var(--red)':''),
@@ -7104,12 +7108,12 @@ function renderPerdas(){
   if(!A.temPri) av.push('<div class="alert a-info">ⓘ A lista de aberturas aparece quando o robô gravar o mês da primeira compra de cada cliente'+(PRI_ERRO?' ('+esc(PRI_ERRO)+')':'')+'.</div>');
   else if(A.antigos) av.push('<div class="alert a-info">ⓘ '+A.antigos+' cliente(s) já compravam antes do começo da planilha do ERP e ficam de fora das aberturas.</div>');
   if(!EQ.docs) av.push('<div class="alert a-info">ⓘ Lendo os equipamentos para achar quem teve tudo recolhido…</div>');
-  $('pd-aviso').innerHTML=av.join('');
-  $('pd-perdidos').innerHTML=pdTabela(P, 'perda');
-  $('pd-abertos').innerHTML=A.temPri?pdTabela(AB, 'abertura'):'';
+  $('ap-aviso').innerHTML=av.join('');
+  $('ap-perdidos').innerHTML=apTabela(P, 'perda');
+  $('ap-abertos').innerHTML=A.temPri?apTabela(AB, 'abertura'):'';
   window._pdRel={ P:P, A:AB };
 }
-function pdExcel(){
+function apExcel(){
   var R=window._pdRel; if(!R) return;
   var aoa=[['Tipo','Cliente','Cidade','Rota','Vendedor','Quando','Motivo / última compra','Observação']];
   R.P.forEach(function(r){ aoa.push(['Perda', r.nome, r.cid, r.rota, r.vendTxt, r.quando, r.motivo, r.obs]); });
@@ -7508,6 +7512,94 @@ function verComprasPorData(cid){
       });
   }).catch(function(e){ corpo('<div class="empty">'+(e&&e.code==='permission-denied'?'Sem permissão para ler a base de compras por loja.':'Não foi possível ler as compras ('+esc(e&&e.message||e)+').')+'</div>'); });
 }
+/* ---------- produtos × meses (botão "Produtos por mês" na ficha) ----------
+   Linhas = produtos, colunas = meses. Vem da mesma base por loja do robô, que
+   guarda os últimos 13 meses fechados de cada loja (por isso não dá dia a dia
+   em 365 dias: o detalhe por dia só existe nos últimos 120). */
+var PM={ cid:'', linhas:[], meses:[], modo:'v', nLojas:1 };
+function verProdutosPorMes(cid){
+  var c=clientePorId(cid); if(!c) return;
+  var voltar={ txt:'← Voltar', cls:'btn-ghost', fn:function(){ verCliente(cid); } };
+  abrirModal({ titulo:'Produtos por mês', sub:esc(c.nome||'')+' · últimos 12 meses', wide:true,
+    corpo:'<div class="empty">Lendo as compras…</div>', botoes:[voltar] });
+  var corpo=function(h){ var b=document.querySelector('.modal .mbody'); if(b) b.innerHTML=h; };
+  lpIdx().then(function(idx){
+    var lojas=lpLojasDoCliente(c, idx);
+    if(!lojas.length){ corpo('<div class="empty">Este cliente não foi achado na base de compras por loja'
+      + ((U.ver||U.ngTodas)?'.':' das suas lojas (o robô liga cada loja ao vendedor pelo representante do ERP; se o cliente está com outro representante lá, fale com o gerente).')+'</div>'); return; }
+    return Promise.all(lojas.map(function(k){ return LP_DOCS[k] ? Promise.resolve(LP_DOCS[k])
+        : getDoc(doc(db,'comercialLojaProd',k)).then(function(sn){ LP_DOCS[k]=sn.exists()?(sn.data()||{}):{}; return LP_DOCS[k]; }); }))
+      .then(function(docs){
+        var ms=[], d0=new Date();
+        for(var i=11;i>=0;i--){ var dd=new Date(d0.getFullYear(), d0.getMonth()-i, 1); ms.push(dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')); }
+        var nomes=idx.produtos||{}, linhas={};
+        docs.forEach(function(d){
+          var pn=d.pn||{};
+          Object.keys(d.meses||{}).forEach(function(ym){
+            if(ms.indexOf(ym)<0) return;
+            var ps=d.meses[ym]||{};
+            Object.keys(ps).forEach(function(cod){
+              var nm=nomes[cod]||pn[cod]||cod;
+              var L=linhas[nm]||(linhas[nm]={ nome:nm, m:{}, tv:0, tq:0 });
+              var a=ps[cod]||[0,0], o=L.m[ym]||(L.m[ym]={ v:0, q:0 });
+              o.v+=a[0]||0; o.q+=a[1]||0; L.tv+=a[0]||0; L.tq+=a[1]||0;
+            });
+          });
+        });
+        var l=Object.keys(linhas).map(function(k){ return linhas[k]; }).filter(function(x){ return x.tv>0 || x.tq>0; });
+        if(!l.length){ corpo('<div class="empty">Sem compras nos últimos 12 meses.</div>'); return; }
+        PM={ cid:cid, linhas:l, meses:ms, modo:'v', nLojas:lojas.length };
+        corpo('<div class="tools" style="margin:0 0 10px">'
+          + '<button class="btn btn-sm" id="pm-v" onclick="pmModo(\'v\')">R$</button>'
+          + '<button class="btn btn-sm btn-ghost" id="pm-q" onclick="pmModo(\'q\')">Quantidade</button>'
+          + '<input type="search" id="pm-busca" placeholder="Buscar produto…" oninput="pmPintar()" autocomplete="off" style="flex:1;min-width:150px">'
+          + '<button class="btn btn-sm btn-ghost" onclick="pmExcel()">⤓ Excel</button></div>'
+          + (lojas.length>1?'<div class="mini" style="margin-bottom:8px">Somando '+lojas.length+' lojas deste cliente.</div>':'')
+          + '<div id="pm-tab"></div>'
+          + '<div class="mini" style="margin-top:9px">O ERP soma as vendas por mês: o mês atual entra até hoje. '
+          + 'O robô guarda 13 meses por loja, por isso a tela mostra 12 meses e não o dia a dia do ano todo — para o dia a dia, use <b>Pedidos por data</b> (últimos 90 dias).</div>');
+        pmPintar();
+      });
+  }).catch(function(e){ corpo('<div class="empty">'+(e&&e.code==='permission-denied'?'Sem permissão para ler a base de compras por loja.':'Não foi possível ler as compras ('+esc(e&&e.message||e)+').')+'</div>'); });
+}
+function pmModo(m){ PM.modo=m;
+  var a=$('pm-v'), b=$('pm-q');
+  if(a) a.className='btn btn-sm'+(m==='v'?'':' btn-ghost');
+  if(b) b.className='btn btn-sm'+(m==='q'?'':' btn-ghost');
+  pmPintar();
+}
+function pmVal(x){ return PM.modo==='v' ? (x?x.v:0) : (x?x.q:0); }
+function pmTxt(n){ if(!n) return '<span class="mini">—</span>';
+  return PM.modo==='v' ? fmtRS0(n) : Math.round(n).toLocaleString('pt-BR'); }
+function pmPintar(){
+  var q=norm(($('pm-busca')||{}).value||'').split(' ').filter(Boolean);
+  var l=PM.linhas.filter(function(x){ if(!q.length) return true; var t=norm(x.nome); return q.every(function(w){ return t.indexOf(w)>=0; }); })
+    .sort(function(a,b){ return (PM.modo==='v'?(b.tv-a.tv):(b.tq-a.tq)) || a.nome.localeCompare(b.nome,'pt-BR'); });
+  if(!l.length){ $('pm-tab').innerHTML='<div class="empty">Nenhum produto com esse nome.</div>'; return; }
+  var tot={}, totG=0;
+  l.forEach(function(x){ PM.meses.forEach(function(m){ var v=pmVal(x.m[m]); tot[m]=(tot[m]||0)+v; totG+=v; }); });
+  var h='<div class="tscroll" style="max-height:60vh"><table class="tb pm-tb"><thead><tr><th class="pm-fix">Produto</th>'
+    + PM.meses.map(function(m){ return '<th class="r">'+esc(nomeMes(m))+'</th>'; }).join('')
+    + '<th class="r">Total</th></tr></thead><tbody>'
+    + l.map(function(x){ return '<tr><td class="pm-fix">'+esc(x.nome)+'</td>'
+        + PM.meses.map(function(m){ return '<td class="r">'+pmTxt(pmVal(x.m[m]))+'</td>'; }).join('')
+        + '<td class="r"><b>'+pmTxt(PM.modo==='v'?x.tv:x.tq)+'</b></td></tr>'; }).join('')
+    + '</tbody><tfoot><tr><td class="pm-fix"><b>Total ('+l.length+')</b></td>'
+    + PM.meses.map(function(m){ return '<td class="r"><b>'+pmTxt(tot[m])+'</b></td>'; }).join('')
+    + '<td class="r"><b>'+pmTxt(totG)+'</b></td></tr></tfoot></table></div>';
+  $('pm-tab').innerHTML=h;
+}
+function pmExcel(){
+  if(U.analista){ toast('Baixar em Excel não está liberado para o seu acesso.', true); return; }
+  var c=clientePorId(PM.cid)||{}, l=PM.linhas.slice().sort(function(a,b){ return b.tv-a.tv; });
+  var aoa=[['Produto'].concat(PM.meses.map(nomeMes)).concat(['Total R$','Total qtd'])];
+  l.forEach(function(x){ aoa.push([x.nome].concat(PM.meses.map(function(m){ return Math.round((x.m[m]||{}).v||0); })).concat([Math.round(x.tv), Math.round(x.tq)])); });
+  carregarXLSX().then(function(){
+    var ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:40}].concat(PM.meses.map(function(){ return { wch:11 }; })).concat([{wch:12},{wch:11}]);
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Produtos por mês');
+    XLSX.writeFile(wb, 'produtos-por-mes-'+norm(c.nome||'cliente').toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+hoje()+'.xlsx');
+  }).catch(function(e){ toast('Não foi possível gerar o Excel: '+(e.message||e), true); });
+}
 function verCompraProduto(cid, i){
   var c=clientePorId(cid), nome=(CP_NOMES[cid]||[])[i]; if(!c || !nome) return;
   var voltar={ txt:'← Voltar', cls:'btn-ghost', fn:function(){ verCliente(cid); } };
@@ -7590,7 +7682,8 @@ function comprasRecentesHtml(c){
   var r=compras90(c), ms=r.meses;
   var per=ms.length ? nomeMes(ms[0])+' a '+nomeMes(ms[ms.length-1])+' (até hoje)' : '';
   var tit='<div class="det-sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Compras dos últimos 90 dias <span class="mini" style="text-transform:none;letter-spacing:0">'+per+'</span>'
-    + ((U.gestor||U.ngTodas||U.comercial) && c.erpId ? '<button class="btn btn-sm btn-ghost" style="margin-left:auto;text-transform:none;letter-spacing:0" onclick="verComprasPorData(\''+c.id+'\')">📅 Pedidos por data</button>' : '')
+    + ((U.gestor||U.ngTodas||U.comercial) && c.erpId ? '<button class="btn btn-sm btn-ghost" style="margin-left:auto;text-transform:none;letter-spacing:0" onclick="verComprasPorData(\''+c.id+'\')">📅 Pedidos por data</button>'
+      + '<button class="btn btn-sm btn-ghost" style="text-transform:none;letter-spacing:0" onclick="verProdutosPorMes(\''+c.id+'\')">▦ Produtos por mês</button>' : '')
     + '</div>';
   if(!r.l) return !c.erpId ? '' : tit+'<div class="mini" style="margin-bottom:13px">'+(U.ver
       ? (fatErp===false?'Sem acesso ao faturamento do ERP.':'Carregando…')
