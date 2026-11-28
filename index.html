@@ -225,6 +225,16 @@ h1{margin:0;font-size:21px;font-weight:700;letter-spacing:-.4px}
 /* a foto vem do catálogo, com o produto centralizado: cortar (cover) escondia parte dele.
    Agora ela cabe inteira (contain), sobre o fundo claro do próprio catálogo. */
 .promo img{width:100%;height:132px;object-fit:contain;display:block;background:#fff;padding:6px}
+/* no celular o cartão ocupava a tela inteira: menor, e já aparece um pedaço do
+   próximo, mostrando que dá para deslizar */
+@media(max-width:900px){
+  .promos{grid-auto-columns:minmax(0,62%);gap:10px;margin-bottom:16px}
+  .promo img{height:96px;padding:4px}
+  .promo .promo-c{padding:10px 12px 11px}
+  .promo .promo-t{font-size:14px}
+  .promo .promo-p{font-size:16px}
+  .promo .promo-v{font-size:10px;margin-top:6px}
+}
 .promo-c{padding:12px 15px 14px}
 .promo-t{font-size:16px;font-weight:800;letter-spacing:-.2px}
 .promo-p{font-size:20px;font-weight:800;color:var(--primary);margin-top:2px}
@@ -964,8 +974,8 @@ main{min-width:0;overflow-x:clip}
       </div>
       <div class="acoes-pc" id="h-acoes"></div>
       <div id="h-promos"></div>
-      <div id="h-meta"></div>
       <div class="kpis" id="kpis"></div>
+      <div id="h-meta"></div>
       <div class="cols hj-cols">
         <div class="card hj-card" id="h-origem"></div>
         <div class="card hj-card" id="h-fazer"></div>
@@ -1392,11 +1402,14 @@ main{min-width:0;overflow-x:clip}
   body[data-pg="hoje"] .hj-tit a{color:var(--primary)}
   /* duas colunas no alto: ações à esquerda; promoções à direita, com a meta do mês
      logo abaixo delas. O resto desce em largura total. */
-  body[data-pg="hoje"] #page-hoje.on{display:grid;grid-template-columns:minmax(0,480px) minmax(0,1fr);column-gap:22px;align-items:start}
+  body[data-pg="hoje"] #page-hoje.on{display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);column-gap:22px;align-items:start}
   body[data-pg="hoje"] #page-hoje > *{grid-column:1 / -1;min-width:0}
-  body[data-pg="hoje"] #page-hoje > .acoes-cel{grid-column:1;grid-row:1}
+  body[data-pg="hoje"] #page-hoje > .acoes-cel{grid-column:1;grid-row:1;margin-bottom:16px}
   body[data-pg="hoje"] #page-hoje > #h-promos{grid-column:2;grid-row:1;margin-bottom:16px}
-  body[data-pg="hoje"] #page-hoje > #h-meta{grid-column:2;grid-row:2;align-self:start;margin:0 0 18px;display:flex;flex-direction:column;gap:12px}
+  body[data-pg="hoje"] #page-hoje > #kpis{grid-column:1 / -1;grid-row:2}
+  /* a meta é uma tabela larga: linha inteira, depois dos números e antes das duas colunas */
+  body[data-pg="hoje"] #page-hoje > #h-meta{grid-column:1 / -1;grid-row:3;align-self:start;margin:0 0 18px;display:flex;flex-direction:column;gap:12px}
+  body[data-pg="hoje"] #page-hoje > .hj-cols{grid-column:1 / -1;grid-row:4}
   body[data-pg="hoje"] #h-meta .meta-card{margin:0;flex:1;display:flex;flex-direction:column;justify-content:center}
   /* a promoção ao lado das ações: o título encosta no topo e cabem duas de cada vez,
      rolando para o lado quando houver mais */
