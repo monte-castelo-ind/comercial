@@ -578,6 +578,17 @@ details.mais[open]{padding-bottom:4px}
 /* pedidos por data */
 .pd-busca{width:100%;margin-bottom:12px}
 .pm-tb th,.pm-tb td{white-space:nowrap;padding-left:9px;padding-right:9px}
+/* ===== blocos de formulário (nov/2026): o pedido deixa de ser uma lista corrida
+   e passa a ter partes numeradas, cada uma com o seu assunto ===== */
+.bl{border:1px solid var(--border);border-radius:14px;padding:13px 14px;margin-bottom:12px;background:var(--card-2)}
+.bl-h{display:flex;align-items:center;gap:8px;font:700 11.5px 'Archivo',sans-serif;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+.bl-h i{width:20px;height:20px;border-radius:6px;background:var(--prim-suave);color:var(--primary);display:flex;align-items:center;justify-content:center;font:800 11px 'Archivo',sans-serif;font-style:normal}
+.bl .fld:last-child{margin-bottom:0}
+.bl .cm-it{background:var(--card)}
+/* cliente preso no topo enquanto a pessoa rola o formulário */
+.modal .mbody .cli-fixo{position:sticky;top:-2px;z-index:4;background:var(--card);padding-top:8px;margin-bottom:12px}
+/* a escolha que mexe no caminho do pedido fica em destaque */
+.bl-aviso{border:1px solid var(--amber);background:rgba(245,176,19,.08);border-radius:12px;padding:11px 13px;margin-bottom:12px}
 .pm-tb .pm-ord{cursor:pointer;user-select:none}
 .pm-tb .pm-ord:hover{color:var(--text)}
 .pm-seta{color:var(--primary);margin-left:4px;font-size:10px}
@@ -5670,6 +5681,7 @@ function fsCliNovo(cb){
 function fsTipo(t){ fs.tipo=t; document.querySelectorAll('#fs-tipos .tipo-sol').forEach(function(b,i){ b.classList.toggle('on', TIPO_IDS[i]===t); }); fsPintarCampos(); }
 function fsPintarCampos(){
   var paraComodato=(fs.tipo==='equipamento' && U.comodato);
+  var cw=$('fs-cli'); if(cw && cw.parentNode) cw.parentNode.classList.toggle('cli-fixo', paraComodato);
   if($('fs-tit-w')) $('fs-tit-w').style.display=paraComodato?'none':'';
   if($('fs-desc-w')) $('fs-desc-w').style.display=paraComodato?'none':'';
   if(paraComodato){ cmPintarCampos(); return; }
@@ -5964,31 +5976,41 @@ function cmPintarCampos(){
   var sel=PK['fs-cli']&&PK['fs-cli'].sel;
   var opS=Object.keys(CM_SERV).map(function(k){ return '<option value="'+k+'">'+CM_SERV[k]+'</option>'; }).join('');
   box.innerHTML='<div class="mini" style="margin:-4px 0 12px">Vai direto para a <b>manutenção</b> (Manut. Comodato), que separa e entrega. O andamento aparece aqui em Solicitações.</div>'
+    /* ---- 1. o que precisa ---- */
+    +'<div class="bl"><div class="bl-h"><i>1</i>O que precisa</div>'
     +'<div class="fld"><label>Tipo do pedido *</label><div class="chips" id="cm-cat">'
     +Object.keys(CM_CAT).map(function(k){ return '<button type="button" class="chip" data-v="'+k+'" onclick="cmCat(this)">'+CM_CAT[k].nome+'</button>'; }).join('')+'</div></div>'
-    +'<div class="fld" id="cm-mov-w" style="display:none"><label>O que vai ser feito? *</label><div class="chips" id="cm-mov">'
+    +'<div class="fld" id="cm-mov-w" style="display:none;margin-bottom:0"><label>O que vai ser feito? *</label><div class="chips" id="cm-mov">'
     +  '<button type="button" class="chip" data-v="entregar" onclick="cmMov(\'entregar\')">Remessa — levar ao cliente</button>'
     +  '<button type="button" class="chip" data-v="retirar" onclick="cmMov(\'retirar\')">Recolha — buscar no cliente</button>'
-    +  '<button type="button" class="chip" data-v="trocar" onclick="cmMov(\'trocar\')">Troca</button></div></div>'
-    +'<div class="fld" id="cm-end-w" style="margin-top:-6px"><div class="mini" id="cm-end"'+(fsNovo()?' style="display:none"':'')+'>'+esc(cmEndLinha(sel))+'</div></div>'
-    +'<div class="fld" id="cm-endnovo-w"'+(fsNovo()?'':' style="display:none"')+'><label>Endereço do cliente novo *</label><input type="text" id="cm-endnovo" placeholder="rua, número, bairro"></div>'
-    +'<div class="grid2">'
-    +'<div class="fld"><label>Cidade</label><input type="text" id="cm-cid" value="'+esc(sel&&sel.cidade||'')+'"></div>'
-    +'<div class="fld"><label>Contato / telefone</label><input type="text" id="cm-ctt"></div>'
-    +'</div>'
-    +'<div class="fld" style="margin-bottom:0"><label>Equipamentos *</label></div>'
+    +  '<button type="button" class="chip" data-v="trocar" onclick="cmMov(\'trocar\')">Troca</button></div></div></div>'
+    /* ---- a escolha que muda o caminho do pedido ---- */
+    +'<div class="bl-aviso" id="cm-novo-box">'
+    +  '<label class="chk" style="margin:0"><input type="checkbox" id="cm-novo" onchange="$(\'cm-novo-w\').style.display=this.checked?\'\':\'none\'"> '
+    +  '<b>É equipamento NOVO</b></label>'
+    +  '<div class="mini" style="margin:5px 0 0 26px">Marcando, o pedido vai antes para a <b>diretoria autorizar</b>. Sem marcar, segue direto para a manutenção separar.</div>'
+    +  '<div id="cm-novo-w" style="display:none;margin-top:10px"><label>Valor estimado (R$)</label>'
+    +  '<input type="text" inputmode="decimal" id="cm-val" placeholder="ex.: 4.500,00 — ajuda a diretoria a decidir"></div></div>'
+    /* ---- 2. equipamentos ---- */
+    +'<div class="bl"><div class="bl-h"><i>2</i>Equipamentos</div>'
     +'<div id="cm-itens" data-prox="1">'+cmItRow(0, 1)+'</div>'
-    +'<button type="button" class="cm-add" onclick="cmItemAdd()">+ Adicionar outro equipamento</button>'
-    +'<div id="cm-rec"></div>'
+    +'<button type="button" class="cm-add" onclick="cmItemAdd()" style="margin-bottom:0">+ Adicionar outro equipamento</button>'
+    +'<div id="cm-rec"></div></div>'
+    /* ---- 3. entrega ---- */
+    +'<div class="bl"><div class="bl-h"><i>3</i>Entrega</div>'
     +'<div class="grid2">'
     +'<div class="fld" id="cm-serv-w"><label>Serviço *</label><select id="cm-serv" onchange="cmRecolhaPintar()">'+opS+'</select></div>'
     +'<div class="fld"><label id="cm-data-lab">Data programada</label><input type="date" id="cm-data"></div></div>'
-    +'<div class="fld"><label>Observações</label><textarea id="cm-obs" placeholder="Endereço de entrega, horário, quem recebe…"></textarea></div>'
-    +'<div class="fld" id="cm-novo-box" style="border:1px dashed var(--border);border-radius:10px;padding:10px 12px">'
-    +  '<label class="chk" style="margin:0"><input type="checkbox" id="cm-novo" onchange="$(\'cm-novo-w\').style.display=this.checked?\'\':\'none\'"> '
-    +  '<b>Equipamento NOVO</b> — precisa da autorização da diretoria antes de a manutenção separar</label>'
-    +  '<div id="cm-novo-w" style="display:none;margin-top:10px"><label>Valor estimado (R$)</label>'
-    +  '<input type="text" inputmode="decimal" id="cm-val" placeholder="ex.: 4.500,00 — ajuda a diretoria a decidir"></div></div>';
+    +'<div class="fld" id="cm-end-w"><div class="mini" id="cm-end"'+(fsNovo()?' style="display:none"':'')+'>'+esc(cmEndLinha(sel))+'</div></div>'
+    +'<div class="fld" id="cm-endnovo-w"'+(fsNovo()?'':' style="display:none"')+'><label>Endereço do cliente novo *</label><input type="text" id="cm-endnovo" placeholder="rua, número, bairro"></div>'
+    +'<div class="grid2">'
+    +'<div class="fld"><label>Endereço de entrega</label><input type="text" id="cm-endent" placeholder="se for diferente do cadastro"></div>'
+    +'<div class="fld"><label>Quem recebe</label><input type="text" id="cm-recebe" placeholder="nome de quem assina"></div></div>'
+    +'<div class="grid2">'
+    +'<div class="fld"><label>Melhor horário</label><input type="text" id="cm-hora" placeholder="ex.: manhã, até 11h"></div>'
+    +'<div class="fld"><label>Contato / telefone</label><input type="text" id="cm-ctt"></div></div>'
+    +'<div class="fld"><label>Cidade</label><input type="text" id="cm-cid" value="'+esc(sel&&sel.cidade||'')+'"></div>'
+    +'<div class="fld" style="margin-bottom:0"><label>Mais alguma coisa?</label><textarea id="cm-obs" placeholder="só o que não coube acima" style="min-height:62px"></textarea></div></div>';
   cmEndCarregar(function(){ var e=$('cm-end'); if(e) e.textContent=cmEndLinha(PK['fs-cli']&&PK['fs-cli'].sel); });
 }
 function cmCat(b){
@@ -6071,6 +6093,16 @@ function fsCliMudou(sel){
   var c=$('cm-cid'); if(c && sel && !c.value.trim()) c.value=sel.cidade||'';
   cmRecolhaPintar();
 }
+/* junta o que a pessoa escreveu nos campos da entrega num texto só — é o campo
+   que a manutenção já lê hoje, então nada muda do lado dela */
+function cmObsJunta(g){
+  var p=[];
+  if(g('cm-endent')) p.push('Entregar em: '+g('cm-endent'));
+  if(g('cm-recebe')) p.push('Quem recebe: '+g('cm-recebe'));
+  if(g('cm-hora'))   p.push('Horário: '+g('cm-hora'));
+  if(g('cm-obs'))    p.push(g('cm-obs'));
+  return p.join(' · ');
+}
 function cmSalvar(el){
   var sel=fsSel();
   if(sel===false){ toast('Escreva o nome do cliente novo.', true); $('fs-cnovo-nome').focus(); return; }
@@ -6108,7 +6140,7 @@ function cmSalvar(el){
   var d=Object.assign({ cliente:sel.nome, clienteId:sel.erpId||'', endereco:sel.novo?g('cm-endnovo'):cmEndDe(sel),
     categoria:cat, clienteNovo:!!sel.novo, vendUid:vendDoCliente({ clienteId:sel.clienteId||'', erpId:sel.erpId||'', nome:sel.nome||'' }),
     cidade:g('cm-cid'), contato:g('cm-ctt'),
-    servico:g('cm-serv')||'entregar', dataProgramada:data, obs:g('cm-obs'),
+    servico:g('cm-serv')||'entregar', dataProgramada:data, obs:cmObsJunta(g),
     status:'aberta', solicitadoPor:U.email, solicitadoNome:U.nome, solicitadoUid:U.uid,
     criadoEm:agora, atualizadoEm:agora, historico:[{ em:agora, por:U.email, nome:U.nome, acao:'pediu' }] }, cmResumoItens(its));
   if(its.length>1 || recK.length) d.itens=its;             /* na recolha vai sempre a lista: é ela que liga ao equipamento */
