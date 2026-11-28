@@ -587,6 +587,17 @@ details.mais[open]{padding-bottom:4px}
 .bl-h i{width:20px;height:20px;border-radius:6px;background:var(--prim-suave);color:var(--primary);display:flex;align-items:center;justify-content:center;font:800 11px 'Archivo',sans-serif;font-style:normal}
 .bl .fld:last-child{margin-bottom:0}
 .bl .cm-it{background:var(--card)}
+/* título do bloco com peso de verdade: tamanho maior, cor do texto, barrinha na cor
+   do app e uma linha fina separando do conteúdo */
+.bl > .det-sec{font:800 13.5px 'Archivo',sans-serif;letter-spacing:0;text-transform:none;color:var(--text);
+  display:flex;align-items:center;justify-content:flex-start;gap:9px;padding-bottom:9px;margin:0 0 12px;border-bottom:1px solid var(--border)}
+/* o que vem depois do título (contagem, botões) encosta na direita */
+.bl > .det-sec > :last-child:not(:first-child){margin-left:auto}
+.bl > .det-sec::before{content:'';width:4px;height:16px;border-radius:3px;background:var(--primary);flex:0 0 auto}
+.bl > .det-sec + .det-sec,.bl > .det-sec:not(:first-child){margin-top:16px}
+.bl > .det-sec .mini{font-weight:500}
+.bl .tb,.bl .it{background:var(--card)}
+#cli-eq .bl{margin-bottom:12px}
 /* cliente preso no topo enquanto a pessoa rola o formulário */
 .modal .mbody .cli-fixo{position:sticky;top:-2px;z-index:4;background:var(--card);padding-top:8px;margin-bottom:12px}
 /* a escolha que mexe no caminho do pedido fica em destaque */
@@ -1690,11 +1701,11 @@ function eqFichaPreencher(c){
       +'color:var(--primary);border:1px solid var(--primary);font:700 10.5px Archivo,sans-serif;letter-spacing:.3px;text-transform:uppercase;vertical-align:middle">Possui comodato</span>' : '';
     if(!lista.length){ el.innerHTML=''; return; }
     var itens=[], val=0, q=0, dono=new Map(); lista.forEach(function(d){ (d.itens||[]).forEach(function(it){ itens.push(it); dono.set(it, d); val+=it.v||0; q+=it.q||1; }); });
-    el.innerHTML='<div class="det-sec">Equipamentos em comodato <span class="mini" style="text-transform:none;letter-spacing:0">'
+    el.innerHTML='<div class="bl"><div class="det-sec">Equipamentos em comodato <span class="mini" style="text-transform:none;letter-spacing:0">'
       + q+' '+(q===1?'item':'itens')+' · '+fmtRS0(val)+(EQ.meta&&EQ.meta.importadoEm?' · planilha de '+fmtQuando(EQ.meta.importadoEm):'')+'</span></div>'
       + eqItensHtml(itens, function(it){ return dono.get(it); })
       + lista.map(eqRecolhidosTxt).join('')
-      + '<div class="mini" style="margin-top:6px">Na visita, confira cada equipamento e marque se fica ou se deve ser recolhido.</div>';
+      + '<div class="mini" style="margin-top:6px">Na visita, confira cada equipamento e marque se fica ou se deve ser recolhido.</div></div>';
   };
   if(EQ.docs){ mostra(EQ.docs.filter(function(d){ return d.clienteId===c.id; })); return; }
   carregarEquip().then(function(){ if(EQ.docs) mostra(EQ.docs.filter(function(d){ return d.clienteId===c.id; })); });
@@ -2828,7 +2839,7 @@ function ngAvalExcel(){
 function ngFichaHtml(c){
   var l=negocs.filter(function(n){ return ngClientes(n).some(function(x){ return x.clienteId===c.id || (c.erpId && x.erpId===c.erpId); }); })
     .sort(function(a,b){ return (ngAndando(b)?1:0)-(ngAndando(a)?1:0) || String(b.atualizadoEm||'').localeCompare(String(a.atualizadoEm||'')); });
-  return '<div class="det-sec" style="display:flex;justify-content:space-between;align-items:center">Negociações'
+  return '<div class="det-sec">Negociações'
     + '<button class="btn btn-sm btn-ghost" style="text-transform:none;letter-spacing:0" onclick="abrirNegoc(null,\''+esc(c.id)+'\')">+ Negociação</button></div>'
     + (l.length ? l.slice(0,6).map(ngCardHtml).join('') : '<div class="mini" style="margin-bottom:10px">Nenhuma negociação com este cliente.</div>');
 }
@@ -5008,11 +5019,13 @@ function maisDetalhes(titulo, html){ return '<details class="mais"'+(simples()?'
 /* =====================================================================
    CLIENTE — ficha
    ===================================================================== */
+/* um pedaço da ficha dentro de um bloco; se não há conteúdo, não desenha a caixa */
+function blk(h){ return h ? '<div class="bl">'+h+'</div>' : ''; }
 function verCliente(id){
   var c=clientePorId(id); if(!c) return;
   var e=erpDe(c), u=ultimaCompra(c), d=diasSemComprar(c), f=fatDe(c);
-  var corpo='';
-  corpo+='<div class="det-sec">ERP</div>';
+  var corpo='<div class="bl">';
+  corpo+='<div class="det-sec">Vendas (ERP)</div>';
   if(!c.erpId) corpo+='<div class="alert a-warn">'+(c.situacao==='prospect'?'Prospect: ainda não é cliente no ERP.':'Sem vínculo com o ERP — edite o cliente e procure o nome na base para ver a última compra.')+'</div>';
   else {
     corpo+=(e&&e.x?'<div class="alert a-info">ⓘ Cliente antigo: saiu da planilha do ERP em '+fmtDia(e.x)+' (a planilha traz os últimos 24 meses). Os dados abaixo são os últimos que ele teve.</div>':'')
@@ -5027,30 +5040,36 @@ function verCliente(id){
     var qd=queda(c);
     if(qd) corpo+='<div class="alert a-err">↓ Comprou '+qd.pct+'% menos em '+nomeMes(qd.mes)+' ('+fmtRS(qd.ult)+') do que no mês anterior ('+fmtRS(qd.ant)+').</div>';
   }
-  corpo+=funilFichaHtml(c)+fichaCadHtml(c)+ngFichaHtml(c)+oportunidadesHtml(c)+comprasRecentesHtml(c)+'<div id="cli-eq"></div>';
-  corpo+='<div class="det-sec">Contato</div><div class="det">'
+  corpo+='</div>';                                   /* fecha o bloco das vendas */
+  corpo+=blk(funilFichaHtml(c))+blk(fichaCadHtml(c))
+       + blk(ngFichaHtml(c)+oportunidadesHtml(c))     /* negociações e oportunidades andam juntas */
+       + blk(comprasRecentesHtml(c))
+       + '<div id="cli-eq"></div>';
+  corpo+='<div class="bl"><div class="det-sec">Contato</div><div class="det">'
     +'<div><span>Situação</span><b>'+({cliente:'Cliente',prospect:'Prospect',inativo:'Inativo'}[c.situacao]||'Cliente')+'</b></div>'
     +'<div><span>Cidade · rota</span><b>'+esc([c.cidade, c.rota?'rota '+c.rota:''].filter(Boolean).join(' · ')||'—')+'</b></div>'
     +'<div><span>Pessoa de contato</span><b>'+esc(c.contato||'—')+'</b></div>'
     +'<div><span>Telefone</span><b>'+(c.telefone?telLink(c.telefone):'—')+'</b></div>'
     +(U.ver?'<div><span>Carteira de</span><b>'+esc(c.donoNome||(c.donoUid?'—':'sem vendedor'))
       +(c.donoFixo===true?' <span class="mini" title="Escolhida na mão: o ERP não mexe neste cliente">🔒 na mão</span>':'')+'</b></div>':'')+'</div>';
-  corpo+='<div class="det-sec">Hoje compra de</div>';
+  corpo+='<div class="det-sec" style="margin-top:14px">Hoje compra de</div>';
   var pr=(c.precos||[]).filter(function(p){ return p.p; });
   corpo+='<div class="det"><div><span>Fornecedor atual</span><b>'+esc(c.fornecedor||'—')+'</b></div>'
     +'<div><span>Total mensal estimado</span><b class="mono">'+(c.totalMensal?fmtRS(c.totalMensal):'—')+'</b></div></div>';
   if(pr.length) corpo+='<table class="tb" style="margin-bottom:13px"><tr><th>Produto</th><th class="r">Preço</th><th>Unid.</th></tr>'
     +pr.map(function(p){ return '<tr><td>'+esc(p.p)+'</td><td class="r">'+(p.v!=null?fmtRS(p.v):'—')+'</td><td>'+esc(p.u||'')+'</td></tr>'; }).join('')+'</table>';
   if(c.obs) corpo+='<div class="det-txt">'+esc(c.obs)+'</div>';
-  corpo+='<div class="det-sec">Próximo contato</div>'
+  corpo+='</div>';                                   /* fecha o bloco do cadastro */
+  corpo+='<div class="bl"><div class="det-sec">Próximo contato</div>'
     +'<div class="det"><div><span>Data</span><b'+(contatoAtrasado(c)?' style="color:var(--red)"':'')+'>'+(c.proxContato?fmtDia(c.proxContato)+' · '+quandoRelativo(c.proxContato):'sem data')+'</b></div>'
     +'<div><span>Último contato</span><b>'+(c.ultimoContato?fmtDia(c.ultimoContato)+' · '+quandoRelativo(c.ultimoContato):'—')+'</b></div>'
     +(c.proxObs?'<div style="grid-column:1/-1"><span>Lembrete</span><b>'+esc(c.proxObs)+'</b></div>':'')+'</div>'
     +(podeEditar(c)?'<div class="chips" style="margin:-4px 0 6px"><span class="mini" style="align-self:center">Remarcar:</span>'
-    +[7,15,30].map(function(n){ return '<button class="chip" onclick="remarcar(\''+c.id+'\','+n+',this)">+'+n+' dias</button>'; }).join('')+'</div>':'');
+    +[7,15,30].map(function(n){ return '<button class="chip" onclick="remarcar(\''+c.id+'\','+n+',this)">+'+n+' dias</button>'; }).join('')+'</div>':'')
+    +'</div>';                                       /* fecha o bloco do próximo contato */
   var ss=sols.filter(function(s){ return s.clienteId===c.id || (c.erpId && s.clienteErpId===c.erpId); });
-  if(ss.length) corpo+='<div class="det-sec">Solicitações</div>'+ss.slice(0,10).map(cartaoSol).join('');
-  corpo+='<div class="det-sec">Histórico de contatos</div><div id="cli-hist"><div class="empty">Carregando…</div></div>';
+  if(ss.length) corpo+=blk('<div class="det-sec">Solicitações</div>'+ss.slice(0,10).map(cartaoSol).join(''));
+  corpo+='<div class="bl"><div class="det-sec">Histórico de contatos</div><div id="cli-hist"><div class="empty">Carregando…</div></div></div>';
 
   abrirModal({ titulo:esc(c.nome), sub:esc([c.cidade, c.situacao==='prospect'?'prospect':''].filter(Boolean).join(' · '))+'<span id="cli-tarja"></span>', wide:true, corpo:'<div id="cli-cred"></div>'+corpo,
     botoes:[].concat(podeEditar(c)?[{ txt:'✎ Editar', cls:'btn-ghost', fn:function(){ abrirCliente(c.id); } },
@@ -7966,7 +7985,7 @@ function comprasRecentesHtml(c){
   if(c.situacao==='prospect') return '';
   var r=compras90(c), ms=r.meses;
   var per=ms.length ? nomeMes(ms[0])+' a '+nomeMes(ms[ms.length-1])+' (até hoje)' : '';
-  var tit='<div class="det-sec" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Compras dos últimos 90 dias <span class="mini" style="text-transform:none;letter-spacing:0">'+per+'</span>'
+  var tit='<div class="det-sec">Compras dos últimos 90 dias <span class="mini" style="text-transform:none;letter-spacing:0">'+per+'</span>'
     + ((U.gestor||U.ngTodas||U.comercial) && c.erpId ? '<button class="btn btn-sm btn-ghost" style="margin-left:auto;text-transform:none;letter-spacing:0" onclick="verComprasPorData(\''+c.id+'\')">📋 Pedidos por lista</button>'
       + '<button class="btn btn-sm btn-ghost" style="text-transform:none;letter-spacing:0" onclick="verProdutosPorData(\''+c.id+'\')">▦ Produtos por data</button>' : '')
     + '</div>';
