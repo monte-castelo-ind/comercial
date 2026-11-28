@@ -222,7 +222,9 @@ h1{margin:0;font-size:21px;font-weight:700;letter-spacing:-.4px}
 .ficha-img{width:100%;max-height:300px;object-fit:contain;background:#fff;border-radius:12px;margin-bottom:12px;cursor:zoom-in}
 .promos{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(260px,340px);gap:12px;overflow-x:auto;margin-bottom:20px;padding-bottom:4px}
 .promo{background:linear-gradient(135deg,var(--prim-suave),var(--card) 70%);border:1px solid var(--primary);border-radius:16px;cursor:pointer;overflow:hidden;display:flex;flex-direction:column}
-.promo img{width:100%;height:120px;object-fit:cover;display:block}
+/* a foto vem do catálogo, com o produto centralizado: cortar (cover) escondia parte dele.
+   Agora ela cabe inteira (contain), sobre o fundo claro do próprio catálogo. */
+.promo img{width:100%;height:132px;object-fit:contain;display:block;background:#fff;padding:6px}
 .promo-c{padding:12px 15px 14px}
 .promo-t{font-size:16px;font-weight:800;letter-spacing:-.2px}
 .promo-p{font-size:20px;font-weight:800;color:var(--primary);margin-top:2px}
@@ -8013,7 +8015,7 @@ function renderPromos(){
 }
 function verPromo(id){
   var p=promos.filter(function(x){ return x.id===id; })[0]; if(!p) return;
-  var corpo=(p.img?'<img src="'+p.img+'" style="width:100%;border-radius:12px;margin-bottom:12px;cursor:zoom-in" onclick="zoom(this.src)">':'')
+  var corpo=(p.img?'<img src="'+p.img+'" style="width:100%;max-height:230px;object-fit:contain;background:#fff;border-radius:12px;margin-bottom:12px;padding:8px;cursor:zoom-in" onclick="zoom(this.src)">':'')
     +(p.preco?'<div style="font-size:24px;font-weight:800;color:var(--primary);margin-bottom:8px">'+esc(p.preco)+'</div>':'')
     +(p.texto?'<div class="det-txt">'+esc(p.texto)+'</div>':'')
     +'<div class="mini">'+(p.de?'De '+fmtDia(p.de)+' ':'')+(p.ate?'até '+fmtDia(p.ate):'sem data para acabar')+' · publicada por '+esc(p.criadoNome||p.criadoPor||'—')+'</div>';
@@ -8040,7 +8042,7 @@ function abrirPromo(id){
 }
 function fpPintarImg(){
   var box=$('fp-img'); if(!box) return;
-  box.innerHTML=fp.img ? '<div class="foto-prev"><img src="'+fp.img+'" onclick="zoom(this.src)"><button type="button" onclick="fpTirar()">×</button></div>'
+  box.innerHTML=fp.img ? '<div class="foto-prev"><img src="'+fp.img+'" style="object-fit:contain;background:#fff" onclick="zoom(this.src)"><button type="button" onclick="fpTirar()">×</button></div>'
     : '<div class="foto-add" onclick="$(\'fp-file\').click()">🖼<small>Enviar imagem</small></div>'
       +'<div class="foto-add" onclick="fpCatalogo()">▦<small>Do catálogo</small></div>';
 }
@@ -8085,7 +8087,7 @@ function salvarPromo(el){
   var pare=ocupado(el,'Publicando…'), pr;
   if(fp.id) pr=updateDoc(doc(db,'comPromocoes',fp.id), d);
   else { d.criadoEm=agora; d.criadoPor=U.email; d.criadoNome=U.nome; pr=setDoc(doc(collection(db,'comPromocoes')), d); }
-  pr.then(function(){ toast(fp.id?'Promoção atualizada.':'Promoção publicada para todo o comercial.'); fecharModal(); })
+  pr.then(function(){ toast(fp.id?'Promoção atualizada.':'Promoção publicada para todo o comercial.'); fecharModal(); setTimeout(prPintar, 300); })
     .catch(function(e){ pare(); falha('salvar a promoção')(e); });
 }
 function encerrarPromo(id, el){
@@ -8096,14 +8098,48 @@ function encerrarPromo(id, el){
     .catch(function(e){ pare(); falha('encerrar a promoção')(e); });
 }
 function gerenciarPromos(){
-  var ROT={ ativa:['Ativa','green'], agendada:['Agendada','blue'], vencida:['Vencida','muted'], encerrada:['Encerrada','muted'] };
-  var corpo=promos.length ? promos.map(function(p){ var s=ROT[promoSituacao(p)];
-      return '<div class="it" onclick="abrirPromo(\''+p.id+'\')"><div class="it-top"><div class="it-tit">'+esc(p.titulo)+'</div><span class="st st-'+s[1]+'">'+s[0]+'</span></div>'
-        +'<div class="it-meta">'+(p.de?fmtDia(p.de):'—')+' a '+(p.ate?fmtDia(p.ate):'—')+(p.preco?' · '+esc(p.preco):'')+'</div></div>'; }).join('')
-    : '<div class="empty">Nenhuma promoção ainda.</div>';
-  abrirModal({ titulo:'Promoções', sub:'Toque para editar ou republicar', corpo:corpo, botoes:[{ txt:'+ Nova promoção', fn:function(){ abrirPromo(); } }] });
+  abrirModal({ titulo:'Promoções', sub:'Editar, cancelar ou republicar', wide:true,
+    corpo:'<div id="pr-lista"></div>', botoes:[{ txt:'+ Nova promoção', fn:function(){ abrirPromo(); } }] });
+  prPintar();
 }
-Object.assign(window, { fpCatalogo:fpCatalogo, fpCatPintar:fpCatPintar, fpEscolherCat:fpEscolherCat, verPromo:verPromo, abrirPromo:abrirPromo, gerenciarPromos:gerenciarPromos, fpFoto:fpFoto, fpTirar:fpTirar });
+/* a lista fica numa função à parte para se repintar sozinha depois de cancelar ou reativar */
+function prPintar(){
+  var box=$('pr-lista'); if(!box) return;
+  var ROT={ ativa:['Ativa','green'], agendada:['Agendada','blue'], vencida:['Vencida','muted'], encerrada:['Encerrada','muted'] };
+  box.innerHTML=promos.length ? promos.map(function(p){
+      var st=promoSituacao(p), s=ROT[st];
+      var bts='<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();abrirPromo(\''+p.id+'\')">✎ Editar</button>';
+      if(st==='ativa' || st==='agendada')
+        bts+='<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();prCancelar(\''+p.id+'\',this)">✕ Cancelar</button>';
+      else
+        bts+='<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();prReativar(\''+p.id+'\',this)">↺ Republicar</button>';
+      return '<div class="it" style="cursor:default"><div class="it-top"><div class="it-tit">'+esc(p.titulo)+'</div><span class="st st-'+s[1]+'">'+s[0]+'</span></div>'
+        +'<div class="it-meta">'+(p.de?fmtDia(p.de):'—')+' a '+(p.ate?fmtDia(p.ate):'—')+(p.preco?' · '+esc(p.preco):'')+'</div>'
+        +'<div style="display:flex;gap:7px;margin-top:9px;flex-wrap:wrap">'+bts+'</div></div>'; }).join('')
+    : '<div class="empty">Nenhuma promoção ainda.</div>';
+}
+/* cancelar: tira do início do app na hora, mesmo que ainda estivesse ativa ou por começar */
+function prCancelar(id, el){
+  var p=promos.filter(function(x){ return x.id===id; })[0]; if(!p) return;
+  if(!confirm('Cancelar "'+(p.titulo||'')+'"? Ela sai do início do app para todo o comercial.')) return;
+  var pare=ocupado(el,'Cancelando…');
+  updateDoc(doc(db,'comPromocoes',id), { ativa:false, atualizadoEm:agoraISO(), atualizadoPor:U.email })
+    .then(function(){ toast('Promoção cancelada.'); setTimeout(prPintar, 300); })
+    .catch(function(e){ pare(); falha('cancelar a promoção')(e); });
+}
+/* republicar: volta a valer; se a data final já passou, estende por mais uma semana */
+function prReativar(id, el){
+  var p=promos.filter(function(x){ return x.id===id; })[0]; if(!p) return;
+  var d={ ativa:true, atualizadoEm:agoraISO(), atualizadoPor:U.email };
+  if(p.ate && p.ate<hoje()){ d.de=hoje(); d.ate=somaDias(hoje(),7); }
+  if(!confirm('Republicar "'+(p.titulo||'')+'"?'+(d.ate?' Ela passa a valer de hoje até '+fmtDia(d.ate)+'.':''))) return;
+  var pare=ocupado(el,'Republicando…');
+  updateDoc(doc(db,'comPromocoes',id), d)
+    .then(function(){ toast('Promoção republicada.'); setTimeout(prPintar, 300); })
+    .catch(function(e){ pare(); falha('republicar a promoção')(e); });
+}
+Object.assign(window, { fpCatalogo:fpCatalogo, fpCatPintar:fpCatPintar, fpEscolherCat:fpEscolherCat, verPromo:verPromo, abrirPromo:abrirPromo, gerenciarPromos:gerenciarPromos, fpFoto:fpFoto, fpTirar:fpTirar,
+  prPintar:prPintar, prCancelar:prCancelar, prReativar:prReativar });
 
 /* ---- tela "Carteira pelo ERP": situação da última sincronização ---- */
 function renderImpStatus(){
